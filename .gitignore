@@ -1,0 +1,21 @@
+# Exclude Visual Studio Code settings and workspace files
+.vscode/
+*.code-workspace
+
+# Exclude Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+/resources
+.env
+.venv
+*.log
+.git
+
+*test.py 
+/screenshots
+
+
+/ollama*
+typescript

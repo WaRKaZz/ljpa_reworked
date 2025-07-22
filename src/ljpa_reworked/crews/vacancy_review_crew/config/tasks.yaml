@@ -1,0 +1,109 @@
+verify_vacancy:
+  description: >
+    Analyze Linkedin post:
+    
+    {linkedin_post}
+
+    Determine if it represents a job vacancy or recruitment opportunity.
+    
+    Look for key indicators that suggest a job posting:
+    - Job titles or position names
+    - Hiring language (e.g., "we're hiring", "looking for", "join our team")
+    - Requirements or qualifications mentioned
+    - Application instructions or contact information
+    - Company hiring announcements
+    - Role descriptions or responsibilities
+    - Salary or benefits information
+    
+    Exclude posts that are:
+    - General company updates or news
+    - Personal achievements or celebrations
+    - Industry insights or thought leadership
+    - Product announcements
+    - Event promotions
+    - Networking posts
+    
+    Provide a clear boolean determination based on your analysis.
+  expected_output: >
+      A ProcessedPost object with the is_vacancy field set to:
+      - True: if the post is clearly a job vacancy, recruitment announcement, or hiring-related content
+      - False: if the post is not related to job opportunities or hiring
+      
+      The analysis should be based on the presence of hiring indicators, job-specific language, 
+      and recruitment intent in the LinkedIn post text.
+  agent: linkedin_analyst
+process_vacancy:
+  description: >
+    Analyze Linkedin post:
+    
+    ***
+    {linkedin_post}
+    ***
+
+    Verify that all required fields in a job vacancy posting are properly filled and meet the specified constraints.
+    
+    Validate the following fields according to their requirements:
+    
+    **Title Field:**
+    - Must be present and not empty after whitespace trimming
+    - Maximum length of 200 characters
+    - Should contain a clear job title or position name
+    
+    **Text Field:**
+    - Must be present and not empty after whitespace trimming
+    - Maximum length of 3000 characters
+    - Should contain meaningful job description, requirements, or details
+    
+    **Credentials Field (Contact Information):**
+    - Must be present and not empty after whitespace trimming
+    - Maximum length of 500 characters
+    - Should contain contact details from the post such as:
+      - Email addresses (preferred)
+      - Phone numbers
+      - WhatsApp numbers
+      - Other contact methods mentioned in the post
+    - Extract and format contact information clearly
+    - Prioritize email addresses when multiple contacts are available
+    
+    **Visa Status Field:**
+    - Must be one of the following valid values:
+      - "not_required" - automatically set if the job location is in any CIS country and in case if post mention "Any VISA".
+      - "provided" - company provides visa sponsorship  only if post mentions that visa provided
+      - "not_provided" - company does not provide visa sponsorship. In case post mentions visa, but do not mention that it is provided. It's also can be list of visa variants but not mention that they are provided.
+      - "not_mentioned" - in all other cases if company not in CIS countries list and do not mention anything about visa
+    
+    **CIS Countries List (visa not required):**
+    - Armenia
+    - Azerbaijan  
+    - Belarus
+    - Kazakhstan
+    - Kyrgyzstan
+    - Moldova
+    - Russia (Russian Federation)
+    - Tajikistan
+    - Turkmenistan
+    - Ukraine
+    - Uzbekistan
+    
+    If the job posting is located in any of the above CIS countries, automatically set visa_status to "not_required".
+    
+    Check for completeness, format compliance, and logical consistency of all fields.
+    Identify any missing, invalid, or improperly formatted information.
+  expected_output: >
+    A VacancyCrewAI object with all fields properly validated and formatted:
+    
+    - title: Clean, trimmed job title (≤200 chars)
+    - text: Comprehensive job description (≤3000 chars)  
+    - credentials: Contact information from post (≤500 chars) - email, phone, WhatsApp, etc. with email preferred
+    - visa_status: Valid enum value from VisaStatus options
+    
+    The output should ensure:
+    - All string fields are properly trimmed of whitespace
+    - Character limits are respected
+    - Contact information is properly extracted and formatted
+    - Email addresses are prioritized in credentials field
+    - Visa status matches one of the predefined enum values
+    - All required information is present and meaningful
+  agent: linkedin_analyst
+  context: 
+    - verify_vacancy

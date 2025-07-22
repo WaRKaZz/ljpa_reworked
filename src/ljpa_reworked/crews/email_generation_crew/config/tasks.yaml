@@ -1,0 +1,41 @@
+email_generation_task:
+  description: >
+    Provided data:
+
+    The job title to match:
+    {title}
+
+    Vacancy Description:
+    {text}
+
+    Contact person or methods what should be used to apply:
+    {credentials}
+    
+    If it is possible extract name of person from text or credentials, start email with Dear *extracted name*, or Dear Mr./Mrs. *extracted surname*
+    but use this if you are confident in name or surname end sex.
+
+    Analyze the provided resume content and job vacancy details to generate a 
+    professional job application email for vacancy:
+    Extract the most suitable position title 
+    from the vacancy that best matches the candidate's qualifications for the 
+    subject line. Create a compelling cover letter body that strategically 
+    highlights relevant skills, experiences, and achievements from the resume 
+    that directly align with the job requirements. The cover letter should 
+    demonstrate clear value proposition, show understanding of the role, and 
+    create a strong case for candidacy. Use the provided signature for the email signature - do not modify or omit it, simply include 
+    it as provided at the end of the email body.
+    Singature to use:
+    {email_signature} 
+  expected_output: >
+    A structured EmailCrewAI object containing: 1) A concise subject field with 
+    the exact position title from the vacancy (max 200 characters, whitespace 
+    stripped), and 2)A professional body field containing a personalized cover letter written in first person perspective from the candidate's viewpoint using information from the provided resume. The cover letter must be structured in exactly three paragraphs following this format:
+    Paragraph 1 (Introduction): State the specific position being applied for, express genuine interest in the role, and provide a brief professional introduction highlighting the candidate's most relevant qualification or experience.
+    Paragraph 2 (Qualifications Match): Connect the candidate's background directly to the job requirements by highlighting 2-3 key qualifications with specific examples. Use keywords from the job description and quantify achievements where possible. Focus only on the most relevant skills and experience that match the position. Do not be too talkative. Try to be dry!
+    Paragraph 3 (Closing): Reaffirm interest in the role, thank the employer for consideration, and include a professional call-to-action requesting an interview or next steps. Do not be too talkative. Try to be dry! If country of vacancy is not Kazakhstan mention that you are required in Visa.
+    The cover letter should maintain a professional tone, demonstrate enthusiasm for the role, and include only essential information relevant to the specific vacancy. If the email references any additional documents beyond the resume for attachment (portfolios, certificates, references, etc.), include a professional note stating that the candidate would prefer to discuss these materials personally first to ensure data security and avoid unnecessary information sharing. The email body must end with the provided signature exactly as supplied, without any modifications or additional closing formalities.
+    Do not metntion "Paragraph 1 (Introduction):" or simmilar, just make pure text.
+    Signature:
+    {email_signature} 
+  
+  agent: email_generator_agent

@@ -1,0 +1,18 @@
+# Exclude Visual Studio Code settings and workspace files
+.vscode/
+*.code-workspace
+
+# Exclude Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+/src/ljpa/resources
+.env
+.venv
+*.log
+.git
+
+/screenshots
+crew_ai_chart.drawio
+database_chart.drawio

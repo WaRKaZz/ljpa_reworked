@@ -1,0 +1,47 @@
+services:
+  selenium:
+    image: selenium/standalone-chromium
+    container_name: selenium
+    ports:
+      - "4444:4444"
+      - "${NOVNC_PORT:-7900}:7900"
+    shm_size: '2g'
+    networks:
+      - ljpa-network
+    environment:
+      - SE_VNC_NO_PASSWORD=1
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:4444/wd/hub/status" ]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  linkedin-bot:
+    build: .
+    container_name: linkedin-bot
+    depends_on:
+      selenium:
+        condition: service_healthy
+    volumes:
+      - ./resources:/app/resources
+      - ./src:/app/src
+    env_file:
+      - .env
+    command: uv run /app/src/ljpa_reworked/main.py
+    networks:
+      - ljpa-network
+        
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - ljpa-network
+
+networks:
+  ljpa-network:
+    driver: bridge
