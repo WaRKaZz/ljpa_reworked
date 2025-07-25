@@ -43,7 +43,7 @@ services:
       - ljpa-network
   
   sqlitebrowser:
-    image: lscr.io/linuxserver/sqlitebrowser:latest
+    image: linuxserver/sqlitebrowser:latest
     container_name: sqlitebrowser
     volumes:
       - ./resources:/data
