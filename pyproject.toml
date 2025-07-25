@@ -52,7 +52,7 @@ ignore = [
     "B008",  # do not perform function calls in argument defaults
     "D417",  # Missing argument descriptions (optional for now)
     "ASYNC210",  # Ignore if not fully async yet
-    "D100", "D101", "D102", "D103",
+    "D100", "D101", "D102", "D103", "D401"
 ]
 
 [tool.ruff.format]

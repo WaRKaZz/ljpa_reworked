@@ -25,7 +25,7 @@ class Base(DeclarativeBase):
     repr_cols = ()
 
     def __repr__(self):
-        """Relationships не используются в repr(), т.к. могут вести к неожиданным подгрузкам"""
+        """Relationships не используются в repr(), т.к. могут вести к неожиданным подгрузкам."""
         cols = []
         for idx, col in enumerate(self.__table__.columns.keys()):
             if col in self.repr_cols or idx < self.repr_cols_num:

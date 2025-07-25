@@ -43,14 +43,18 @@ services:
       - ljpa-network
   
   sqlitebrowser:
-    image: adminer:latest
+    image: lscr.io/linuxserver/sqlitebrowser:latest
     container_name: sqlitebrowser
     volumes:
-      - ./resources:/var/www/html/resources
+      - ./resources:/data
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Almaty
     env_file:
       - .env
     ports:
-      - "${SQLITEVBROWSER_PORT:-8080}:8080"
+      - "${SQLITEVBROWSER_PORT:-3000}:3000"
 
 networks:
   ljpa-network:
