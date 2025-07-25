@@ -41,21 +41,7 @@ services:
     restart: unless-stopped
     networks:
       - ljpa-network
-  
-  sqlitebrowser:
-    image: linuxserver/sqlitebrowser:latest
-    container_name: sqlitebrowser
-    volumes:
-      - ./resources:/data
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Asia/Almaty
-    env_file:
-      - .env
-    ports:
-      - "${SQLITEVBROWSER_PORT:-3000}:3000"
-
+      
 networks:
   ljpa-network:
     driver: bridge
