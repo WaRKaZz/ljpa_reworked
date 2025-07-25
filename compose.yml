@@ -43,12 +43,14 @@ services:
       - ljpa-network
   
   sqlitebrowser:
-    image: linuxserver/sqlitebrowser
+    image: 'ghcr.io/coleifer/sqlite-web:latest'
     container_name: sqlitebrowser
+    env_file:
+      - .env
     ports:
-      - "${SQLITEVBROWSER_PORT:-3000}:3000"
+      - "${SQLITEVBROWSER_PORT:-8080}:8080"
     volumes:
-      - ./resources:/config
+      - ./resources:/data
 
 networks:
   ljpa-network:
