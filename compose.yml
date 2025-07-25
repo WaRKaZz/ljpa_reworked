@@ -48,7 +48,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      -./resources:/config
+      - ./resources:/config
 
 networks:
   ljpa-network:
