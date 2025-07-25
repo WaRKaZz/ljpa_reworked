@@ -46,7 +46,7 @@ services:
     image: linuxserver/sqlitebrowser
     container_name: sqlitebrowser
     ports:
-      - "3000:3000"
+      - "${SQLITEVBROWSER_PORT:-3000}:3000"
     volumes:
       - ./resources:/config
 
