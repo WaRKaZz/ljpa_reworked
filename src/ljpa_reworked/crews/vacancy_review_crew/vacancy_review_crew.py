@@ -6,7 +6,7 @@ from crewai.project import CrewBase, agent, crew, task
 from crewai.tasks.conditional_task import ConditionalTask
 from crewai.tasks.task_output import TaskOutput
 
-from ljpa_reworked.config import GEMINI_API_KEY, GEMINI_MODEL
+from ljpa_reworked.config import LLM_API_KEY, LLM_MODEL
 from ljpa_reworked.models.crewai_pydantic_models import ProcessedPost, VacancyCrewAI
 
 config_dir = os.path.join(os.path.dirname(__file__), "config")
@@ -22,7 +22,7 @@ class VacancyReviewCrew:
 
     @agent
     def linkedin_analyst(self) -> Agent:
-        llm = LLM(api_key=GEMINI_API_KEY, model=GEMINI_MODEL)
+        llm = LLM(api_key=LLM_API_KEY, model=LLM_MODEL)
         return Agent(config=self.agents_config["linkedin_analyst"], llm=llm)
 
     @task

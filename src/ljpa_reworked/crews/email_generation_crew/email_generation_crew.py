@@ -13,8 +13,8 @@ from ljpa_reworked.config import (
     EMBED_BASE_URL,
     EMBED_MODEL,
     EMBED_PROVIDER,
-    GEMINI_API_KEY,
-    GEMINI_MODEL,
+    LLM_API_KEY,
+    LLM_MODEL,
 )
 from ljpa_reworked.models.crewai_pydantic_models import EmailCrewAI
 
@@ -37,8 +37,8 @@ class EmailGenerationCrew:
         embed_model: str = EMBED_MODEL,
         embed_api_key: str = EMBED_API_KEY,
         embed_api_base: str = EMBED_BASE_URL,
-        gemini_api_key: str = GEMINI_API_KEY,
-        gemini_model: str = GEMINI_MODEL,
+        llm_api_key: str = LLM_API_KEY,
+        llm_model: str = LLM_MODEL,
     ) -> None:
         super().__init__()
         pdf_path = Path(cv_file_path)
@@ -50,7 +50,7 @@ class EmailGenerationCrew:
                 "api_base": embed_api_base,
             },
         }
-        self.llm = LLM(api_key=gemini_api_key, model=gemini_model)
+        self.llm = LLM(api_key=llm_api_key, model=llm_model)
         self.resume_pdf = PDFKnowledgeSource(
             file_paths=[
                 pdf_path,
