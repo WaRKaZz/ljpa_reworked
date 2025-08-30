@@ -88,10 +88,9 @@ class LinkedinPost(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
     screenshot_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
-
+    url: Mapped[str | None] = mapped_column(Text, nullable=True)
     processed: Mapped[bool] = mapped_column(Boolean, default=False)
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[created_at]
     vacancy_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("vacancy.id"), nullable=True
     )

@@ -1,13 +1,17 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from ljpa_reworked.models.crewai_pydantic_models import VacancyCrewAI, VisaStatus
+if TYPE_CHECKING:
+    from ljpa_reworked.models.crewai_pydantic_models import VacancyCrewAI
+from ljpa_reworked.models.crewai_pydantic_models import VisaStatus
 from ljpa_reworked.models.database_models import Vacancy
 
 
 def create_vacancy(
     db: Session,
-    vacancy_data: VacancyCrewAI,
+    vacancy_data: "VacancyCrewAI",
     source: str = "other",
 ) -> Vacancy:
     """Create a new vacancy from CrewAI data."""
@@ -17,8 +21,8 @@ def create_vacancy(
         credentials=vacancy_data.credentials,
         visa_status=vacancy_data.visa_status.value,
         url=vacancy_data.url,
+        source=source,
     )
-    vacancy.source = source
     db.add(vacancy)
     db.commit()
     db.refresh(vacancy)

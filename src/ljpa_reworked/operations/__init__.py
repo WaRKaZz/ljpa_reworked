@@ -1,6 +1,4 @@
-"""
-This package contains database operations for various models.
-"""
+"""This package contains database operations for various models."""
 
 from .email_ops import (
     create_email,
@@ -27,6 +25,7 @@ from .evaluation_ops import (
 from .linkedin_post_ops import (
     create_linkedin_post,
     get_all_linkedin_posts,
+    get_duplicate_post,
     get_linkedin_post_by_id,
     get_linkedin_posts_by_vacancy,
     get_unprocessed_linkedin_posts,
@@ -93,6 +92,7 @@ __all__ = [
     "soft_delete_linkedin_post",
     "update_linkedin_post",
     "link_post_to_vacancy",
+    "get_duplicate_post"
     # resume_ops
     "create_resume",
     "delete_resume",

@@ -14,6 +14,7 @@ def create_linkedin_post(
     post = LinkedinPost(
         text=text,
         screenshot_path=screenshot_path,
+        url=url,
     )
     db.add(post)
     db.commit()
@@ -121,3 +122,15 @@ def search_linkedin_posts_by_text(db: Session, keyword: str) -> list[LinkedinPos
         )
         .all()
     )
+
+
+def get_duplicate_post(db: Session, text: str, threshold: int) -> LinkedinPost | None:
+    """Check if a vacancy with similar text exists."""
+    from thefuzz import fuzz
+
+    vacancies = db.query(LinkedinPost).filter(LinkedinPost.deleted.is_(False)).all()
+    for vacancy in vacancies:
+        similarity = fuzz.token_set_ratio(vacancy.text, text)
+        if similarity >= threshold:
+            return vacancy
+    return None

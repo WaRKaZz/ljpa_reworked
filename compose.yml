@@ -1,6 +1,6 @@
 services:
   selenium:
-    image: selenium/standalone-chromium
+    image: docker.io/selenium/standalone-chromium
     container_name: selenium
     ports:
       - "4444:4444"
@@ -32,7 +32,7 @@ services:
       - ljpa-network
         
   ollama:
-    image: ollama/ollama:latest
+    image: docker.io/ollama/ollama:latest
     container_name: ollama
     ports:
       - "11434:11434"

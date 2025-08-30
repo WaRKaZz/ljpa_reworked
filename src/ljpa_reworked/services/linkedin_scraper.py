@@ -4,6 +4,7 @@ import os
 from getpass import getpass
 from time import sleep
 
+from pydantic import BaseModel
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver import ChromeOptions
@@ -20,6 +21,15 @@ from ljpa_reworked.config import (
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class PostData(BaseModel):
+    text: str
+    screenshot: bytes
+    url: str | None = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class LinkedInScraper:
@@ -138,7 +148,7 @@ class LinkedInScraper:
         except NoSuchElementException:
             pass
 
-    def search_posts(self, max_posts: int = 20) -> dict[str, bytes] | None:
+    def search_posts(self, max_posts: int = 20) -> list[PostData] | None:
         try:
             self.driver.get(self.SEARCH_URL)
             self._scroll_down(pause=3.0, max_scrolls=15)
@@ -146,18 +156,24 @@ class LinkedInScraper:
             posts_elements = self.driver.find_elements(
                 By.CLASS_NAME, "fie-impression-container"
             )
-            posts_data = {}
+            posts_data = []
             for post in posts_elements[:max_posts]:
                 url = self._get_post_url(post)
                 self._expand_post(post)
-                posts_data[post.text] = [post.screenshot_as_png, url]
+                posts_data.append(
+                    PostData(
+                        text=post.text,
+                        screenshot=post.screenshot_as_png,
+                        url=url,
+                    )
+                )
             return posts_data
         except Exception as err:
             logger.error("Failed to search posts: %s", err)
             self._capture_screenshot()
             return None
 
-    def get_vacancies(self) -> dict[str, bytes] | None:
+    def get_vacancies(self) -> list[PostData] | None:
         if self.login():
             posts = self.search_posts()
             self.close()

@@ -5,8 +5,9 @@ from datetime import datetime
 from os import path
 from typing import TYPE_CHECKING
 
-from thefuzz import fuzz
-
+if TYPE_CHECKING:
+    from ljpa_reworked.models.crewai_pydantic_models import VacancyCrewAI
+    from ljpa_reworked.models.database_models import LinkedinPost
 from ljpa_reworked.config import (
     CV_FILE_NAME,
     RESOURCES_DIR,
@@ -16,14 +17,16 @@ from ljpa_reworked.config import (
     SMTP_PORT,
     SMTP_SERVER,
 )
+from ljpa_reworked.crew_workflow import crewai_process_linkedin_post
 from ljpa_reworked.models.database_models import DataSource
 from ljpa_reworked.operations import (
     create_linkedin_post,
     create_resume,
     create_vacancy,
-    get_all_linkedin_posts,
+    get_duplicate_post,
     get_emails_by_recipient,
     link_post_to_vacancy,
+    mark_linkedin_post_as_processed,
     mark_vacancy_as_sent,
 )
 from ljpa_reworked.services.linkedin_scraper import LinkedInScraper
@@ -40,18 +43,6 @@ if TYPE_CHECKING:
 SIMILARITY_THRESHOLD = 92
 
 
-def _is_duplicate(text: str, existing_texts: list[str]) -> bool:
-    """Checks if a given text is a duplicate of any in a list of existing texts."""
-    for existing_text in existing_texts:
-        similarity = fuzz.token_set_ratio(text, existing_text)
-        if similarity >= SIMILARITY_THRESHOLD:
-            print(
-                f"Skipping post due to {similarity}% similarity with an existing post."
-            )
-            return True
-    return False
-
-
 def _save_screenshot(screenshot_data: bytes) -> str:
     """Saves a screenshot to the screenshots directory and returns the filename."""
     screenshot_name = f"{datetime.now().timestamp()}.png"
@@ -61,33 +52,39 @@ def _save_screenshot(screenshot_data: bytes) -> str:
     return screenshot_name
 
 
-def get_linkedin_posts(db: "SessionLocal") -> list[dict]:
+def get_linkedin_posts(db: "SessionLocal") -> list["LinkedinPost"]:
     raw_posts = LinkedInScraper().get_vacancies()
     if not raw_posts:
         return []
 
     posts = []
-    recent_posts = get_all_linkedin_posts(db, limit=20)
-    existing_texts = [post.text for post in recent_posts]
+    for raw_post in raw_posts:
+        duplicate_post = get_duplicate_post(
+            db, raw_post.text, threshold=SIMILARITY_THRESHOLD
+        )
 
-    for text, data in raw_posts.items():
-        if _is_duplicate(text, existing_texts):
-            continue
+        if duplicate_post:
+            if duplicate_post.processed:
+                print(
+                    "Skipping post due to similarity with an existing and processed post."
+                )
+                continue
+            else:
+                # Reprocess
+                posts.append(duplicate_post)
+                continue
 
-        screenshot_name = _save_screenshot(data[0])
+        screenshot_name = _save_screenshot(raw_post.screenshot)
 
         post = create_linkedin_post(
-            db=db,
-            text=text,
-            screenshot_path=screenshot_name,
+            db=db, text=raw_post.text, screenshot_path=screenshot_name, url=raw_post.url
         )
-        posts.append(post.to_dict())
-        posts[-1]["url"] = data[1]
-        existing_texts.append(text)
+        posts.append(post)
+
     return posts
 
 
-def save_vacancies(vacancies, db: "SessionLocal") -> int:
+def save_vacancies(vacancies: list["VacancyCrewAI"], db: "SessionLocal") -> int:
     for vacancy in vacancies:
         orm_vacancy = create_vacancy(
             db=db, vacancy_data=vacancy, source=DataSource.linkedin
@@ -176,3 +173,16 @@ def send_telegram_post(vacancy: "Vacancy", db: "SessionLocal"):
     mark_vacancy_as_sent(db=db, vacancy_id=vacancy.id)
     text = f"Title: {vacancy.title}\n\nURL: {vacancy.url}\n\nTO: {vacancy.credentials}\n\nRating: {vacancy.basic_evaluation.rating}\n\n{vacancy.text}"
     telegram.send_image(image_path=screenshot_path, caption=text[:4000])
+
+
+def process_linkedin_posts(
+    posts: list["LinkedinPost"], db: "SessionLocal"
+) -> list["VacancyCrewAI"]:
+    vacancies = []
+    for post in posts:
+        mark_linkedin_post_as_processed(db, post.id)
+        processed_vacancy = crewai_process_linkedin_post(post, db)
+        if processed_vacancy:
+            vacancies.append(processed_vacancy)
+
+    return vacancies

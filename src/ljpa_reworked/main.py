@@ -4,7 +4,6 @@ from ljpa_reworked.crew_workflow import (
     crewai_evaluate_vacancy,
     crewai_generate_email,
     crewai_generate_resume,
-    crewai_process_linkedin_posts,  # noqa
 )
 from ljpa_reworked.database import SessionLocal
 from ljpa_reworked.operations import (
@@ -16,6 +15,7 @@ from ljpa_reworked.operations import (
 from ljpa_reworked.workflow import (  # noqa
     extract_email,
     get_linkedin_posts,
+    process_linkedin_posts,
     save_resume,
     save_vacancies,
     send_email,
@@ -27,7 +27,7 @@ from ljpa_reworked.workflow import (  # noqa
 def main():
     with SessionLocal() as db:
         posts = get_linkedin_posts(db)
-        vacancies = crewai_process_linkedin_posts(posts=posts, db=db)
+        vacancies = process_linkedin_posts(posts=posts, db=db)
         save_vacancies(vacancies, db)
         vacancies = get_eligble_vacancies(db=db)
         for vacancy in vacancies:
