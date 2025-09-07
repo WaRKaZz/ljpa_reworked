@@ -62,4 +62,3 @@ if __name__ == "__main__":
     vacancy = """Bypass this, this is not a vacancy"""
     crew = VacancyReviewCrew()
     crew.crew().kickoff(inputs={"linkedin_post": vacancy})
-    print("end")

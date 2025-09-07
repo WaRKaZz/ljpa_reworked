@@ -4,8 +4,8 @@ import requests
 
 from ljpa_reworked.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__) # TODO: Review if this logger is necessary.
+logging.basicConfig(level=logging.INFO) # TODO: Review if this logger is necessary.
 
 
 class Telegram:
@@ -26,10 +26,10 @@ class Telegram:
         try:
             response = requests.post(url, data=data)
             response.raise_for_status()  # Raises an exception for bad status codes
-            logger.info("Message sent successfully.")
+            logger.info("Message sent successfully.") # TODO: Review if this logger is necessary.
             return True
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to send message: {e}")
+            logger.error(f"Failed to send message: {e}") # TODO: Review if this logger is necessary.
             return False
 
     def send_image(self, image_path: str, caption: str = "") -> bool:
@@ -42,11 +42,11 @@ class Telegram:
                 files = {"photo": image_file}
                 response = requests.post(url, data=data, files=files)
                 response.raise_for_status()
-                logger.info("Image sent successfully.")
+                logger.info("Image sent successfully.") # TODO: Review if this logger is necessary.
                 return True
         except FileNotFoundError:
-            logger.error(f"Image file not found: {image_path}")
+            logger.error(f"Image file not found: {image_path}") # TODO: Review if this logger is necessary.
             return False
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to send image: {e}")
+            logger.error(f"Failed to send image: {e}") # TODO: Review if this logger is necessary.
             return False

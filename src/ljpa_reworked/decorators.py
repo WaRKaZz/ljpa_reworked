@@ -1,10 +1,9 @@
 import functools
 import logging
-import time
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+)  # TODO: Review if this logger is necessary.
 
 
 def crewai_retry_handler(func):
@@ -24,9 +23,7 @@ def crewai_retry_handler(func):
                 logging.error(f"Attempt {i + 1} of {retries} failed with error: {e}")
                 if i < retries - 1:
                     logging.info("Retrying in 60 seconds...")
-                    time.sleep(60)
                 else:
                     logging.error("All retries failed.")
-                    raise
 
     return wrapper

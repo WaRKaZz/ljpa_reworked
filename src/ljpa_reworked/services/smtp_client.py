@@ -11,8 +11,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 class SMTPClient:
-    """
-    SMTP client for sending emails with optional attachments.
+    """SMTP client for sending emails with optional attachments.
 
     Example:
         config = {
@@ -29,6 +28,7 @@ class SMTPClient:
                 body="This is a test message",
                 attachment="document.pdf"
             )
+
     """
 
     def __init__(self, config: dict):
@@ -43,25 +43,25 @@ class SMTPClient:
             self._connection = smtplib.SMTP(self._server, self._port)
             self._connection.starttls()
             self._connection.login(self._user, self._password)
-            logger.info(f"Connected to SMTP server {self._server} on port {self._port}")
         except Exception as e:
-            logger.error(f"Error connecting to SMTP server: {e}")
+            logger.error(
+                f"Error connecting to SMTP server: {e}"
+            )  # TODO: Review if this logger is necessary.
             raise
 
     def disconnect(self):
         if self._connection:
             self._connection.quit()
-            logger.info("Disconnected from SMTP server.")
 
     def send_email(self, to: str, subject: str, body: str, attachment: str = None):
-        """
-        Send email with optional attachment.
+        """Send email with optional attachment.
 
         Args:
             to (str): Recipient email address
             subject (str): Email subject
             body (str): Email body text
             attachment (str, optional): Path to file attachment
+
         """
         msg = MIMEMultipart()
         msg["From"] = self._user
@@ -80,7 +80,6 @@ class SMTPClient:
                     f"attachment; filename={os.path.basename(attachment)}",
                 )
                 msg.attach(part)
-                logger.info(f"Attached file {attachment}")
             except Exception as e:
                 logger.error(f"Failed to attach file {attachment}: {e}")
                 raise

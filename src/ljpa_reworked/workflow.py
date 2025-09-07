@@ -1,13 +1,27 @@
+from __future__ import annotations
+
+import logging
 import os
 import re
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 from os import path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ljpa_reworked.models.crewai_pydantic_models import VacancyCrewAI
-    from ljpa_reworked.models.database_models import LinkedinPost
+    from sqlalchemy.orm import Session
+
+    from ljpa_reworked.models.crewai_pydantic_models import (
+        ResumeCrewAI,
+        VacancyCrewAI,
+    )
+    from ljpa_reworked.models.database_models import (
+        Email,
+        LinkedinPost,
+        Resume,
+        Vacancy,
+    )
+
 from ljpa_reworked.config import (
     CV_FILE_NAME,
     RESOURCES_DIR,
@@ -34,12 +48,8 @@ from ljpa_reworked.services.resume_generator import ResumeGenerator
 from ljpa_reworked.services.smtp_client import SMTPClient
 from ljpa_reworked.services.telegram import Telegram
 
-if TYPE_CHECKING:
-    from ljpa_reworked.database import SessionLocal
-    from ljpa_reworked.models.crewai_pydantic_models import (
-        ResumeCrewAI,
-    )
-    from ljpa_reworked.models.database_models import Email, Resume, Vacancy
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 SIMILARITY_THRESHOLD = 92
 
 
@@ -52,7 +62,7 @@ def _save_screenshot(screenshot_data: bytes) -> str:
     return screenshot_name
 
 
-def get_linkedin_posts(db: "SessionLocal") -> list["LinkedinPost"]:
+def get_linkedin_posts(db: Session) -> list[LinkedinPost]:
     raw_posts = LinkedInScraper().get_vacancies()
     if not raw_posts:
         return []
@@ -65,7 +75,7 @@ def get_linkedin_posts(db: "SessionLocal") -> list["LinkedinPost"]:
 
         if duplicate_post:
             if duplicate_post.processed:
-                print(
+                logger.info(
                     "Skipping post due to similarity with an existing and processed post."
                 )
                 continue
@@ -84,7 +94,7 @@ def get_linkedin_posts(db: "SessionLocal") -> list["LinkedinPost"]:
     return posts
 
 
-def save_vacancies(vacancies: list["VacancyCrewAI"], db: "SessionLocal") -> int:
+def save_vacancies(vacancies: list[VacancyCrewAI], db: Session) -> None:
     for vacancy in vacancies:
         orm_vacancy = create_vacancy(
             db=db, vacancy_data=vacancy, source=DataSource.linkedin
@@ -101,9 +111,7 @@ def extract_email(credentials: str) -> str | None:
     return match.group(0) if match else None
 
 
-def save_resume(
-    resume: "ResumeCrewAI", vacancy: "Vacancy", db: "SessionLocal"
-) -> "Resume":
+def save_resume(resume: ResumeCrewAI, vacancy: Vacancy, db: Session) -> Resume:
     resume_name = f"{datetime.now().timestamp()}.pdf"
     orm_resume = create_resume(
         db=db,
@@ -134,17 +142,16 @@ def _prepare_resume_for_sending(resume_path: str) -> str:
     return temp_resume_path
 
 
-def verified_recepient(email, db: "SessionLocal"):
-    emails = get_emails_by_recipient(db, email)
-    one_month_ago = datetime.now() - datetime.timedelta(month=1)
-    for email in emails:
-        given_date = datetime.datetime.strptime(email.created_at, "%Y-%m-%d %H:%M:%S")
-        if given_date < one_month_ago:
+def verified_recepient(email_address: str, db: Session) -> bool:
+    emails = get_emails_by_recipient(db, email_address)
+    one_month_ago = datetime.now() - timedelta(days=30)
+    for email_record in emails:
+        if email_record.created_at > one_month_ago:
             return False
     return True
 
 
-def send_email(email: "Email") -> None:
+def send_email(email: Email) -> None:
     config = {
         "email": SMTP_EMAIL,
         "password": SMTP_PASSWORD,
@@ -162,22 +169,30 @@ def send_email(email: "Email") -> None:
                 body=email.body,
                 attachment=attachment_path,
             )
-            print(f"Email successfully sent to {email.recipient}")
+
+            logger.info(f"Email successfully sent to {email.recipient}")
         except Exception as e:
-            print(f"Failed to send email to {email.recipient}: {e}")
+            logger.error(f"Failed to send email to {email.recipient}: {e}")
 
 
-def send_telegram_post(vacancy: "Vacancy", db: "SessionLocal"):
+def send_telegram_post(vacancy: Vacancy, db: Session):
     telegram = Telegram()
-    screenshot_path = path.join(SCREENSHOTS_DIR, vacancy.linkedin_posts.screenshot_path)
-    mark_vacancy_as_sent(db=db, vacancy_id=vacancy.id)
-    text = f"Title: {vacancy.title}\n\nURL: {vacancy.url}\n\nTO: {vacancy.credentials}\n\nRating: {vacancy.basic_evaluation.rating}\n\n{vacancy.text}"
-    telegram.send_image(image_path=screenshot_path, caption=text[:4000])
+    if vacancy.linkedin_posts:
+        screenshot_path = path.join(
+            SCREENSHOTS_DIR, vacancy.linkedin_posts[0].screenshot_path
+        )
+        mark_vacancy_as_sent(db=db, vacancy_id=vacancy.id)
+        text = f"Title: {vacancy.title}\n\nURL: {vacancy.url}\n\nTO: {vacancy.credentials}\n\nRating: {vacancy.basic_evaluation.rating}\n\n{vacancy.text}"
+        telegram.send_image(image_path=screenshot_path, caption=text[:4000])
+    else:
+        logger.warning(
+            f"Vacancy {vacancy.id} has no associated LinkedIn post to send to Telegram."
+        )
 
 
 def process_linkedin_posts(
-    posts: list["LinkedinPost"], db: "SessionLocal"
-) -> list["VacancyCrewAI"]:
+    posts: list[LinkedinPost], db: Session
+) -> list[VacancyCrewAI]:
     vacancies = []
     for post in posts:
         mark_linkedin_post_as_processed(db, post.id)

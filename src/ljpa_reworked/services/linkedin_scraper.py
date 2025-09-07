@@ -61,6 +61,7 @@ class LinkedInScraper:
     def _save_cookies(self) -> None:
         with open(self.COOKIES_PATH, "w") as file:
             json.dump(self.driver.get_cookies(), file)
+
         logger.info("Cookies saved to %s", self.COOKIES_PATH)
 
     def _load_cookies(self) -> None:
@@ -69,7 +70,6 @@ class LinkedInScraper:
                 cookies = json.load(file)
                 for cookie in cookies:
                     self.driver.add_cookie(cookie)
-            logger.info("Cookies loaded from %s", self.COOKIES_PATH)
 
     def _scroll_down(self, pause: float = 2.0, max_scrolls: int = 10) -> None:
         last_height = self.driver.execute_script("return document.body.scrollHeight")
@@ -93,12 +93,16 @@ class LinkedInScraper:
             else:
                 return clean_href + "/recent-activity/all/"
         except Exception as e:
-            print(f"Error finding LinkedIn profile link: {e}")
+            logger.error(
+                f"Error finding LinkedIn profile link: {e}"
+            )  # TODO: Review if this logger is necessary.
             return None
 
     def _capture_screenshot(self) -> None:
         self.driver.save_screenshot(self.SCREENSHOT_PATH)
-        logger.error("Screenshot saved to %s", self.SCREENSHOT_PATH)
+        logger.error(
+            "Screenshot saved to %s", self.SCREENSHOT_PATH
+        )  # TODO: Review if this logger is necessary.
 
     def _input_credentials(self, email: str, password: str) -> None:
         self.wait.until(EC.presence_of_element_located((By.ID, "username"))).send_keys(
@@ -114,7 +118,7 @@ class LinkedInScraper:
         if "checkpoint/challenge" in self.driver.current_url:
             logger.warning(
                 "Two-factor authentication required! Please complete verification."
-            )
+            )  # TODO: Review if this logger is necessary.
             sleep(360)
         return "feed" in self.driver.current_url
 
@@ -124,17 +128,23 @@ class LinkedInScraper:
             self._load_cookies()
             self.driver.refresh()
             if "feed" in self.driver.current_url:
-                logger.info("Already logged in.")
+                logger.info(
+                    "Already logged in."
+                )  # TODO: Review if this logger is necessary.
                 return True
             email, password = self._get_credentials()
             self._input_credentials(email, password)
             if self._check_login_success():
                 self._save_cookies()
-                logger.info("Login successful!")
+                logger.info(
+                    "Login successful!"
+                )  # TODO: Review if this logger is necessary.
                 return True
             return False
         except Exception as err:
-            logger.error("Login failed: %s", err)
+            logger.error(
+                "Login failed: %s", err
+            )  # TODO: Review if this logger is necessary.
             self._capture_screenshot()
             return False
 
@@ -169,7 +179,9 @@ class LinkedInScraper:
                 )
             return posts_data
         except Exception as err:
-            logger.error("Failed to search posts: %s", err)
+            logger.error(
+                "Failed to search posts: %s", err
+            )  # TODO: Review if this logger is necessary.
             self._capture_screenshot()
             return None
 
