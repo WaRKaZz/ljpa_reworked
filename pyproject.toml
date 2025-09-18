@@ -6,6 +6,7 @@ requires-python = ">=3.10,<3.14"
 dependencies = [
     "alembic>=1.16.2",
     "crewai[tools]>=0.148.0",
+    "pytest>=8.4.2",
     "reportlab>=4.4.2",
     "selenium>=4.33.0",
     "sqlalchemy>=2.0.41",
