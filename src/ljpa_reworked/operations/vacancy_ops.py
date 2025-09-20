@@ -6,13 +6,13 @@ from sqlalchemy.orm import Session
 if TYPE_CHECKING:
     from ljpa_reworked.models.crewai_pydantic_models import VacancyCrewAI
 from ljpa_reworked.models.crewai_pydantic_models import VisaStatus
-from ljpa_reworked.models.database_models import Vacancy
+from ljpa_reworked.models.database_models import DataSource, Vacancy
 
 
 def create_vacancy(
     db: Session,
     vacancy_data: "VacancyCrewAI",
-    source: str = "other",
+    source: DataSource = DataSource.linkedin,
 ) -> Vacancy:
     """Create a new vacancy from CrewAI data."""
     vacancy = Vacancy(

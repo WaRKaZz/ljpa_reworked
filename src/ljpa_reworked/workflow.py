@@ -125,7 +125,7 @@ def save_vacancies(vacancies: list[VacancyCrewAI], db: Session) -> None:
     for vacancy in vacancies:
         _validate_vacancy_data(vacancy)
         orm_vacancy = create_vacancy(
-            db=db, vacancy_data=vacancy, source=DataSource.linkedin.value
+            db=db, vacancy_data=vacancy, source=DataSource.linkedin
         )
         # post_id is checked in _validate_vacancy_data
         post_id = cast(int, vacancy.post_id)
@@ -133,7 +133,7 @@ def save_vacancies(vacancies: list[VacancyCrewAI], db: Session) -> None:
     logger.info(f"Saved {len(vacancies)} vacancies.")
 
 
-def extract_email(credentials: str) -> str:
+def extract_email(credentials: str) -> str | None:
     """Extracts an email address from a string."""
     if not isinstance(credentials, str):
         raise TypeError("credentials must be a string.")
@@ -141,7 +141,7 @@ def extract_email(credentials: str) -> str:
     email_regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
     match = re.search(email_regex, credentials)
     if not match:
-        raise ValueError("No email found in credentials.")
+        return None
     return match.group(0)
 
 

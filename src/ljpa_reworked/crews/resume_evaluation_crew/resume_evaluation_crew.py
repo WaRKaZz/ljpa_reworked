@@ -80,6 +80,6 @@ class ResumeEvaluationCrew:
             tasks=self.tasks,
             process=Process.sequential,
             embedder=self.embedder,
-            verbose=True,
+            verbose=False,
             max_rpm=10,
         )
