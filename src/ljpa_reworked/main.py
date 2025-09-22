@@ -27,9 +27,9 @@ from ljpa_reworked.workflow import (  # noqa
 
 def main():
     with SessionLocal() as db:
-        # posts = get_linkedin_posts(db)
-        # vacancies = process_linkedin_posts(posts=posts, db=db)
-        # save_vacancies(vacancies, db)
+        posts = get_linkedin_posts(db)
+        vacancies = process_linkedin_posts(posts=posts, db=db)
+        save_vacancies(vacancies, db)
         vacancies = get_eligble_vacancies(db=db)
         for vacancy in vacancies:
             vacancy_credentials = cast(str, vacancy.credentials)
