@@ -33,24 +33,26 @@ def main():
         vacancies = get_eligble_vacancies(db=db)
         for vacancy in vacancies:
             vacancy_credentials = cast(str, vacancy.credentials)
-            recipient_email = extract_email(vacancy_credentials)
             evaluation = crewai_evaluate_vacancy(vacancy=vacancy)
             create_evaluation(
                 db=db,
                 vacancy_id=vacancy.id,
                 evaluation_data=evaluation,
             )
-            update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
             if not evaluation.rating > 50:
+                update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
                 continue
 
             resume = crewai_generate_resume(vacancy=vacancy, evaluation=evaluation)
             orm_resume = save_resume(resume, vacancy, db)
 
+            recipient_email = extract_email(vacancy_credentials)
             if not recipient_email:
                 send_telegram_post(vacancy=vacancy, db=db)
+                update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
                 continue
             elif not verified_recipient(recipient_email, db):
+                update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
                 continue
 
             email = crewai_generate_email(vacancy=vacancy)
@@ -62,6 +64,7 @@ def main():
                 resume_path=orm_resume.path,
             )
             send_email(orm_email)
+            update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
 
 
 if __name__ == "__main__":
