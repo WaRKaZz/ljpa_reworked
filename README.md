@@ -1,56 +1,100 @@
-# {{crew_name}} Crew
+LJPA
 
-Welcome to the {{crew_name}} Crew project, powered by [crewAI](https://crewai.com). This template is designed to help you set up a multi-agent AI system with ease, leveraging the powerful and flexible framework provided by crewAI. Our goal is to enable your agents to collaborate effectively on complex tasks, maximizing their collective intelligence and capabilities.
+LJPA - LinkedIn Job Posting Applier A Telegram bot designed to streamline the job search process by aggregating vacancy posts from linkedin and submitting applications via email.
+Prerequisites
 
-## Installation
+    Latest version of Docker installed
+    Docker Compose installed
 
-Ensure you have Python >=3.10 <3.14 installed on your system. This project uses [UV](https://docs.astral.sh/uv/) for dependency management and package handling, offering a seamless setup and execution experience.
+Installation
 
-First, if you haven't already, install uv:
+    Clone the repository:
 
-```bash
-pip install uv
-```
+    git clone https://github.com/warkazz/ljpa.git
+    cd ljpa
 
-Next, navigate to your project directory and install the dependencies:
+    Preconfigure your Telegram bot:
+        Create a new bot using @BotFather on Telegram.
+        Follow the instructions to get your BOT_TOKEN.
+        Get your CHAT_ID by sending a message to your bot and using an API request like this:
 
-(Optional) Lock the dependencies and install them by using the CLI command:
-```bash
-crewai install
-```
+        curl https://api.telegram.org/bot<BOT_TOKEN>/getUpdates
 
-### Customizing
+        Find your chat_id in the response.
 
-**Add your `OPENAI_API_KEY` into the `.env` file**
+    Copy the example environment file and configure your environment variables:
 
-- Modify `src/ljpa_reworked/config/agents.yaml` to define your agents
-- Modify `src/ljpa_reworked/config/tasks.yaml` to define your tasks
-- Modify `src/ljpa_reworked/crew.py` to add your own logic, tools and specific args
-- Modify `src/ljpa_reworked/main.py` to add custom inputs for your agents and tasks
+    cp .env_example .env
 
-## Running the Project
+    Edit the .env file using any text editor and provide the necessary values.
+    Environment Variables
+        LINKEDIN_EMAIL: Your linkedin account email.
+        LINKEDIN_PASSWORD: Password for your linkedin account.
+        BOT_TOKEN: Telegram bot token from @BotFather.
+        CHAT_ID: Your Telegram chat ID for receiving messages.
+        SMTP_EMAIL: Your email address used for sending applications.
+        SMTP_PASSWORD: Password for the SMTP email account.
+        SMTP_PORT: Port for the SMTP server (e.g., 587 for Gmail).
+        SMTP_SERVER: SMTP server address (e.g., smtp.gmail.com).
+        CV_FILE_NAME_PDF: Name of your CV in PDF format.
+        CV_FILE_NAME_TXT: Name of your CV in TXT format.
+        EMAIL_SIGNATURE: Custom email signature to be added at the end of your applications.
+        NOVNC_PORT: Port used for NoVNC if applicable.
+        GPT4FREE_HOST: Hostname or URL for GPT-4 API access.
+        LINKEDIN_SEARCH_URL: linkedin search URL with your specific search parameters.
+        VNC_PASSWORD: Password for accessing the NoVNC interface.
 
-To kickstart your flow and begin execution, run this from the root folder of your project:
+    Start the application:
 
-```bash
-crewai run
-```
+    docker compose build && docker compose pull && docker compose up -d && docker compose logs -f
 
-This command initializes the LJPA-reworked Flow as defined in your configuration.
+First-Time Login to Linkedin
 
-This example, unmodified, will run the create a `report.md` file with the output of a research on LLMs in the root folder.
+A manual login to Linkedin may be required. If you see a log message indicating that manual login is needed, follow these steps:
 
-## Understanding Your Crew
+    Open your browser and navigate to:
 
-The LJPA-reworked Crew is composed of multiple AI agents, each with unique roles, goals, and tools. These agents collaborate on a series of tasks, defined in `config/tasks.yaml`, leveraging their collective skills to achieve complex objectives. The `config/agents.yaml` file outlines the capabilities and configurations of each agent in your crew.
+    http://localhost:8080/vnc.html
 
-## Support
+    You will be prompted to enter the VNC password.
+    Use the password set in the .env file under VNC_PASSWORD.
+    Log in to your Linkedin account using your credfockdentials.
 
-For support, questions, or feedback regarding the {{crew_name}} Crew or crewAI.
+After the first login, the bot will handle the rest automatically.
+Scheduling the Bot
 
-- Visit our [documentation](https://docs.crewai.com)
-- Reach out to us through our [GitHub repository](https://github.com/joaomdmoura/crewai)
-- [Join our Discord](https://discord.com/invite/X4JWnZnxPb)
-- [Chat with our docs](https://chatg.pt/DWjSBZn)
+You can schedule the bot to run at specific intervals using cron or any other task scheduling tool.
+Using Crontab
 
-Let's create wonders together with the power and simplicity of crewAI.
+    Open the crontab editor:
+
+    crontab -e
+
+    Add the following line to run the bot once per day (adjust the time as needed):
+
+    0 9 * * * cd /path/to/linkedin-bot && docker-compose up --build --force-recreate
+
+    This example runs the bot every day at 9 AM.
+
+Alternative Methods
+
+    You can also use systemd timers, Docker's built-in scheduling, or external tools like Anacron if preferred.
+    Ensure the Docker service is running when using these methods.
+
+Troubleshooting
+
+    Ensure that Docker and Docker Compose are properly installed.
+    Verify your .env file is correctly configured.
+    Check logs using:
+
+    docker-compose logs -f
+
+License
+
+This project is licensed under the MIT License. See the LICENSE file for more details.
+Contributing
+
+Feel free to submit issues or pull requests for enhancements.
+Important Notice
+
+The application is currently in its Alpha stage and functions as is. It may not work as intended. Use it at your own risk.

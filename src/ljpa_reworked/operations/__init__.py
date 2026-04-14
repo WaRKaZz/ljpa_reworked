@@ -1,4 +1,4 @@
-"""This package contains database operations for various models."""
+"""Package containing database operations for various models."""
 
 from .email_ops import (
     create_email,
@@ -61,7 +61,6 @@ from .vacancy_ops import (
 __all__ = [
     # email_ops
     "create_email",
-    "mark_vacancy_as_sentcreate_email",
     "delete_email",
     "get_email_by_id",
     "get_emails_by_recipient",
@@ -92,7 +91,7 @@ __all__ = [
     "soft_delete_linkedin_post",
     "update_linkedin_post",
     "link_post_to_vacancy",
-    "get_duplicate_post"
+    "get_duplicate_post",
     # resume_ops
     "create_resume",
     "delete_resume",

@@ -13,6 +13,9 @@
 *.log
 .git
 
+./pytest_cache
+./ruff_cache
+
 *test.py 
 /screenshots
 
@@ -20,3 +23,5 @@
 /ollama*
 typescript
 GEMINI.md
+start.sh
+restart.sh

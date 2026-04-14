@@ -1,27 +1,35 @@
-# Use a slim Python base image
-FROM python:3.11-slim
-
-# Set environment variables to prevent Python from writing .pyc files and to buffer output
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+FROM python:3.11-slim AS builder
 
 
-#RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-# Install uv, a fast Python package installer
-RUN pip install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy only the files required for dependency installation to leverage Docker layer caching
-COPY pyproject.toml alembic.ini uv.lock .
+COPY pyproject.toml uv.lock ./
 
-RUN uv sync --frozen --no-install-project --no-dev
-RUN uv pip install --system .
-#RUN alembic upgrade head
+RUN uv pip install --system --no-cache -r pyproject.toml
 
+FROM python:3.11-slim
 
-# Run database migrations and start the application
-# The 'kickoff' script is defined in pyproject.toml
-CMD ["/bin/bash", "-c", "alembic upgrade head"]
-#CMD ["/bin/bash", "-c", "alembic upgrade head && sleep infinity"]
+WORKDIR /app
+
+# Запрещаем Python создавать .pyc файлы и включаем моментальный вывод логов
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Важно: добавляем src в пути поиска Python, чтобы работали импорты 'from ljpa_reworked'
+ENV PYTHONPATH=/app/src
+
+# Копируем установленные библиотеки из билдера
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Теперь копируем сам код приложения
+COPY . .
+
+# Устанавливаем сам проект как пакет (теперь ljpa_reworked виден системе)
+# Мы используем 'uv' из первого этапа, если он нужен, но тут достаточно просто python
+RUN pip install --no-deps .
+
+# Запуск: сначала миграции, потом приложение через модуль (-m)
+CMD ["/bin/bash", "-c", "alembic upgrade head && python -m ljpa_reworked.main"]

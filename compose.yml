@@ -23,25 +23,13 @@ services:
       selenium:
         condition: service_healthy
     volumes:
-      - ./resources:/app/resources
-      - ./src:/app/src
+      - ./resources:/app/resources:Z
+      - ./src:/app/src:Z
     env_file:
       - .env
-    command: uv run /app/src/ljpa_reworked/main.py
     networks:
       - ljpa-network
-        
-  ollama:
-    image: docker.io/ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ./ollama_data:/root/.ollama
-    restart: unless-stopped
-    networks:
-      - ljpa-network
-      
+    
 networks:
   ljpa-network:
     driver: bridge

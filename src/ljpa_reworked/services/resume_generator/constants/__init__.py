@@ -1,3 +1,5 @@
+"""Constants for the resume generator."""
+
 from os import getcwd, path
 from pathlib import Path
 
