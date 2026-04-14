@@ -20,3 +20,17 @@
 /screenshots
 crew_ai_chart.drawio
 database_chart.drawio
+
+
+./pytest_cache
+./ruff_cache
+
+*test.py 
+/screenshots
+
+
+/ollama*
+typescript
+GEMINI.md
+start.sh
+restart.sh
