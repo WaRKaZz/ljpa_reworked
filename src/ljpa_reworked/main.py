@@ -34,16 +34,24 @@ def main():
         for vacancy in vacancies:
             vacancy_credentials = cast(str, vacancy.credentials)
             evaluation = crewai_evaluate_vacancy(vacancy=vacancy)
+            if evaluation is None:
+                update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
+                continue
+
             create_evaluation(
                 db=db,
                 vacancy_id=vacancy.id,
                 evaluation_data=evaluation,
             )
-            if not evaluation.rating > 50:
+            if evaluation.rating <= 50:
                 update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
                 continue
 
             resume = crewai_generate_resume(vacancy=vacancy, evaluation=evaluation)
+            if resume is None:
+                update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
+                continue
+
             orm_resume = save_resume(resume, vacancy, db)
 
             recipient_email = extract_email(vacancy_credentials)
@@ -56,6 +64,10 @@ def main():
                 continue
 
             email = crewai_generate_email(vacancy=vacancy)
+            if email is None:
+                update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
+                continue
+
             orm_email = create_email(
                 db=db,
                 vacancy_id=vacancy.id,
