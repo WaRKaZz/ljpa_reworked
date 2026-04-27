@@ -38,7 +38,7 @@ services:
       - ljpa-network
 
   sqlite-ui:
-    image: coleifer/sqlite-web
+    image: ghcr.io/coleifer/sqlite-web
     container_name: sqlite-ui
     ports:
       - "${DB_WEBUI_PORT:-7901}:8080"
