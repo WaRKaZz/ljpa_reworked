@@ -3,11 +3,10 @@ import logging
 import os
 from getpass import getpass
 from time import sleep
-from typing import List
 
 from pydantic import BaseModel
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver import ChromeOptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
@@ -20,7 +19,9 @@ from ljpa_reworked.config import (
     SELENIUM_COMMAND_EXECUTOR,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -53,7 +54,9 @@ class LinkedInScraper:
         options.add_argument("--disable-extensions")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option("useAutomationExtension", False)
-        return webdriver.Remote(command_executor=SELENIUM_COMMAND_EXECUTOR, options=options)
+        return webdriver.Remote(
+            command_executor=SELENIUM_COMMAND_EXECUTOR, options=options
+        )
 
     @staticmethod
     def _get_credentials() -> tuple[str, str]:
@@ -76,18 +79,32 @@ class LinkedInScraper:
                     except Exception:
                         pass
 
-    def _scroll_and_load(self, pause: float = 1.5) -> None:
-        """Makes exactly 3 full scrolls down the page."""
-        for _ in range(3):
-            # Scroll down by exactly one full screen height
+    def _scroll_and_load(self, pause: float = 2.0, count: int = 10) -> None:
+        """Makes exactly count full scrolls down the page."""
+        logger.info("Scrolling %d times with %ss pause...", count, pause)
+        for i in range(count):
+            # Using JavaScript scrollBy for better reliability
             self.driver.execute_script("window.scrollBy(0, window.innerHeight);")
-            sleep(pause)
 
+            # Also try to scroll the last list item into view to trigger lazy loading
+            try:
+                items = self.driver.find_elements(By.CSS_SELECTOR, '[role="listitem"]')
+                if items:
+                    self.driver.execute_script(
+                        "arguments[0].scrollIntoView({block: 'end'});", items[-1]
+                    )
+            except Exception:
+                pass
+
+            logger.debug("Scroll %d/%d done.", i + 1, count)
+            sleep(pause)
 
     def _expand_post(self, post_element) -> None:
         """Clicks 'See more' if the post text is truncated."""
         try:
-            btn = post_element.find_element(By.CSS_SELECTOR, '[data-testid="expandable-text-button"]')
+            btn = post_element.find_element(
+                By.CSS_SELECTOR, '[data-testid="expandable-text-button"]'
+            )
             self.driver.execute_script("arguments[0].click();", btn)
             sleep(0.3)
         except NoSuchElementException:
@@ -96,7 +113,9 @@ class LinkedInScraper:
     def _get_post_url(self, post_element) -> str | None:
         """Extracts the author's profile or company page URL."""
         try:
-            links = post_element.find_elements(By.CSS_SELECTOR, 'a[href*="/in/"], a[href*="/company/"]')
+            links = post_element.find_elements(
+                By.CSS_SELECTOR, 'a[href*="/in/"], a[href*="/company/"]'
+            )
             for link in links:
                 href = link.get_attribute("href")
                 if href and "lipi=" not in href and "showcase" not in href:
@@ -115,15 +134,21 @@ class LinkedInScraper:
                 return True
 
             email, password = self._get_credentials()
-            self.wait.until(EC.presence_of_element_located((By.ID, "username"))).send_keys(email)
+            self.wait.until(
+                EC.presence_of_element_located((By.ID, "username"))
+            ).send_keys(email)
             self.driver.find_element(By.ID, "password").send_keys(password)
             self.driver.find_element(By.XPATH, "//button[@type='submit']").click()
 
             self.wait.until(
-                lambda d: "feed" in d.current_url or "checkpoint/challenge" in d.current_url
+                lambda d: (
+                    "feed" in d.current_url or "checkpoint/challenge" in d.current_url
+                )
             )
             if "checkpoint/challenge" in self.driver.current_url:
-                logger.warning("2FA/Checkpoint required. Please complete it manually. Waiting 60s...")
+                logger.warning(
+                    "2FA/Checkpoint required. Please complete it manually. Waiting 60s..."
+                )
                 sleep(60)
 
             if "feed" in self.driver.current_url:
@@ -136,23 +161,32 @@ class LinkedInScraper:
             self.driver.save_screenshot(self.SCREENSHOT_PATH)
             return False
 
-    def search_posts(self, max_posts: int = 20) -> List[PostData]:
+    def search_posts(self, max_posts: int = 20) -> list[PostData]:
         try:
             self.driver.get(self.SEARCH_URL)
-            sleep(3)
+            sleep(5)
             self._scroll_and_load()
 
             # Filter only elements that actually contain post text
-            post_elements = [
-                el for el in self.driver.find_elements(By.CSS_SELECTOR, '[role="listitem"]')
-                if el.find_elements(By.CSS_SELECTOR, '[data-testid="expandable-text-box"]')
-            ]
+            all_items = self.driver.find_elements(By.CSS_SELECTOR, '[role="listitem"]')
+            logger.info("Found %d total list items after scrolling.", len(all_items))
 
-            posts_data: List[PostData] = []
+            post_elements = [
+                el
+                for el in all_items
+                if el.find_elements(
+                    By.CSS_SELECTOR, '[data-testid="expandable-text-box"]'
+                )
+            ]
+            logger.info("Filtered %d posts with text boxes.", len(post_elements))
+
+            posts_data: list[PostData] = []
             for post in post_elements[:max_posts]:
                 try:
                     self._expand_post(post)
-                    text_box = post.find_element(By.CSS_SELECTOR, '[data-testid="expandable-text-box"]')
+                    text_box = post.find_element(
+                        By.CSS_SELECTOR, '[data-testid="expandable-text-box"]'
+                    )
                     text = text_box.text.strip()
                     if not text:
                         continue
@@ -163,7 +197,9 @@ class LinkedInScraper:
                     except Exception:
                         screenshot = None
 
-                    posts_data.append(PostData(text=text, screenshot=screenshot, url=url))
+                    posts_data.append(
+                        PostData(text=text, screenshot=screenshot, url=url)
+                    )
                 except Exception as e:
                     logger.debug("Skipped post due to extraction error: %s", e)
                     continue
@@ -175,7 +211,7 @@ class LinkedInScraper:
             self.driver.save_screenshot(self.SCREENSHOT_PATH)
             return []
 
-    def get_vacancies(self) -> List[PostData]:
+    def get_vacancies(self) -> list[PostData]:
         if self.login():
             posts = self.search_posts()
             self.close()
@@ -186,3 +222,20 @@ class LinkedInScraper:
     def close(self) -> None:
         if self.driver:
             self.driver.quit()
+
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    scraper = LinkedInScraper()
+    try:
+        if scraper.login():
+            scraper.driver.get(scraper.SEARCH_URL)
+            sleep(3)
+            scraper._scroll_and_load(pause=2.0, count=10)
+            logger.info("Scrolling test completed.")
+        else:
+            logger.error("Could not complete test because login failed.")
+    finally:
+        scraper.close()

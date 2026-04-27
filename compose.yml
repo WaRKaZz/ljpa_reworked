@@ -3,13 +3,20 @@ services:
     image: docker.io/selenium/standalone-chromium
     container_name: selenium
     ports:
-      - "4444:4444"
-      - "${NOVNC_PORT:-7900}:7900"
+      - "${SELENIUM_PORT:-4444}:4444"
+      # --- Uncomment for manual login---
+      # - "${NOVNC_PORT:-7900}:7900"
     shm_size: '2g'
     networks:
       - ljpa-network
     environment:
       - SE_VNC_NO_PASSWORD=1
+      # Disable VNC/NoVNC for lightweight operation
+      - SE_START_VNC=false
+      - SE_START_NO_VNC=false
+      # --- Set to true for manual login ---
+      # - SE_START_VNC=true
+      # - SE_START_NO_VNC=true
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:4444/wd/hub/status" ]
       interval: 1s
@@ -27,6 +34,18 @@ services:
       - ./src:/app/src:Z
     env_file:
       - .env
+    networks:
+      - ljpa-network
+
+  sqlite-ui:
+    image: coleifer/sqlite-web
+    container_name: sqlite-ui
+    ports:
+      - "${DB_WEBUI_PORT:-7901}:8080"
+    volumes:
+      - ./resources:/data:Z
+    environment:
+      - SQLITE_DATABASE=app.db
     networks:
       - ljpa-network
     
