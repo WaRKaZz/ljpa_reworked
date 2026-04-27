@@ -1,0 +1,16 @@
+FROM python:3.12-slim
+
+# Install sqlite-web
+RUN pip install --no-cache-dir sqlite-web
+
+# Set the working directory to where the database is mounted
+WORKDIR /data
+
+# Expose the default port
+EXPOSE 8080
+
+# Run sqlite_web. 
+# We use '0.0.0.0' to allow external connections from the host/docker network.
+# The filename will be passed via the command or default to app.db
+ENTRYPOINT ["sqlite_web"]
+CMD ["app.db", "-H", "0.0.0.0", "-p", "8080"]

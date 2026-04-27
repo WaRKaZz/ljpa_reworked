@@ -38,14 +38,16 @@ services:
       - ljpa-network
 
   sqlite-ui:
-    image: ghcr.io/coleifer/sqlite-web
+    build:
+      context: .
+      dockerfile: Dockerfile.sqlite-web
     container_name: sqlite-ui
     ports:
       - "${DB_WEBUI_PORT:-7901}:8080"
     volumes:
       - ./resources:/data:Z
-    environment:
-      - SQLITE_DATABASE=app.db
+    # Overriding command to ensure it uses the correct host and port within the container
+    command: ["app.db", "-H", "0.0.0.0", "-p", "8080"]
     networks:
       - ljpa-network
     
