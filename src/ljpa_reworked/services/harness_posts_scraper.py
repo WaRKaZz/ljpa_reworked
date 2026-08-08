@@ -2,6 +2,8 @@ import logging
 import os
 import subprocess
 
+from ljpa_reworked.config import AGY_BIN_PATH
+
 logger = logging.getLogger(__name__)
 
 
@@ -447,34 +449,30 @@ Success means:
 
 Never claim success based only on extracted browser content. Success requires verified rows in data/app.db.
 """
-    task_prompt = prompt or default_prompt
+    binary = AGY_BIN_PATH
+    prompt_file = os.path.join("data", "harness_prompt.txt")
     if prompt:
-        cmd = [
-            "podman",
-            "exec",
-            container_name,
-            "agy",
-            "--print",
-            "--print-timeout",
-            "15m",
-            "--dangerously-skip-permissions",
-            prompt,
-        ]
+        task_prompt = prompt
+    elif os.path.exists(prompt_file):
+        with open(prompt_file, "r", encoding="utf-8") as f:
+            task_prompt = f.read()
     else:
-        cmd = [
-            "podman",
-            "exec",
-            container_name,
-            "bash",
-            "-c",
-            'agy --print --print-timeout 15m --dangerously-skip-permissions "$(cat /app/data/harness_prompt.txt)"',
-        ]
+        task_prompt = default_prompt
 
+    logger.info("Executing Harness 1 agy agent locally using binary '%s'...", binary)
+    cmd = [
+        binary,
+        "--print",
+        "--print-timeout",
+        "15m",
+        "--dangerously-skip-permissions",
+        task_prompt,
+    ]
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return res.stdout
     except subprocess.CalledProcessError as e:
-        logger.error("Error executing agy harness in container: %s", e.stderr)
+        logger.error("Error executing local agy harness: %s", e.stderr)
         raise
 
 

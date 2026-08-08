@@ -31,6 +31,8 @@ SELENIUM_PORT = os.getenv("SELENIUM_PORT")
 
 LINKEDIN_PROFILE_URL = os.getenv("LINKEDIN_PROFILE_URL")
 
+AGY_BIN_PATH = os.getenv("AGY_BIN_PATH", "/home/warkazz/.local/bin/agy")
+
 SELENIUM_COMMAND_EXECUTOR = f"http://{SELENIUM_HOST}:{SELENIUM_PORT}/wd/hub"
 
 # =============================================================================
