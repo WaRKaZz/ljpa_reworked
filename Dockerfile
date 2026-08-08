@@ -4,11 +4,20 @@ FROM python:3.11-slim
 # Set environment variables to prevent Python from writing .pyc files and to buffer output
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+ENV PATH="/root/.local/bin:${PATH}"
 
+# Install system dependencies including curl and git
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-#RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-# Install uv, a fast Python package installer
-RUN pip install uv
+# Install official Antigravity CLI (agy)
+RUN curl -fsSL https://antigravity.google/install.sh | bash || true
+
+# Install uv package installer
+RUN pip install --no-cache-dir uv
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -18,10 +27,5 @@ COPY pyproject.toml alembic.ini uv.lock .
 
 RUN uv sync --frozen --no-install-project --no-dev
 RUN uv pip install --system .
-#RUN alembic upgrade head
 
-
-# Run database migrations and start the application
-# The 'kickoff' script is defined in pyproject.toml
 CMD ["/bin/bash", "-c", "alembic upgrade head"]
-#CMD ["/bin/bash", "-c", "alembic upgrade head && sleep infinity"]

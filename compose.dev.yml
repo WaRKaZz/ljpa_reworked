@@ -26,6 +26,7 @@ services:
       - ./compose.yml:/app/compose.yml
       - ./.agents:/app/.agents
       - ./.gemini:/root/.gemini
+      - /home/warkazz/.local/bin/agy:/usr/local/bin/agy:ro
     env_file:
       - .env
     environment:
