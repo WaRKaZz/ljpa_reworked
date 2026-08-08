@@ -2,6 +2,7 @@ import logging
 from typing import List
 
 from jobspy import scrape_jobs
+from sqlalchemy.orm import Session
 
 from ljpa_reworked.models.crewai_pydantic_models import VisaStatus
 from ljpa_reworked.models.database_models import DataSource, Vacancy
@@ -15,6 +16,7 @@ def fetch_and_store_jobs(
     search_term: str = "Python Developer",
     location: str = "Remote",
     results_wanted: int = 10,
+    db: Session | None = None,
 ) -> List[Vacancy]:
     """Fetch job postings via python-jobspy ETL pipeline and store them as Vacancy records in SQLite."""
     logger.info("Executing JobSpy scrape for '%s' in '%s' on %s...", search_term, location, site_name)
@@ -46,6 +48,7 @@ def fetch_and_store_jobs(
             url=url,
             source=source_enum,
             visa_status=VisaStatus.not_mentioned,
+            db=db,
         )
         saved_vacancies.append(vacancy)
 

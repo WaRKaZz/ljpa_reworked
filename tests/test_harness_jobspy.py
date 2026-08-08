@@ -55,6 +55,7 @@ def test_fetch_and_store_jobs_normalizes_and_saves():
             url="https://www.linkedin.com/jobs/view/99999/",
             source=DataSource.linkedin,
             visa_status=VisaStatus.not_mentioned,
+            db=None,
         )
         assert len(results) == 1
         assert results[0] == mock_vacancy
