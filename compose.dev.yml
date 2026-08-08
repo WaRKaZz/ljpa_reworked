@@ -8,6 +8,31 @@ services:
       - "9222:9222"
     volumes:
       - ./resources:/app/resources
+    command: cloakserve --host 0.0.0.0 --port 9222
+    networks:
+      - ljpa-network
+
+  antigravity-cli-dev:
+    build: .
+    container_name: antigravity-cli-dev
+    depends_on:
+      cloak-browser:
+        condition: service_started
+    volumes:
+      - ./resources:/app/resources
+      - ./data:/app/data
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./compose.yml:/app/compose.yml
+      - ./.agents:/app/.agents
+      - ./.gemini:/root/.gemini
+    env_file:
+      - .env
+    environment:
+      - CDP_URL=${CDP_URL:-http://cloak-browser:9222}
+    stdin_open: true
+    tty: true
+    command: tail -f /dev/null
     networks:
       - ljpa-network
 
