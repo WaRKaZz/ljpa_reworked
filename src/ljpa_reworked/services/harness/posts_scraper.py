@@ -50,22 +50,20 @@ def run_agy_harness_1(prompt: str | None = None, container_name: str = "antigrav
         raise
 
 
-def run_agy_harness_sdk(prompt: str | None = None, verbose: bool = False) -> str:
+def run_linkedin_posts_agent(prompt: str | None = None, verbose: bool = False) -> str:
     """
-    Programmatic Harness 1 runner that delegates to a python proxy inside the container.
+    Programmatic Harness 1 runner that delegates to python /app/linkedin_posts_agent.py inside the container.
     """
     import sys
     logger.info("Delegating to Python SDK internal proxy via podman exec...")
     
     cmd = [
         "podman", "exec", "-i", "antigravity-cli-dev", 
-        "python", "/app/agy_sdk.py"
+        "python", "/app/linkedin_posts_agent.py"
     ]
     if prompt:
-        # Pass custom prompt via stdin
         input_data = prompt
     else:
-        # agy_sdk.py will read the mounted prompts/harness_1_linkedin_posts.md by default
         input_data = None
 
     if verbose:
@@ -82,3 +80,7 @@ def run_agy_harness_sdk(prompt: str | None = None, verbose: bool = False) -> str
         error_msg = getattr(e, 'stderr', None) or str(e)
         logger.error("Error executing internal python proxy: %s", error_msg)
         raise
+
+# Alias for backward compatibility
+run_agy_harness_sdk = run_linkedin_posts_agent
+
