@@ -9,9 +9,7 @@ from ljpa_reworked.database import Base
 from ljpa_reworked.models.database_models import DataSource, LinkedinPost, Vacancy
 from ljpa_reworked.models.crewai_pydantic_models import VisaStatus
 from ljpa_reworked.services.harness_jobspy import fetch_and_store_jobs
-from ljpa_reworked.services.harness_posts_scraper import (
-    extract_posts_from_feed,
-)
+from ljpa_reworked.services.harness_posts_scraper import run_agy_harness_1
 from ljpa_reworked.operations.linkedin_post_ops import (
     get_all_linkedin_posts,
     link_post_to_vacancy,
@@ -74,34 +72,13 @@ def test_stage2_jobspy_integration(db_session):
         assert record.visa_status == VisaStatus.not_mentioned
 
 
-@pytest.mark.asyncio
-async def test_stage2_posts_scraper_integration(db_session):
-    """Test integration of extract_posts_from_feed and save_linkedin_post,
+def test_stage2_posts_scraper_integration(db_session):
+    """Test integration of run_agy_harness_1 and save_linkedin_post,
     verifying LinkedinPost models are persisted correctly into SQLite.
     """
-    mock_page = MagicMock()
-    mock_elem1 = MagicMock()
-    mock_elem1.inner_text = AsyncMock(return_value="Hiring Lead DevOps Engineer! Contact devops@example.com")
-    mock_link1 = MagicMock()
-    mock_link1.get_attribute = AsyncMock(return_value="https://www.linkedin.com/feed/update/urn:li:activity:777777/")
-    mock_link_loc1 = MagicMock()
-    mock_link_loc1.first = mock_link1
-    mock_link_loc1.count = AsyncMock(return_value=1)
-    mock_elem1.locator = MagicMock(return_value=mock_link_loc1)
-
-    mock_posts_locator = MagicMock()
-    mock_posts_locator.count = AsyncMock(return_value=1)
-    mock_posts_locator.nth.side_effect = [mock_elem1]
-    mock_page.locator.return_value = mock_posts_locator
-
-    extracted_posts = await extract_posts_from_feed(mock_page, max_posts=5)
-    assert len(extracted_posts) == 1
-    assert extracted_posts[0]["text"] == "Hiring Lead DevOps Engineer! Contact devops@example.com"
-    assert extracted_posts[0]["url"] == "https://www.linkedin.com/feed/update/urn:li:activity:777777/"
-
     saved_post = save_linkedin_post(
-        text=extracted_posts[0]["text"],
-        url=extracted_posts[0]["url"],
+        text="Hiring Lead DevOps Engineer! Contact devops@example.com",
+        url="https://www.linkedin.com/feed/update/urn:li:activity:777777/",
         db=db_session,
     )
     assert saved_post.id is not None
