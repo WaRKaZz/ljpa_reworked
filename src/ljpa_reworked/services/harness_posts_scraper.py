@@ -169,24 +169,38 @@ def run_agy_harness_1(prompt: str | None = None, container_name: str = "antigrav
     """
     Harness 1 AGY Agent Runner:
     Delegates post searching and navigation task to the Google Antigravity SDK (`agy` CLI) agent
-    running inside the dedicated container harness with strict Guard-Rails.
+    running inside the dedicated container harness with strict Guard-Rails and Self-Verification audit loop.
     """
     default_prompt = (
-        "STRICT GUARD-RAILS & NON-NEGOTIABLE VALIDATION RULES:\n"
-        "1. Read the candidate personal profile from resources/profile.md. Meticulously analyze skills and experience.\n"
-        "2. Dynamically expand candidate target job titles based strictly on profile skills (PLC, SCADA, Automation, Control Systems).\n"
-        "3. Connect to CloakBrowser CDP at http://cloak-browser:9222 and navigate the LinkedIn posts feed.\n"
-        "4. FOR EVERY POST EVALUATED:\n"
-        "   - RULE A (MANDATORY URL): The post MUST have a valid, direct permalink URL. If URL is missing or invalid, DISCARD post immediately.\n"
-        "   - RULE B (MANDATORY CREDENTIALS/EMAIL): The post MUST contain recruiter contact credentials (email address, direct apply link, or explicit contact method). If missing, DISCARD post immediately.\n"
-        "   - RULE C (NO NOISE): Do NOT save generic UI elements, profile widgets, ads, or posts without vacancy details. Skip them and move to next post.\n"
-        "5. For valid posts meeting ALL guard-rails, save directly into SQLite database data/app.db following ORM schema:\n"
-        "   - 'vacancy' table: title (String 200), text (Text), credentials (String 500 - mandatory email/contact), url (String 200 - mandatory permalink), source='LinkedIn', visa_status='NOT_SPECIFIED', processed=False, deleted=False.\n"
-        "   - 'linkedin_post' table: text (Text), url (Text - mandatory permalink), vacancy_id (Integer ForeignKey 'vacancy.id'), processed=False, deleted=False.\n"
-        "Be extremely thoughtful, meticulous, and strict. Do not save any record unless both URL and contact credentials exist."
+        "MANDATORY TOOL REQUIREMENT:\n"
+        "You MUST use the Unbrowse MCP server (`mcp-unbrowse` / Playwright browser actions connected to http://cloak-browser:9222) "
+        "for all web navigation, searching, and post extraction. Do not attempt raw HTTP requests without unbrowse.\n\n"
+        "STRICT GUARD-RAILS & SELF-VERIFICATION AUDIT PIPELINE:\n"
+        "ACT WITH MAXIMUM THOUGHTFULNESS AND RIGOR AS IF YOUR LIFE DEPENDS ON DATA ACCURACY.\n\n"
+        "PHASE 1: CANDIDATE PROFILE ANALYSIS & SEARCH EXPANSION\n"
+        "1. Read resources/profile.md. Meticulously analyze candidate Ivan Danilov's skills, experience, and target roles "
+        "(PLC Systems, Siemens STEP7, TIA Portal, Allen-Bradley, Schneider, SCADA/HMI, Industrial Automation, Control Systems Engineering).\n"
+        "2. Formulate target search terms based strictly on profile skills to search for hiring vacancy posts on LinkedIn.\n\n"
+        "PHASE 2: LINKEDIN POST SEARCH & EXTRACTION VIA UNBROWSE MCP\n"
+        "3. Connect to CloakBrowser CDP at http://cloak-browser:9222 using Unbrowse MCP. Navigate to LinkedIn posts feed/search.\n"
+        "4. Search for recent job vacancy posts matching candidate profile skills.\n"
+        "5. FOR EVERY POST EVALUATED, APPLY NON-NEGOTIABLE GUARD-RAILS:\n"
+        "   - GUARD-RAIL 1 (MANDATORY URL): The post MUST have a valid, direct permalink URL. If missing/invalid, DISCARD post immediately.\n"
+        "   - GUARD-RAIL 2 (MANDATORY CREDENTIALS/EMAIL): The post MUST contain recruiter contact credentials (email address or direct apply link). If missing, DISCARD post immediately.\n"
+        "   - GUARD-RAIL 3 (NO NOISE): Ignore profile UI text, user widgets, ads, or posts without genuine job vacancy details.\n"
+        "6. Save extracted valid vacancies into SQLite database data/app.db:\n"
+        "   - 'vacancy' table: title (String 200), text (Text), credentials (String 500 - mandatory email/apply link), url (String 200 - mandatory permalink), source='LinkedIn', visa_status='NOT_SPECIFIED', processed=False, deleted=False.\n"
+        "   - 'linkedin_post' table: text (Text), url (Text - mandatory permalink), vacancy_id (Integer ForeignKey 'vacancy.id'), processed=False, deleted=False.\n\n"
+        "PHASE 3: SELF-VERIFICATION & CLEANUP AUDIT LOOP\n"
+        "7. After scraping, connect to SQLite database data/app.db and audit all saved records in 'vacancy' and 'linkedin_post' tables:\n"
+        "   - Inspect every saved row: Verify that 'url' is valid, 'credentials' contains a valid recruiter email or apply link, and text matches candidate profile.\n"
+        "   - IF ANY RECORD FAILS GUARD-RAILS OR IS INCOMPLETE: Delete it immediately using SQL ('DELETE FROM vacancy WHERE id=X;' and 'DELETE FROM linkedin_post WHERE vacancy_id=X;').\n"
+        "8. Check total count of valid audited vacancies in SQLite database data/app.db:\n"
+        "   - IF VALID COUNT < 10: Continue searching LinkedIn posts for additional matching vacancies until exactly 10 fully verified, valid vacancies exist in the database.\n"
+        "   - ONLY STOP AND FINISH when there are 10 fully audited, high-quality vacancies saved in SQLite data/app.db meeting all Guard-Rails."
     )
     task_prompt = prompt or default_prompt
-    logger.info("Triggering Harness 1 agy agent in container '%s' with strict Guard-Rails...", container_name)
+    logger.info("Triggering Harness 1 agy agent in container '%s' with strict Guard-Rails and Self-Verification...", container_name)
 
     cmd = [
         "podman",
