@@ -459,7 +459,7 @@ Never claim success based only on extracted browser content. Success requires ve
     else:
         task_prompt = default_prompt
 
-    logger.info("Executing Harness 1 agy agent locally using binary '%s' and profile '%s'...", binary, GEMINI_DIR)
+    logger.info("Executing Harness 1 agy agent locally using binary '%s' and isolated home '%s'...", binary, GEMINI_DIR)
     cmd = [
         binary,
         "--print",
@@ -468,7 +468,13 @@ Never claim success based only on extracted browser content. Success requires ve
         "--dangerously-skip-permissions",
         task_prompt,
     ]
-    env = {**os.environ, "GEMINI_DIR": GEMINI_DIR}
+    # To completely isolate the CLI from system credentials, we must change HOME
+    # and unset DBUS_SESSION_BUS_ADDRESS to prevent it from using the Gnome/KDE keyring.
+    env = {
+        **os.environ,
+        "HOME": GEMINI_DIR,
+        "DBUS_SESSION_BUS_ADDRESS": ""
+    }
     try:
         res = subprocess.run(cmd, env=env, capture_output=True, text=True, check=True)
         return res.stdout
@@ -479,11 +485,8 @@ Never claim success based only on extracted browser content. Success requires ve
 
 async def run_agy_harness_sdk(prompt: str | None = None) -> str:
     """
-    Programmatic Harness 1 runner leveraging official google-antigravity Python SDK.
+    Programmatic Harness 1 runner that delegates to a python proxy inside the container.
     """
-    import asyncio
-    from google.antigravity import Agent, CapabilitiesConfig, LocalAgentConfig
-
     prompt_file = os.path.join("data", "harness_prompt.txt")
     if prompt:
         task_prompt = prompt
@@ -493,16 +496,18 @@ async def run_agy_harness_sdk(prompt: str | None = None) -> str:
     else:
         task_prompt = "/goal Discover and audit 10 LinkedIn vacancies into data/app.db"
 
-    logger.info("Initializing Harness 1 via google.antigravity Python SDK...")
-    config = LocalAgentConfig(
-        system_instructions="You are Harness 1 LinkedIn Post Vacancy Discovery Agent.",
-        capabilities=CapabilitiesConfig(),
-    )
-    tokens = []
-    async with Agent(config) as agent:
-        resp = await agent.chat(task_prompt)
-        async for token in resp:
-            tokens.append(token)
-
-    return "".join(tokens)
+    logger.info("Delegating to Python SDK internal proxy via podman exec...")
+    
+    cmd = [
+        "podman", "exec", "-i", "antigravity-cli-dev", 
+        "uv", "run", "python", "-m", "ljpa_reworked.services.harness_internal"
+    ]
+    
+    try:
+        # Pass the prompt via stdin
+        res = subprocess.run(cmd, input=task_prompt, capture_output=True, text=True, check=True)
+        return res.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        logger.error("Error executing internal python proxy: %s", e.stderr)
+        raise
 
