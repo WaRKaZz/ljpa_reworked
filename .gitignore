@@ -22,3 +22,4 @@ typescript
 GEMINI.md
 REFACTORING_PLAN.md
 .gemini/
+data/*.db

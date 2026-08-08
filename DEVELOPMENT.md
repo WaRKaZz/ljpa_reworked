@@ -1,29 +1,66 @@
-# Development and Conventions
+# Development Guidelines & Conventions
 
-This document outlines the development standards, workflows, and conventions for the `ljpa_reworked` project.
+This document outlines the standards, workflows, and local execution conventions for the `ljpa_reworked` project.
 
-## 1. Code Standards & Dependency Management
+## 1. Local Testing & Execution Policy
 
-- **Dependency Management**: We use `uv` for lightning-fast dependency management. Install dependencies via `uv pip install -r requirements.txt` (or equivalent `uv` commands).
-- **Code Formatting & Linting**: We use `ruff` to maintain code quality.
-  - To format code: `uv run ruff format .`
-  - To check for linting errors: `uv run ruff check .`
+* **Local Host Execution:** All function calls, unit tests, module executions, and debugging tasks must be performed **directly on the local host machine** using `uv`.
+* **Docker Container Policy:** Docker Compose services (`cloak-browser`, `linkedin-bot`) are intended for target deployment and VNC session holding. **Do NOT build or rebuild Docker images during routine local testing** unless explicitly instructed to test container builds.
+* **Pre-built Docker Image Preference:** Always prioritize using existing, ready-to-use Docker images from Docker Hub in `compose.yml`. Avoid creating custom `Dockerfile`s unless no suitable pre-built image exists.
 
-## 2. Database Migrations Workflow
+## 2. Dependency Management & Formatting
 
-Whenever changes are made to SQLAlchemy models in `src/ljpa_reworked/models/`:
-1. Modify the Python classes.
+* **Dependency Management:** Managed via `uv`. Install project dependencies locally:
+  ```bash
+  uv pip install -e .
+  ```
+* **Code Quality:** Formatted and checked via `ruff`:
+  ```bash
+  uv run ruff format .
+  uv run ruff check .
+  ```
+
+## 3. Database Migrations & Web Inspection (SQLite)
+
+The application uses SQLite (`data/app.db`) managed via SQLAlchemy and Alembic.
+
+Whenever modifying models in `src/ljpa_reworked/models/database_models.py`:
+1. Update Python model definitions.
 2. Generate an Alembic revision:
    ```bash
-   alembic revision --autogenerate -m "Description of changes"
+   uv run alembic revision --autogenerate -m "Description of changes"
    ```
-3. Inspect the generated migration file in `src/ljpa_reworked/migrations/versions/` to ensure correctness.
-4. Apply the migration to the database:
+3. Inspect the migration script in `src/ljpa_reworked/migrations/versions/`.
+4. Apply the migration to `data/app.db`:
    ```bash
-   alembic upgrade head
+   uv run alembic upgrade head
    ```
 
-## 3. Testing and Debugging
+### Web Database Inspection (`sqlite-ui`)
+For visual database inspection in a web browser, start the optional `sqlite-ui` debug service:
+```bash
+docker compose --profile debug up -d sqlite-ui
+```
+Open `http://localhost:7901` in your browser to view, query, and edit the SQLite database via `sqlite-web`.
 
-- **Unit and Integration Tests**: Ensure tests are run before merging. You can find tests under `src/ljpa_reworked/tests/`.
-- **Debugging**: When debugging agents, it may be useful to run them independently of the scraping pipeline to save time and API costs.
+## 4. Interactive Browser Authentication & VNC
+
+To perform initial or periodic LinkedIn session renewal:
+1. Start the browser container: `docker compose up -d cloak-browser`.
+2. Connect to the VNC session in your web browser: `http://localhost:6080`.
+3. Perform the login manually in the open Chromium window.
+4. Execute `src/operations/login_harness.py` to capture and verify `auth/state.json`.
+
+## 5. Testing & Verification
+
+Run tests locally using `pytest`:
+```bash
+uv run pytest
+```
+Ensure all harness components and database operations pass before completing features.
+
+
+## 4. Local Execution & Docker Strategy
+
+- **Development & Testing**: Execute Python modules, scripts, and tests directly on the local host machine during development.
+- **Docker Deployment**: Docker containers are maintained for target deployment. Avoid building or running Docker images for routine testing tasks unless specifically testing the container build itself.
