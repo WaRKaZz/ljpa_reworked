@@ -2,7 +2,7 @@ import logging
 import os
 import subprocess
 
-from ljpa_reworked.config import AGY_BIN_PATH
+from ljpa_reworked.config import AGY_BIN_PATH, GEMINI_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -459,7 +459,7 @@ Never claim success based only on extracted browser content. Success requires ve
     else:
         task_prompt = default_prompt
 
-    logger.info("Executing Harness 1 agy agent locally using binary '%s'...", binary)
+    logger.info("Executing Harness 1 agy agent locally using binary '%s' and profile '%s'...", binary, GEMINI_DIR)
     cmd = [
         binary,
         "--print",
@@ -468,8 +468,9 @@ Never claim success based only on extracted browser content. Success requires ve
         "--dangerously-skip-permissions",
         task_prompt,
     ]
+    env = {**os.environ, "GEMINI_DIR": GEMINI_DIR}
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        res = subprocess.run(cmd, env=env, capture_output=True, text=True, check=True)
         return res.stdout
     except subprocess.CalledProcessError as e:
         logger.error("Error executing local agy harness: %s", e.stderr)
