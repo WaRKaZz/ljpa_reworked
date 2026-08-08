@@ -1,56 +1,76 @@
-# {{crew_name}} Crew
+# LinkedIn Job Processing Automation (LJPA) Reworked
 
-Welcome to the {{crew_name}} Crew project, powered by [crewAI](https://crewai.com). This template is designed to help you set up a multi-agent AI system with ease, leveraging the powerful and flexible framework provided by crewAI. Our goal is to enable your agents to collaborate effectively on complex tasks, maximizing their collective intelligence and capabilities.
+LJPA Reworked is an autonomous AI-driven pipeline that automates the process of finding relevant job vacancies on LinkedIn, evaluating candidate suitability, generating perfectly tailored ATS resumes, and organizing applications.
 
-## Installation
+Built with **CrewAI**, **Playwright**, and containerized for consistency using **Podman/Docker**, this tool brings autonomous agentic behavior to the job search process.
 
-Ensure you have Python >=3.10 <3.14 installed on your system. This project uses [UV](https://docs.astral.sh/uv/) for dependency management and package handling, offering a seamless setup and execution experience.
+## 🚀 Key Features
 
-First, if you haven't already, install uv:
+*   **Intelligent Job Scraping:** Uses Playwright to interactively (via VNC) authenticate and traverse LinkedIn without getting blocked.
+*   **Vacancy Processing & Evaluation:** CrewAI agents (`VacancyReviewCrew`, `ResumeEvaluationCrew`) read job descriptions and decide if a vacancy is a good match based on your baseline resume.
+*   **Tailored ATS Resumes:** The `ResumeGenerationCrew` dynamically adapts your resume and outputs a format ready to be compiled into a pristine PDF using `RenderCV`.
+*   **Automated Cover Letters:** Generates customized cover letters/emails for each specific recruiter (`EmailGenerationCrew`).
+*   **Cost-Effective AI:** Supports any OpenAI-compatible API (e.g., vLLM, OpenRouter, Together AI) by configuring a custom `base_url`.
+
+## 🛠️ Architecture & Technologies
+
+*   **Python 3.10+** (Managed via `uv`)
+*   **CrewAI** for multi-agent orchestration
+*   **Playwright & Selenium (Chromium VNC)** for browser automation
+*   **SQLAlchemy + Alembic** for PostgreSQL database state management
+*   **Docker / Podman Compose** for infrastructure
+
+## 📦 Installation & Setup
+
+1. **Clone the repository and prepare environments:**
+   ```bash
+   git clone <your-repo>
+   cd ljpa_reworked
+   cp .env.example .env
+   ```
+   *Edit `.env` to add your `OPENAI_API_KEY`, `OPENAI_API_BASE` (if using a custom provider), and LinkedIn credentials.*
+
+2. **Start the Container Infrastructure:**
+   We use a Selenium standalone image with an integrated noVNC server to safely handle browser automation.
+   
+   If you want to run the bot locally (Development Mode):
+   ```bash
+   podman-compose -f compose.dev.yml up -d
+   ```
+   *(Use `docker-compose` if you are using Docker instead of Podman)*
+
+3. **Install Python Dependencies (if running locally):**
+   ```bash
+   pip install uv
+   uv sync
+   ```
+
+## 🔐 LinkedIn Authentication (VNC)
+
+Before agents can scrape LinkedIn, you must authenticate. LJPA uses an interactive VNC session to safely handle 2FA and Captchas and saves the session state for headless agents.
+
+1. Run the interactive login wrapper:
+   ```bash
+   ./scripts/linkedin_relogin.sh
+   ```
+2. Open your browser and navigate to: **http://localhost:7900/vnc.html**
+3. Log into LinkedIn manually in the VNC window. The script will detect the successful login, save the session to `auth/state.json`, and close automatically.
+
+## ⚙️ Usage
+
+Once authenticated, you can trigger the main application pipeline:
 
 ```bash
-pip install uv
+uv run python src/ljpa_reworked/main.py
 ```
+*(Or, if running fully containerized, it will start automatically inside the `linkedin-bot` container).*
 
-Next, navigate to your project directory and install the dependencies:
+## 🧠 Customizing Your Agents
 
-(Optional) Lock the dependencies and install them by using the CLI command:
-```bash
-crewai install
-```
+*   **Agents Config:** `src/ljpa_reworked/config/agents.yaml`
+*   **Tasks Config:** `src/ljpa_reworked/config/tasks.yaml`
+*   **Custom Tools:** Inside the `tools/` directory (e.g., custom LinkedIn parsers).
 
-### Customizing
+## 📄 License
 
-**Add your `OPENAI_API_KEY` into the `.env` file**
-
-- Modify `src/ljpa_reworked/config/agents.yaml` to define your agents
-- Modify `src/ljpa_reworked/config/tasks.yaml` to define your tasks
-- Modify `src/ljpa_reworked/crew.py` to add your own logic, tools and specific args
-- Modify `src/ljpa_reworked/main.py` to add custom inputs for your agents and tasks
-
-## Running the Project
-
-To kickstart your flow and begin execution, run this from the root folder of your project:
-
-```bash
-crewai run
-```
-
-This command initializes the LJPA-reworked Flow as defined in your configuration.
-
-This example, unmodified, will run the create a `report.md` file with the output of a research on LLMs in the root folder.
-
-## Understanding Your Crew
-
-The LJPA-reworked Crew is composed of multiple AI agents, each with unique roles, goals, and tools. These agents collaborate on a series of tasks, defined in `config/tasks.yaml`, leveraging their collective skills to achieve complex objectives. The `config/agents.yaml` file outlines the capabilities and configurations of each agent in your crew.
-
-## Support
-
-For support, questions, or feedback regarding the {{crew_name}} Crew or crewAI.
-
-- Visit our [documentation](https://docs.crewai.com)
-- Reach out to us through our [GitHub repository](https://github.com/joaomdmoura/crewai)
-- [Join our Discord](https://discord.com/invite/X4JWnZnxPb)
-- [Chat with our docs](https://chatg.pt/DWjSBZn)
-
-Let's create wonders together with the power and simplicity of crewAI.
+Check the `LICENSE.md` file for details.

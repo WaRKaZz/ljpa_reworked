@@ -15,23 +15,6 @@ services:
       interval: 1s
       timeout: 3s
       retries: 30
-
-  linkedin-bot:
-    build: .
-    container_name: linkedin-bot
-    depends_on:
-      selenium:
-        condition: service_healthy
-    volumes:
-      - ./resources:/app/resources
-      - ./src:/app/src
-    env_file:
-      - .env
-    environment:
-      - CDP_URL=http://selenium:4444
-    command: uv run /app/src/ljpa_reworked/main.py
-    networks:
-      - ljpa-network
         
 
 networks:
