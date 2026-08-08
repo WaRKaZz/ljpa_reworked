@@ -10,17 +10,18 @@ All Harness agents are executed inside the dedicated **`antigravity-cli` (`agy`)
   - **Container & Engine**: `antigravity-cli` container (`antigravity-cli-dev`) executing the Google Antigravity SDK (`agy` CLI) via `podman exec` / `docker exec` + MCP Unbrowse / Playwright server.
   - **Prompt Execution**: Triggered via `agy --print --dangerously-skip-permissions "<prompt>"`.
   - **Mandatory Tool**: MUST use the **MCP Unbrowse server (`mcp-unbrowse`)** for all browser navigation, search, and page extraction over `http://cloak-browser:9222`.
+  - **Prompt Structure**: Formatted as a depersonalized `/goal` specification prompt.
   - **Prompt Instructions & Guard-Rails**:
-    1. Reads candidate profile from `resources/profile.md` and dynamically extracts/expands candidate target job titles across all matching potential roles based strictly on profile skills and experience.
-    2. Connects to `http://cloak-browser:9222` via MCP Unbrowse to navigate LinkedIn Posts feed and search.
-    3. **STRICT GUARD-RAILS (NON-NEGOTIABLE)**:
-       - **Rule 1 (Mandatory URL)**: Discard any post missing a valid permalink URL.
-       - **Rule 2 (Mandatory Credentials/Email)**: Discard any post missing recruiter contact credentials or apply link.
-       - **Rule 3 (No Noise)**: Ignore profile widgets, UI text, or generic ads.
+    1. **Dynamic Profile Ingestion**: Reads candidate files in `resources/` (e.g. `resources/profile.md`) and dynamically extracts candidate skills, domain experience, and matching roles without any hardcoded names or job titles.
+    2. **Feed Extraction via MCP Unbrowse**: Connects to `http://cloak-browser:9222` via MCP Unbrowse to navigate LinkedIn feed (`https://www.linkedin.com/feed/`) across up to 3 passes.
+    3. **STRICT GUARD-RAILS & DEDUPLICATION**:
+       - **Rule 1 (30-Day Deduplication)**: Skips any post whose URL or identical text already exists in SQLite (`data/app.db`) from the last 30 days (`created_at > datetime('now', '-30 days')`).
+       - **Rule 2 (Mandatory Credentials/Email)**: Discards any post missing recruiter contact email address or explicit apply link.
+       - **Rule 3 (URL Flexibility & Qualitative Match)**: Direct permalink URL preferred; profile URL or email-verified post text accepted if direct URL is missing. Qualitative semantic matching against candidate skills.
     4. **SELF-VERIFICATION & POST-AUDIT CLEANUP LOOP**:
-       - After scraping, inspects saved records in SQLite (`data/app.db`).
-       - If any record is incomplete or fails Guard-Rails, executes SQL DELETE to clean up invalid rows.
-       - If total valid count is less than 10, resumes searching LinkedIn posts until **exactly 10 fully verified, valid vacancies** meeting all Guard-Rails are saved in SQLite (`data/app.db`).
+       - Inspects saved records in SQLite (`data/app.db`).
+       - Executes SQL DELETE for any incomplete/invalid rows.
+       - Continues extraction up to 3 passes max until 10 fresh, 30-day deduplicated vacancies are saved (or finalizes with valid saved count after 3 passes).
     5. Maps fields and persists records into SQLite (`data/app.db`) following SQLAlchemy ORM schema:
        - `Vacancy` table (`title`, `text`, `credentials`, `url`, `source`="LinkedIn", `visa_status`="NOT_SPECIFIED", `processed`=False, `deleted`=False)
        - `LinkedinPost` table (`text`, `url`, `screenshot_path`, `vacancy_id`, `processed`=False, `deleted=False`)
