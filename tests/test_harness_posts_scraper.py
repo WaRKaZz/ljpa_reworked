@@ -24,7 +24,7 @@ async def test_extract_posts_from_feed_returns_structured_dicts():
     mock_elem1.locator = MagicMock(return_value=mock_link_loc1)
 
     mock_elem2 = MagicMock()
-    mock_elem2.inner_text = AsyncMock(return_value="We are looking for a Data Engineer in Berlin.")
+    mock_elem2.inner_text = AsyncMock(return_value="We are looking for a Data Engineer in Berlin. Send CV to jobs@berlin.de")
     mock_link2 = MagicMock()
     mock_link2.get_attribute = AsyncMock(return_value="https://www.linkedin.com/feed/update/urn:li:activity:987654321/")
     mock_link_loc2 = MagicMock()
@@ -44,7 +44,7 @@ async def test_extract_posts_from_feed_returns_structured_dicts():
     assert len(posts) == 2
     assert posts[0]["text"] == "Hiring Senior Python Developer at TechCorp! Contact recruiter@techcorp.com"
     assert posts[0]["url"] == "https://www.linkedin.com/feed/update/urn:li:activity:123456789/"
-    assert posts[1]["text"] == "We are looking for a Data Engineer in Berlin."
+    assert posts[1]["text"] == "We are looking for a Data Engineer in Berlin. Send CV to jobs@berlin.de"
     assert posts[1]["url"] == "https://www.linkedin.com/feed/update/urn:li:activity:987654321/"
 
 

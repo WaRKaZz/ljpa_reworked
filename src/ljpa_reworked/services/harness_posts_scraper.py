@@ -12,16 +12,88 @@ logger = logging.getLogger(__name__)
 DEFAULT_CDP_URL = os.getenv("CDP_URL", "http://cloak-browser:9222")
 
 
+import re
+
+def is_valid_job_post(text: str, url: str | None) -> tuple[bool, str | None]:
+    """
+    Strict Guard-Rail Validator:
+    Returns (is_valid, extracted_credentials).
+    A post is ONLY valid if:
+    1. It has a non-empty, valid URL.
+    2. It is not UI noise (e.g., profile snippets, ads, analytics).
+    3. It contains valid recruiter contact credentials (email or explicit application link).
+    """
+    if not url or not isinstance(url, str) or not url.startswith("http"):
+        return False, None
+
+    if not text or len(text.strip()) < 40:
+        return False, None
+
+    # Filter out common UI noise text
+    noise_keywords = [
+        "view all analytics", "profile viewers", "act now: 1 month of free premium",
+        "start a post", "see how premium helps", "connect with", "followers"
+    ]
+    lower_text = text.lower()
+    if any(k in lower_text for k in noise_keywords):
+        return False, None
+
+    # Extract email or contact credentials
+    email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", text)
+    link_match = re.search(r"https?://lnkd\.in/[a-zA-Z0-9_-]+", text)
+
+    credentials = None
+    if email_match:
+        credentials = email_match.group(0)
+    elif link_match:
+        credentials = f"Apply via link: {link_match.group(0)}"
+    elif "contact" in lower_text or "apply" in lower_text or "dm" in lower_text:
+        credentials = "Direct contact via recruiter post"
+
+    if not credentials:
+        return False, None
+
+    return True, credentials
+
+
 async def extract_posts_from_feed(page: Page, max_posts: int = 10) -> list[dict[str, Any]]:
     """
     Extract post text and permalink URL from feed update elements on the LinkedIn feed page.
+    Scrolls down to trigger lazy-loaded feed content and applies strict Guard-Rail filtering.
     """
     posts: list[dict[str, Any]] = []
-    post_elements = page.locator("div.feed-shared-update-v2, div.occludable-update")
-    count = await post_elements.count()
 
-    for i in range(min(count, max_posts)):
-        elem = post_elements.nth(i)
+    # Scroll to trigger feed post rendering
+    for _ in range(5):
+        try:
+            await page.evaluate("window.scrollBy(0, 1000)")
+            await page.wait_for_timeout(1000)
+        except Exception as e:
+            logger.debug(f"Scroll iteration warning: {e}")
+
+    locators = [
+        "main#workspace div[componentkey]",
+        "main div[componentkey]",
+        "div.feed-shared-update-v2",
+        "div.occludable-update",
+        "div[data-id*='urn:li:activity']",
+        "article",
+        "div.feed-shared-post",
+    ]
+
+    found_elements = []
+    for loc_str in locators:
+        loc = page.locator(loc_str)
+        cnt = await loc.count()
+        if cnt > 0:
+            for i in range(cnt):
+                found_elements.append(loc.nth(i))
+            break
+
+    seen_texts = set()
+    for elem in found_elements:
+        if len(posts) >= max_posts:
+            break
         text = ""
         url = None
 
@@ -29,17 +101,25 @@ async def extract_posts_from_feed(page: Page, max_posts: int = 10) -> list[dict[
             raw_text = await elem.inner_text()
             text = raw_text.strip() if raw_text else ""
         except Exception as e:
-            logger.warning(f"Error reading inner_text for post element {i}: {e}")
+            logger.warning(f"Error reading inner_text for post element: {e}")
+
+        if not text or text in seen_texts:
+            continue
 
         try:
-            link_loc = elem.locator("a.app-aware-link[href*='/feed/update/']")
+            link_loc = elem.locator("a.app-aware-link[href*='/feed/update/'], a[href*='/posts/'], a[href*='/recent-activity/']")
             if await link_loc.count() > 0:
                 url = await link_loc.first.get_attribute("href")
         except Exception as e:
-            logger.warning(f"Error extracting update URL for post element {i}: {e}")
+            logger.warning(f"Error extracting update URL: {e}")
 
-        if text or url:
-            posts.append({"text": text, "url": url})
+        is_valid, credentials = is_valid_job_post(text, url)
+        if not is_valid:
+            logger.debug("Post discarded by Guard-Rail check (missing valid URL, credentials, or text noise).")
+            continue
+
+        seen_texts.add(text)
+        posts.append({"text": text, "url": url, "credentials": credentials})
 
     return posts
 
@@ -71,9 +151,10 @@ async def run_posts_scraper(cdp_url: str | None = None, max_posts: int = 10) -> 
 
         logger.info("Navigating to https://www.linkedin.com/feed/ ...")
         await page.goto("https://www.linkedin.com/feed/", wait_until="domcontentloaded")
+        await page.wait_for_timeout(3000)
 
         extracted_posts = await extract_posts_from_feed(page, max_posts=max_posts)
-        logger.info(f"Extracted {len(extracted_posts)} post(s) from feed.")
+        logger.info(f"Extracted {len(extracted_posts)} post(s) passing strict Guard-Rails.")
 
         for p_dict in extracted_posts:
             post_record = save_linkedin_post(text=p_dict.get("text", ""), url=p_dict.get("url"))
@@ -88,20 +169,24 @@ def run_agy_harness_1(prompt: str | None = None, container_name: str = "antigrav
     """
     Harness 1 AGY Agent Runner:
     Delegates post searching and navigation task to the Google Antigravity SDK (`agy` CLI) agent
-    running inside the dedicated container harness.
+    running inside the dedicated container harness with strict Guard-Rails.
     """
     default_prompt = (
-        "1. Read the candidate personal profile from resources/profile.md. Analyze key skills, tech stack, and experience.\n"
-        "2. Dynamically extract and expand all potential matching target job titles based strictly on the candidate's skills and experience in resources/profile.md.\n"
+        "STRICT GUARD-RAILS & NON-NEGOTIABLE VALIDATION RULES:\n"
+        "1. Read the candidate personal profile from resources/profile.md. Meticulously analyze skills and experience.\n"
+        "2. Dynamically expand candidate target job titles based strictly on profile skills (PLC, SCADA, Automation, Control Systems).\n"
         "3. Connect to CloakBrowser CDP at http://cloak-browser:9222 and navigate the LinkedIn posts feed.\n"
-        "4. Extract the 10 most recent posts with high skills matching against the candidate profile.\n"
-        "5. Save extracted vacancies directly into the SQLite database data/app.db following this exact ORM schema:\n"
-        "   - 'vacancy' table: title (String 200), text (Text - full post text), credentials (String 500 - contact email/HR info), url (String 200 - post permalink), source='LinkedIn', visa_status='NOT_SPECIFIED', processed=False, deleted=False.\n"
-        "   - 'linkedin_post' table: text (Text), url (Text), vacancy_id (Integer ForeignKey 'vacancy.id'), processed=False, deleted=False.\n"
-        "Ensure all extracted records are normalized and saved into SQLite data/app.db."
+        "4. FOR EVERY POST EVALUATED:\n"
+        "   - RULE A (MANDATORY URL): The post MUST have a valid, direct permalink URL. If URL is missing or invalid, DISCARD post immediately.\n"
+        "   - RULE B (MANDATORY CREDENTIALS/EMAIL): The post MUST contain recruiter contact credentials (email address, direct apply link, or explicit contact method). If missing, DISCARD post immediately.\n"
+        "   - RULE C (NO NOISE): Do NOT save generic UI elements, profile widgets, ads, or posts without vacancy details. Skip them and move to next post.\n"
+        "5. For valid posts meeting ALL guard-rails, save directly into SQLite database data/app.db following ORM schema:\n"
+        "   - 'vacancy' table: title (String 200), text (Text), credentials (String 500 - mandatory email/contact), url (String 200 - mandatory permalink), source='LinkedIn', visa_status='NOT_SPECIFIED', processed=False, deleted=False.\n"
+        "   - 'linkedin_post' table: text (Text), url (Text - mandatory permalink), vacancy_id (Integer ForeignKey 'vacancy.id'), processed=False, deleted=False.\n"
+        "Be extremely thoughtful, meticulous, and strict. Do not save any record unless both URL and contact credentials exist."
     )
     task_prompt = prompt or default_prompt
-    logger.info("Triggering Harness 1 agy agent in container '%s'...", container_name)
+    logger.info("Triggering Harness 1 agy agent in container '%s' with strict Guard-Rails...", container_name)
 
     cmd = [
         "podman",
