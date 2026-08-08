@@ -1,38 +1,39 @@
 services:
-  selenium:
-    image: docker.io/selenium/standalone-chromium
-    container_name: selenium
+  cloak-browser:
+    image: cloakhq/cloakbrowser:latest
+    container_name: cloak-browser
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      - PORT=6080
+      - CDP_PORT=9222
     ports:
-      - "4444:4444"
-      - "${NOVNC_PORT:-7900}:7900"
-    shm_size: '2g'
+      - "9222:9222"
+      - "6080:6080"
+      - "5900:5900"
+    volumes:
+      - ./auth:/app/auth
     networks:
       - ljpa-network
-    environment:
-      - SE_VNC_NO_PASSWORD=1
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:4444/wd/hub/status" ]
-      interval: 1s
-      timeout: 3s
-      retries: 30
 
   linkedin-bot:
     build: .
     container_name: linkedin-bot
     depends_on:
-      selenium:
-        condition: service_healthy
+      cloak-browser:
+        condition: service_started
     volumes:
+      - ./auth:/app/auth
+      - ./data:/app/data
       - ./resources:/app/resources
       - ./src:/app/src
     env_file:
       - .env
     environment:
-      - CDP_URL=http://selenium:4444
-    command: uv run /app/src/ljpa_reworked/main.py
+      - CDP_URL=${CDP_URL:-http://cloak-browser:9222}
+    command: uv run src/ljpa_reworked/main.py
     networks:
       - ljpa-network
-        
 
 networks:
   ljpa-network:
