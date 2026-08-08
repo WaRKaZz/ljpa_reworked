@@ -23,3 +23,27 @@ def test_compose_yml_structure():
     volumes = [str(v) for v in bot.get("volumes", [])]
     assert any("./resources:/app/resources" in v for v in volumes), "linkedin-bot must mount ./resources:/app/resources"
     assert any("./data:/app/data" in v for v in volumes), "linkedin-bot must mount ./data:/app/data"
+
+def test_compose_dev_yml_structure():
+    compose_dev_path = Path("compose.dev.yml")
+    assert compose_dev_path.exists(), "compose.dev.yml must exist"
+
+    with open(compose_dev_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    services = config.get("services", {})
+    assert "antigravity-cli-dev" in services, "compose.dev.yml must contain service 'antigravity-cli-dev'"
+
+    dev_service = services["antigravity-cli-dev"]
+    volumes = [str(v) for v in dev_service.get("volumes", [])]
+    
+    assert any("./src/ljpa_reworked/services/harness/linkedin_posts_agent.py:/app/linkedin_posts_agent.py:ro" in v for v in volumes), "must mount linkedin_posts_agent.py read-only"
+    assert any("./src/ljpa_reworked/services/harness/jobspy_etl_fetcher.py:/app/jobspy_etl_fetcher.py:ro" in v for v in volumes), "must mount jobspy_etl_fetcher.py read-only"
+
+def test_dockerfile_antigravity_config():
+    dockerfile_path = Path("Dockerfile.antigravity")
+    assert dockerfile_path.exists(), "Dockerfile.antigravity must exist"
+
+    content = dockerfile_path.read_text(encoding="utf-8")
+    assert "python-jobspy" in content, "Dockerfile.antigravity must install python-jobspy"
+
