@@ -1,21 +1,67 @@
 import asyncio
 import logging
 import os
+import socket
+import sys
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
+from dotenv import load_dotenv
 from playwright.async_api import async_playwright, BrowserContext, Page
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+load_dotenv()
+
+# Force unbuffered stdout logging
+sys.stdout.reconfigure(line_buffering=True)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 DEFAULT_SAVE_PATH = Path("resources/state.json")
 
 def get_cdp_endpoint() -> str:
-    """Returns the CDP endpoint HTTP/WS URL from env or defaults to http://localhost:9222."""
-    url = os.getenv("CDP_URL", "http://localhost:9222")
+    """Returns the CDP endpoint HTTP/WS URL from env or defaults to http://localhost:9222?fingerprint=linkedin_seed."""
+    url = os.getenv("CDP_URL", "http://localhost:9222?fingerprint=linkedin_seed")
     if not url.startswith("ws://") and not url.startswith("http://"):
         url = f"http://{url}"
+    if "cloak-browser" in url:
+        try:
+            socket.gethostbyname("cloak-browser")
+        except socket.gaierror:
+            url = url.replace("cloak-browser", "localhost")
+    if "fingerprint" not in url:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}fingerprint=linkedin_seed"
     return url
+
+def clean_env_val(val: Optional[str]) -> str:
+    """Helper to strip enclosing quotes from env string values."""
+    if not val:
+        return ""
+    val = val.strip()
+    if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+        return val[1:-1]
+    return val
+
+async def fill_login_form(page: Page, email: str, password: str) -> bool:
+    """Fills the LinkedIn login credentials and submits the form using resilient :visible locators."""
+    try:
+        email_locator = page.locator("input[type='email']:visible, #username:visible, input[name='session_key']:visible")
+        if await email_locator.count() > 0:
+            logger.info("Found visible email field. Filling email from .env...")
+            await email_locator.first.fill(email)
+            
+            password_locator = page.locator("input[type='password']:visible, #password:visible, input[name='session_password']:visible")
+            await password_locator.first.fill(password)
+            
+            submit_btn = page.locator("button[type='submit']:visible, .btn__primary--large:visible")
+            if await submit_btn.count() > 0:
+                await submit_btn.first.click()
+            else:
+                await password_locator.first.press("Enter")
+            logger.info("Credentials submitted successfully. Waiting for authentication / 2FA...")
+            return True
+    except Exception as e:
+        logger.warning(f"Error filling login form: {e}")
+    return False
 
 async def check_login_success(
     page: Page,
@@ -25,7 +71,7 @@ async def check_login_success(
     timeout: float = 3600.0,
 ) -> bool:
     """
-    Polls the browser page until logged-in navigation element (.global-nav__me) is present,
+    Polls the browser page until logged-in navigation element or feed URL is present,
     then saves storage_state to state_path.
     """
     path = Path(state_path)
@@ -34,10 +80,15 @@ async def check_login_success(
 
     while True:
         try:
-            if await page.locator(".global-nav__me").count() > 0:
-                logger.info("Successful LinkedIn login detected!")
+            is_feed_url = "/feed" in page.url or "/in/" in page.url
+            has_nav_element = (
+                await page.locator(".global-nav__me, header.global-nav, button:has-text('Me')").count() > 0
+            )
+
+            if is_feed_url or has_nav_element:
+                logger.info(f"Successful LinkedIn login detected on {page.url}!")
                 await context.storage_state(path=str(path))
-                logger.info(f"Session state successfully saved to {path}")
+                logger.info(f"Session state successfully saved to '{path}'")
                 return True
         except Exception as e:
             logger.debug(f"Checking login status: {e}")
@@ -52,6 +103,9 @@ async def check_login_success(
 async def main(state_path: Union[str, Path] = DEFAULT_SAVE_PATH):
     save_path = Path(state_path)
     cdp_url = get_cdp_endpoint()
+    email = clean_env_val(os.getenv("LINKEDIN_EMAIL"))
+    password = clean_env_val(os.getenv("LINKEDIN_PASSWORD"))
+
     logger.info(f"Connecting to CloakBrowser container via CDP endpoint at {cdp_url}...")
 
     async with async_playwright() as p:
@@ -60,10 +114,17 @@ async def main(state_path: Union[str, Path] = DEFAULT_SAVE_PATH):
             context = browser.contexts[0] if browser.contexts else await browser.new_context()
             page = context.pages[0] if context.pages else await context.new_page()
 
-            logger.info("Navigating to https://www.linkedin.com/login ...")
-            await page.goto("https://www.linkedin.com/login", wait_until="domcontentloaded")
-            logger.info("Please perform LinkedIn login and complete 2FA if prompted.")
+            # Check if already logged in or needs login
+            if "/feed" not in page.url:
+                logger.info("Navigating to https://www.linkedin.com/login ...")
+                await page.goto("https://www.linkedin.com/login", wait_until="domcontentloaded")
 
+                if email and password:
+                    await fill_login_form(page, email, password)
+                else:
+                    logger.warning("LINKEDIN_EMAIL or LINKEDIN_PASSWORD missing in .env")
+
+            logger.info("If 2FA or CAPTCHA appears, please complete it manually.")
             success = await check_login_success(page, context, state_path=save_path, timeout=3600.0)
             if success:
                 logger.info(f"LinkedIn authentication state successfully saved to '{save_path}'!")
