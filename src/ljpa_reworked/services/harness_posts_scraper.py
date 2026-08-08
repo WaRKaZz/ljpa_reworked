@@ -56,6 +56,17 @@ async def run_posts_scraper(cdp_url: str | None = None, max_posts: int = 10) -> 
         logger.info(f"Harness 1 connecting to CDP endpoint: {endpoint}")
         browser = await p.chromium.connect_over_cdp(endpoint)
         context = browser.contexts[0] if browser.contexts else await browser.new_context()
+
+        # Load auth cookies if state file exists
+        from ljpa_reworked.auth.session import DEFAULT_STATE_PATH, verify_auth_state, load_auth_state
+        if verify_auth_state(DEFAULT_STATE_PATH):
+            try:
+                state = load_auth_state(DEFAULT_STATE_PATH)
+                await context.add_cookies(state.get("cookies", []))
+                logger.info("Loaded auth state cookies into Playwright context.")
+            except Exception as e:
+                logger.warning(f"Could not load cookies from state file: {e}")
+
         page = context.pages[0] if context.pages else await context.new_page()
 
         logger.info("Navigating to https://www.linkedin.com/feed/ ...")
@@ -69,3 +80,42 @@ async def run_posts_scraper(cdp_url: str | None = None, max_posts: int = 10) -> 
             saved_posts.append(post_record)
 
     return saved_posts
+
+
+import subprocess
+
+def run_agy_harness_1(prompt: str | None = None, container_name: str = "antigravity-cli-dev") -> str:
+    """
+    Harness 1 AGY Agent Runner:
+    Delegates post searching and navigation task to the Google Antigravity SDK (`agy` CLI) agent
+    running inside the dedicated container harness.
+    """
+    default_prompt = (
+        "1. Read the candidate personal profile from resources/profile.md. Analyze key skills, tech stack, and experience.\n"
+        "2. Expand candidate target job titles into as many matching potential roles as possible "
+        "(e.g., Senior Python Engineer, Backend Developer, AI/ML Engineer, Fullstack Python Lead, Software Architect).\n"
+        "3. Connect to CloakBrowser CDP at http://cloak-browser:9222 and navigate the LinkedIn posts feed.\n"
+        "4. Extract the 10 most recent posts with high skills matching against the candidate profile.\n"
+        "5. Save extracted vacancies directly into the SQLite database data/app.db following this exact ORM schema:\n"
+        "   - 'vacancy' table: title (String 200), text (Text - full post text), credentials (String 500 - contact email/HR info), url (String 200 - post permalink), source='LinkedIn', visa_status='NOT_SPECIFIED', processed=False, deleted=False.\n"
+        "   - 'linkedin_post' table: text (Text), url (Text), vacancy_id (Integer ForeignKey 'vacancy.id'), processed=False, deleted=False.\n"
+        "Ensure all extracted records are normalized and saved into SQLite data/app.db."
+    )
+    task_prompt = prompt or default_prompt
+    logger.info("Triggering Harness 1 agy agent in container '%s'...", container_name)
+
+    cmd = [
+        "podman",
+        "exec",
+        container_name,
+        "agy",
+        "--print",
+        "--dangerously-skip-permissions",
+        task_prompt,
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return res.stdout
+    except subprocess.CalledProcessError as e:
+        logger.error("Error executing agy harness in container: %s", e.stderr)
+        raise
