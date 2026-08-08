@@ -447,19 +447,28 @@ Success means:
 Never claim success based only on extracted browser content. Success requires verified rows in data/app.db.
 """
     task_prompt = prompt or default_prompt
-    logger.info("Triggering Harness 1 agy agent in container '%s' with strict Guard-Rails and Self-Verification...", container_name)
+    if prompt:
+        cmd = [
+            "podman",
+            "exec",
+            container_name,
+            "agy",
+            "--print",
+            "--print-timeout",
+            "15m",
+            "--dangerously-skip-permissions",
+            prompt,
+        ]
+    else:
+        cmd = [
+            "podman",
+            "exec",
+            container_name,
+            "bash",
+            "-c",
+            'agy --print --print-timeout 15m --dangerously-skip-permissions "$(cat /app/data/harness_prompt.txt)"',
+        ]
 
-    cmd = [
-        "podman",
-        "exec",
-        container_name,
-        "agy",
-        "--print",
-        "--print-timeout",
-        "15m",
-        "--dangerously-skip-permissions",
-        task_prompt,
-    ]
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return res.stdout

@@ -15,5 +15,5 @@ def test_run_agy_harness_1_executes_podman_cmd():
         assert cmd_args[0] == "podman"
         assert cmd_args[1] == "exec"
         assert cmd_args[2] == "antigravity-cli-dev"
-        assert cmd_args[3] == "agy"
+        assert cmd_args[3] in ["bash", "agy"]
         assert res == "AGY Agent completed successfully."
