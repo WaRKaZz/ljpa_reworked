@@ -1,4 +1,5 @@
 import logging
+import os
 import subprocess
 
 logger = logging.getLogger(__name__)
@@ -475,3 +476,34 @@ Never claim success based only on extracted browser content. Success requires ve
     except subprocess.CalledProcessError as e:
         logger.error("Error executing agy harness in container: %s", e.stderr)
         raise
+
+
+async def run_agy_harness_sdk(prompt: str | None = None) -> str:
+    """
+    Programmatic Harness 1 runner leveraging official google-antigravity Python SDK.
+    """
+    import asyncio
+    from google.antigravity import Agent, CapabilitiesConfig, LocalAgentConfig
+
+    prompt_file = os.path.join("data", "harness_prompt.txt")
+    if prompt:
+        task_prompt = prompt
+    elif os.path.exists(prompt_file):
+        with open(prompt_file, "r", encoding="utf-8") as f:
+            task_prompt = f.read()
+    else:
+        task_prompt = "/goal Discover and audit 10 LinkedIn vacancies into data/app.db"
+
+    logger.info("Initializing Harness 1 via google.antigravity Python SDK...")
+    config = LocalAgentConfig(
+        system_instructions="You are Harness 1 LinkedIn Post Vacancy Discovery Agent.",
+        capabilities=CapabilitiesConfig(),
+    )
+    tokens = []
+    async with Agent(config) as agent:
+        resp = await agent.chat(task_prompt)
+        async for token in resp:
+            tokens.append(token)
+
+    return "".join(tokens)
+

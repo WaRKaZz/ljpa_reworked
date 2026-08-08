@@ -6,7 +6,9 @@ requires-python = ">=3.10,<3.14"
 dependencies = [
     "alembic>=1.16.2",
     "crewai[tools]>=0.148.0",
+    "google-antigravity>=0.1.10",
     "playwright>=1.55.0",
+    "protobuf>=7.35.0",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.4.0",
     "python-jobspy>=1.1.80",
