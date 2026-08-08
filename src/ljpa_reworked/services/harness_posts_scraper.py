@@ -110,6 +110,8 @@ def run_agy_harness_1(prompt: str | None = None, container_name: str = "antigrav
         container_name,
         "agy",
         "--print",
+        "--print-timeout",
+        "15m",
         "--dangerously-skip-permissions",
         task_prompt,
     ]
