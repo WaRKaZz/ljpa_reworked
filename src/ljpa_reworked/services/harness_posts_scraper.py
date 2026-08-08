@@ -92,8 +92,7 @@ def run_agy_harness_1(prompt: str | None = None, container_name: str = "antigrav
     """
     default_prompt = (
         "1. Read the candidate personal profile from resources/profile.md. Analyze key skills, tech stack, and experience.\n"
-        "2. Expand candidate target job titles into as many matching potential roles as possible "
-        "(e.g., Senior Python Engineer, Backend Developer, AI/ML Engineer, Fullstack Python Lead, Software Architect).\n"
+        "2. Dynamically extract and expand all potential matching target job titles based strictly on the candidate's skills and experience in resources/profile.md.\n"
         "3. Connect to CloakBrowser CDP at http://cloak-browser:9222 and navigate the LinkedIn posts feed.\n"
         "4. Extract the 10 most recent posts with high skills matching against the candidate profile.\n"
         "5. Save extracted vacancies directly into the SQLite database data/app.db following this exact ORM schema:\n"

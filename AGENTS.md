@@ -10,7 +10,7 @@ All Harness agents are executed inside the dedicated **`antigravity-cli` (`agy`)
   - **Container & Engine**: `antigravity-cli` container (`antigravity-cli-dev`) executing the Google Antigravity SDK (`agy` CLI) via `podman exec` / `docker exec` + MCP Unbrowse / Playwright server.
   - **Prompt Execution**: Triggered via `agy --print --dangerously-skip-permissions "<prompt>"`.
   - **Prompt Instructions**:
-    1. Reads candidate profile from `resources/profile.md` and expands candidate target job titles across multiple relevant roles (e.g. Senior Python Developer, Backend Engineer, AI/ML Engineer, Fullstack Engineer, Tech Lead).
+    1. Reads candidate profile from `resources/profile.md` and dynamically extracts/expands candidate target job titles across all matching potential roles based strictly on profile skills and experience.
     2. Connects to `http://cloak-browser:9222` to navigate LinkedIn Posts feed.
     3. Extracts the **10 most recent vacancy posts with high candidate skills matching**.
     4. Maps fields and persists records into SQLite (`data/app.db`) following SQLAlchemy ORM schema:

@@ -32,7 +32,7 @@ This document describes the plan for migrating from the legacy Selenium architec
 **Collection Pipelines (Harnesses inside `antigravity-cli` container):**
 1. **Harness 1: LinkedIn Posts Scraper (`agy` Agent + MCP Unbrowse)**
    * **Execution Environment:** `antigravity-cli` container (`antigravity-cli-dev`) executed via `podman exec` running `agy --print --dangerously-skip-permissions "<prompt>"`.
-   - **Logic & Prompting:** The `agy` agent receives candidate profile context (`resources/profile.md`), expands target candidate job titles across multiple relevant roles (Senior Python Developer, Backend Engineer, AI/ML Engineer, Fullstack, Tech Lead), and executes natural language web navigation commands via the MCP browser server.
+   - **Logic & Prompting:** The `agy` agent receives candidate profile context (`resources/profile.md`), dynamically extracts and expands target candidate job titles across all matching potential roles based strictly on profile skills, and executes natural language web navigation commands via the MCP browser server.
    * **Execution:** Connects to `http://cloak-browser:9222`, loads `resources/state.json`, navigates to LinkedIn Posts, and extracts the **10 most recent posts with high skills matching**.
    * **Data Storage:** Maps fields and normalizes data into SQLAlchemy models, saving records directly to SQLite (`data/app.db`) across `Vacancy` and `LinkedinPost` tables.
 
