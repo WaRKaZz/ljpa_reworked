@@ -22,6 +22,27 @@ def create_linkedin_post(
     return post
 
 
+def save_linkedin_post(
+    text: str,
+    url: str | None = None,
+    screenshot_path: str | None = None,
+    db: Session | None = None,
+) -> LinkedinPost:
+    """Save a LinkedIn post record to SQLite."""
+    if db is not None:
+        return create_linkedin_post(
+            db=db, text=text, screenshot_path=screenshot_path, url=url
+        )
+
+    from ljpa_reworked.database import SessionLocal
+
+    with SessionLocal() as session:
+        return create_linkedin_post(
+            db=session, text=text, screenshot_path=screenshot_path, url=url
+        )
+
+
+
 def get_linkedin_post_by_id(db: Session, post_id: int) -> LinkedinPost | None:
     """Get a LinkedIn post by its ID, excluding soft-deleted ones."""
     return (
