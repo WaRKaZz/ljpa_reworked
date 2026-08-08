@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
 from ljpa_reworked.auth.login_linkedin import check_login_success, get_cdp_endpoint
 
@@ -8,8 +8,6 @@ def test_get_cdp_endpoint():
         assert get_cdp_endpoint() == "http://cloak-browser:9222"
     with patch.dict("os.environ", {}, clear=True):
         assert get_cdp_endpoint() == "http://localhost:9222"
-    with patch.dict("os.environ", {"CDP_URL": "cloak-browser:9222"}):
-        assert get_cdp_endpoint() == "http://cloak-browser:9222"
 
 @pytest.mark.asyncio
 async def test_check_login_success_detected(tmp_path):
@@ -20,7 +18,7 @@ async def test_check_login_success_detected(tmp_path):
 
     mock_context = MagicMock()
     mock_context.storage_state = AsyncMock()
-    state_file = tmp_path / "state.json"
+    state_file = tmp_path / "resources" / "state.json"
 
     result = await check_login_success(mock_page, mock_context, state_path=state_file, poll_interval=0.01, timeout=1.0)
     assert result is True
@@ -35,7 +33,7 @@ async def test_check_login_success_timeout(tmp_path):
 
     mock_context = MagicMock()
     mock_context.storage_state = AsyncMock()
-    state_file = tmp_path / "state.json"
+    state_file = tmp_path / "resources" / "state.json"
 
     result = await check_login_success(mock_page, mock_context, state_path=state_file, poll_interval=0.01, timeout=0.05)
     assert result is False

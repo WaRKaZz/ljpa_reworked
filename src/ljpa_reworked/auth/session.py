@@ -5,15 +5,22 @@ from typing import Any, Dict, Union
 
 logger = logging.getLogger(__name__)
 
-def verify_auth_state(state_path: Union[str, Path] = "auth/state.json") -> bool:
+DEFAULT_STATE_PATH = Path("resources/state.json")
+
+def verify_auth_state(state_path: Union[str, Path] = DEFAULT_STATE_PATH) -> bool:
     """
     Validates whether the Playwright storage_state JSON file exists, is well-formed,
     and contains required authentication cookies (such as 'li_at' for LinkedIn).
     """
     path = Path(state_path)
     if not path.exists():
-        logger.warning(f"Auth state file does not exist: {path}")
-        return False
+        # Fallback check for auth/state.json if default resources/state.json not found
+        fallback = Path("auth/state.json")
+        if path == DEFAULT_STATE_PATH and fallback.exists():
+            path = fallback
+        else:
+            logger.warning(f"Auth state file does not exist: {path}")
+            return False
         
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -40,12 +47,15 @@ def verify_auth_state(state_path: Union[str, Path] = "auth/state.json") -> bool:
         logger.error(f"Failed to read or parse auth state file {path}: {e}")
         return False
 
-def load_auth_state(state_path: Union[str, Path] = "auth/state.json") -> Dict[str, Any]:
+def load_auth_state(state_path: Union[str, Path] = DEFAULT_STATE_PATH) -> Dict[str, Any]:
     """
     Loads and returns the storage_state dictionary from state_path.
     Raises ValueError if state file is invalid.
     """
     path = Path(state_path)
+    if not verify_auth_state(path) and path == DEFAULT_STATE_PATH and Path("auth/state.json").exists():
+        path = Path("auth/state.json")
+
     if not verify_auth_state(path):
         raise ValueError(f"Invalid or missing auth state file at {path}")
     return json.loads(path.read_text(encoding="utf-8"))

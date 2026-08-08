@@ -4,15 +4,10 @@ services:
     container_name: cloak-browser-dev
     security_opt:
       - seccomp:unconfined
-    environment:
-      - PORT=6080
-      - CDP_PORT=9222
     ports:
       - "9222:9222"
-      - "6080:6080"
-      - "5900:5900"
     volumes:
-      - ./auth:/app/auth
+      - ./resources:/app/resources
     networks:
       - ljpa-network
 
