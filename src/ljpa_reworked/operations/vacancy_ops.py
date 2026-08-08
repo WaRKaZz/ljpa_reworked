@@ -19,7 +19,7 @@ def create_vacancy(
         title=vacancy_data.title,
         text=vacancy_data.text,
         credentials=vacancy_data.credentials,
-        visa_status=vacancy_data.visa_status.value,
+        visa_status=vacancy_data.visa_status,
         url=vacancy_data.url,
         source=source,
     )
@@ -27,6 +27,66 @@ def create_vacancy(
     db.commit()
     db.refresh(vacancy)
     return vacancy
+
+
+def create_vacancy_direct(
+    db: Session,
+    title: str,
+    text: str,
+    credentials: str | None = None,
+    url: str | None = None,
+    source: DataSource = DataSource.linkedin,
+    visa_status: VisaStatus = VisaStatus.not_mentioned,
+) -> Vacancy:
+    """Create a new vacancy record from direct field attributes."""
+    vacancy = Vacancy(
+        title=title,
+        text=text,
+        credentials=credentials,
+        url=url,
+        source=source,
+        visa_status=visa_status,
+    )
+    db.add(vacancy)
+    db.commit()
+    db.refresh(vacancy)
+    return vacancy
+
+
+def save_vacancy(
+    title: str,
+    text: str,
+    credentials: str | None = None,
+    url: str | None = None,
+    source: DataSource = DataSource.linkedin,
+    visa_status: VisaStatus = VisaStatus.not_mentioned,
+    db: Session | None = None,
+) -> Vacancy:
+    """Save a vacancy record to SQLite database."""
+    if db is not None:
+        return create_vacancy_direct(
+            db=db,
+            title=title,
+            text=text,
+            credentials=credentials,
+            url=url,
+            source=source,
+            visa_status=visa_status,
+        )
+
+    from ljpa_reworked.database import SessionLocal
+
+    with SessionLocal() as session:
+        return create_vacancy_direct(
+            db=session,
+            title=title,
+            text=text,
+            credentials=credentials,
+            url=url,
+            source=source,
+            visa_status=visa_status,
+        )
+
 
 
 def get_vacancy_by_id(db: Session, vacancy_id: int) -> Vacancy | None:
