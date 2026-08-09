@@ -1,6 +1,6 @@
 services:
   cloak-browser:
-    image: cloakhq/cloakbrowser:latest
+    image: docker.io/cloakhq/cloakbrowser:latest
     container_name: cloak-browser
     security_opt:
       - seccomp:unconfined
