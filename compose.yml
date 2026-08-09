@@ -12,25 +12,25 @@ services:
     networks:
       - ljpa-network
 
-  linkedin-bot:
-    build: .
-    container_name: linkedin-bot
-    depends_on:
-      cloak-browser:
-        condition: service_started
-    volumes:
-      - ./resources:/app/resources
-      - ./data:/app/data
-      - ./src:/app/src
-      - ./tests:/app/tests
-      - ./compose.yml:/app/compose.yml
-    env_file:
-      - .env
-    environment:
-      - CDP_URL=${CDP_URL:-http://cloak-browser:9222}
-    command: uv run src/ljpa_reworked/main.py
-    networks:
-      - ljpa-network
+#  linkedin-bot:
+#    build: .
+#    container_name: linkedin-bot
+#    depends_on:
+#      cloak-browser:
+#        condition: service_started
+#    volumes:
+#      - ./resources:/app/resources
+#      - ./data:/app/data
+#      - ./src:/app/src
+#      - ./tests:/app/tests
+#      - ./compose.yml:/app/compose.yml
+#    env_file:
+#      - .env
+#    environment:
+#      - CDP_URL=${CDP_URL:-http://cloak-browser:9222}
+#    command: uv run src/ljpa_reworked/main.py
+#    networks:
+#      - ljpa-network
 
   antigravity-cli:
     build:
@@ -38,6 +38,8 @@ services:
       dockerfile: Dockerfile.antigravity
     container_name: antigravity-cli
     userns_mode: "keep-id"
+    ports:
+      - "8080:8080"
     depends_on:
       cloak-browser:
         condition: service_started
