@@ -56,7 +56,7 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/home/agent/.config/gcloud/application_default_credentials.json
     stdin_open: true
     tty: true
-    command: uv run /app/harness_server.py
+    command: python3 /app/harness_server.py
     networks:
       - ljpa-network
 
