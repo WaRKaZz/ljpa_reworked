@@ -37,6 +37,7 @@ services:
       context: .
       dockerfile: Dockerfile.antigravity
     container_name: antigravity-cli
+    userns_mode: "keep-id"
     depends_on:
       cloak-browser:
         condition: service_started
@@ -46,16 +47,16 @@ services:
       - ./prompts:/app/prompts
       - ./src/ljpa_reworked/services/harness:/app:ro
       - ./.agents:/app/.agents
-      - ./.gemini:/root/.gemini
-      - ./data/gcloud:/root/.config/gcloud
+      - ./.gemini:/home/agent/.gemini
+      - ./data/gcloud:/home/agent/.config/gcloud
     env_file:
       - .env
     environment:
       - CDP_URL=${CDP_URL:-http://cloak-browser:9222}
-      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - GOOGLE_APPLICATION_CREDENTIALS=/home/agent/.config/gcloud/application_default_credentials.json
     stdin_open: true
     tty: true
-    command: tail -f /dev/null
+    command: uv run /app/harness_server.py
     networks:
       - ljpa-network
 
