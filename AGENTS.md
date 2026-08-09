@@ -6,37 +6,14 @@ This document outlines the AI agents, crews, and tools utilized in the project.
 
 All Harness agents are executed inside the dedicated **`antigravity-cli` (`agy`)** container, leveraging persistent skills, MCP servers (`.gemini`), session storage (`resources/state.json`), candidate resume (`resources/Danilov_Latest_CV.pdf`), and candidate personal profile (`resources/profile.md`).
 
-- **`Harness 1: Post Search Agent`**:
-  - **Container & Engine**: `antigravity-cli` container (`antigravity-cli-dev`) executing the Google Antigravity SDK (`agy` CLI) via `podman exec` / `docker exec` + MCP Unbrowse / Playwright server.
-  - **Prompt Execution**: Triggered via `agy --print --dangerously-skip-permissions "<prompt>"`.
-  - **Mandatory Tool**: MUST use the **MCP Unbrowse server (`mcp-unbrowse`)** for all browser navigation, search, and page extraction over `http://cloak-browser:9222`.
-  - **Prompt Structure**: Formatted as a depersonalized `/goal` specification prompt.
-  - **Prompt Instructions & Guard-Rails**:
-    1. **Dynamic Profile Ingestion**: Reads candidate files in `resources/` (e.g. `resources/profile.md`) and dynamically extracts candidate skills, domain experience, and matching roles without any hardcoded names or job titles.
-    2. **Feed Extraction via MCP Unbrowse**: Connects to `http://cloak-browser:9222` via MCP Unbrowse to navigate LinkedIn feed (`https://www.linkedin.com/feed/`) across up to 3 passes.
-    3. **STRICT GUARD-RAILS & DEDUPLICATION**:
-       - **Rule 1 (30-Day Deduplication)**: Skips any post whose URL or identical text already exists in SQLite (`data/app.db`) from the last 30 days (`created_at > datetime('now', '-30 days')`).
-       - **Rule 2 (Mandatory Credentials/Email)**: Discards any post missing recruiter contact email address or explicit apply link.
-       - **Rule 3 (URL Flexibility & Qualitative Match)**: Direct permalink URL preferred; profile URL or email-verified post text accepted if direct URL is missing. Qualitative semantic matching against candidate skills.
-    4. **SELF-VERIFICATION & POST-AUDIT CLEANUP LOOP**:
-       - Inspects saved records in SQLite (`data/app.db`).
-       - Executes SQL DELETE for any incomplete/invalid rows.
-       - Continues extraction up to 3 passes max until 10 fresh, 30-day deduplicated vacancies are saved (or finalizes with valid saved count after 3 passes).
-    5. Maps fields and persists records into SQLite (`data/app.db`) following SQLAlchemy ORM schema:
-       - `Vacancy` table (`title`, `text`, `credentials`, `url`, `source`="LinkedIn", `visa_status`="NOT_SPECIFIED", `processed`=False, `deleted`=False)
-       - `LinkedinPost` table (`text`, `url`, `screenshot_path`, `vacancy_id`, `processed`=False, `deleted=False`)
-  - **Output**: Validated SQLAlchemy records stored directly into SQLite (`data/app.db`).
+- **`Harness 1: Post Search Agent`** (`linkedin_posts_agent.py`):
+  - **Container & Engine**: `antigravity-cli` container (`antigravity-cli-dev`) executing the Google Antigravity SDK (`google.antigravity`) + MCP Unbrowse / Playwright server over `http://cloak-browser:9222`.
+  - **Purpose**: Autonomous agent navigating LinkedIn feed (`https://www.linkedin.com/feed/`), extracting unformatted recruiter posts, validating contact credentials (email/apply link), and persisting Vacancy/LinkedinPost records to SQLite (`data/app.db`).
 
-- **`Harness 2: Official Job Postings Scraper`**:
-  - **Container & Engine**: `antigravity-cli` container (`agy` CLI) executing `python-jobspy` ETL pipeline.
-  - **Purpose**: API-level collection and deduplication of official LinkedIn job postings.
-  - **Output**: Validated vacancy records saved to SQLite (`data/app.db`).
-
-- **`Harness 3: Web Application Agent`**:
-  - **Container & Engine**: `antigravity-cli` container (`agy` CLI) + MCP Unbrowse / Playwright server.
-  - **Purpose**: Fallback web application agent for job vacancies lacking recruiter email addresses.
-  - **Context**: Uses candidate profile (`resources/profile.md`) and ATS resume (`resources/Danilov_Latest_CV.pdf`).
-  - **Output**: Submits job application forms via external web portals or LinkedIn Easy Apply using the user's RenderCV PDF resume.
+- **`Harness 2: Auto-Apply Web Application Agent`** (`auto_apply_agent.py`):
+  - **Container & Engine**: `antigravity-cli` container (`antigravity-cli-dev`) executing Google Antigravity SDK + MCP Unbrowse / Playwright server over `http://cloak-browser:9222`.
+  - **Purpose**: Autonomous agent taking job vacancy apply URLs directly from SQLite DB (`data/app.db`) and filling out external web application forms or LinkedIn Easy Apply using the candidate's RenderCV compiled PDF resume (`resources/Danilov_Latest_CV.pdf`) and candidate profile (`resources/profile.md`).
+  - **Output**: Submits job application forms and updates vacancy status in SQLite database.
 
 ## 2. CrewAI Crews
 

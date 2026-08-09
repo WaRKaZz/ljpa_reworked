@@ -14,8 +14,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gnupg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Official Antigravity CLI (agy) via curl
-RUN curl -fsSL https://antigravity.google/install.sh | bash || true
+# Install Google Cloud SDK (gcloud CLI) via official Debian apt repository
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
+    && apt-get update && apt-get install -y --no-install-recommends google-cloud-cli \
+    && rm -rf /var/lib/apt/lists/*
+
 
 # Install Node.js 22.x LTS and npm
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
@@ -27,7 +31,7 @@ RUN npm install -g unbrowse@latest
 
 # Install uv package installer and Python AGY SDK / MCP packages
 RUN pip install --no-cache-dir uv \
-    && uv pip install --system google-antigravity markitdown-mcp sqlalchemy alembic pydantic python-jobspy
+    && uv pip install --system google-antigravity markitdown-mcp sqlalchemy pydantic
 
 WORKDIR /app
 

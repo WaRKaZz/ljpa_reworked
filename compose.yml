@@ -33,7 +33,9 @@ services:
       - ljpa-network
 
   antigravity-cli:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.antigravity
     container_name: antigravity-cli
     depends_on:
       cloak-browser:
@@ -41,19 +43,31 @@ services:
     volumes:
       - ./resources:/app/resources
       - ./data:/app/data
-      - ./src:/app/src
-      - ./tests:/app/tests
-      - ./compose.yml:/app/compose.yml
+      - ./prompts:/app/prompts
+      - ./src/ljpa_reworked/services/harness:/app:ro
       - ./.agents:/app/.agents
       - ./.gemini:/root/.gemini
-      - /home/warkazz/.local/bin/agy:/usr/local/bin/agy:ro
+      - ./data/gcloud:/root/.config/gcloud
     env_file:
       - .env
     environment:
       - CDP_URL=${CDP_URL:-http://cloak-browser:9222}
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
     stdin_open: true
     tty: true
     command: tail -f /dev/null
+    networks:
+      - ljpa-network
+
+  sqlite-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.sqlite
+    container_name: sqlite-ui
+    ports:
+      - "7901:7901"
+    volumes:
+      - ./data:/data
     networks:
       - ljpa-network
 

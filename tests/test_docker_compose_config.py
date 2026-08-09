@@ -37,8 +37,7 @@ def test_compose_dev_yml_structure():
     dev_service = services["antigravity-cli-dev"]
     volumes = [str(v) for v in dev_service.get("volumes", [])]
     
-    assert any("./src/ljpa_reworked/services/harness/linkedin_posts_agent.py:/app/linkedin_posts_agent.py:ro" in v for v in volumes), "must mount linkedin_posts_agent.py read-only"
-    assert any("./src/ljpa_reworked/services/harness/jobspy_etl_fetcher.py:/app/jobspy_etl_fetcher.py:ro" in v for v in volumes), "must mount jobspy_etl_fetcher.py read-only"
+    assert any("./src/ljpa_reworked/services/harness" in v and ":ro" in v for v in volumes), "must mount harness directory or files read-only"
 
 def test_dockerfile_antigravity_config():
     dockerfile_path = Path("Dockerfile.antigravity")

@@ -18,13 +18,13 @@ This project is an automated job discovery, resume tailoring, and job applicatio
 The application pipeline operates through the following steps:
 
 1. **Browser Authentication (Stage 1):** Interactive login to LinkedIn performed via noVNC (`http://localhost:6080`) on the `cloak-browser` container. Session credentials are persisted in `./auth/state.json`.
-2. **Job Discovery (Harness 1 & 2):**
-   * *Harness 1 (Posts Scraper):* Executed inside `antigravity-cli` container (`antigravity-cli-dev`) via `podman exec` running the `agy` CLI (`agy --print --dangerously-skip-permissions "<prompt>"`). The agent reads `resources/profile.md`, expands job titles, navigates LinkedIn Posts feed via `ws://cloak-browser:9222`, extracts the 10 most recent posts with high skills matching, and persists records to SQLite (`data/app.db`) in `Vacancy` and `LinkedinPost` tables.
-   * *Harness 2 (JobSpy ETL):* `python-jobspy` fetches official job postings directly from API endpoints.
+2. **Job Discovery:**
+   * *Harness 1 (Post Search Agent):* Executed inside `antigravity-cli` container (`antigravity-cli-dev`) via `podman exec`. Reads `resources/profile.md`, expands job titles, navigates LinkedIn Posts feed via MCP Unbrowse over `http://cloak-browser:9222`, extracts recent recruiter posts, and persists records to SQLite (`data/app.db`) in `Vacancy` and `LinkedinPost` tables.
+   * *JobSpy Service (`services/jobspy.py`):* Standard Python ETL pipeline using `python-jobspy` to fetch official job postings directly from API endpoints without browser automation or LLM.
 3. **Data Ingestion:** Extracted vacancies are normalized and deduplicated in SQLite (`data/app.db`).
 4. **Vacancy Review & Evaluation:** `VacancyReviewCrew` and `ResumeEvaluationCrew` evaluate job fit against candidate profile.
 5. **Resume Generation:** `ResumeGenerationCrew` outputs strict YAML tailored to the job, which `RenderCV` compiles into an ATS-compliant PDF.
-6. **Application Submission:** `EmailGenerationCrew` drafts candidate applications. If no email is available, **Harness 3 (Web Application Agent)** navigates the application portal to submit the candidate's resume directly.
+6. **Application Submission:** `EmailGenerationCrew` drafts candidate applications via email. For web form or LinkedIn Easy Apply vacancies, **Harness 2 (Auto-Apply Web Application Agent)** navigates the portal via MCP Unbrowse to submit the candidate's resume directly.
 
 ## Development & Execution Rules
 

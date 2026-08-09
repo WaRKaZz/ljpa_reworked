@@ -1,0 +1,10 @@
+# Dockerfile.sqlite - Web UI container for SQLite database inspection (sqlite-web)
+FROM python:3.11-slim
+
+RUN pip install --no-cache-dir sqlite-web
+
+WORKDIR /data
+
+EXPOSE 7901
+
+CMD ["sqlite_web", "app.db", "-H", "0.0.0.0", "-p", "7901", "--no-browser"]
