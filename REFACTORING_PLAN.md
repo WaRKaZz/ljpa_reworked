@@ -92,14 +92,36 @@
 - Operator confirms the remaining isolated-container checks and opt-in smoke-test work are complete; Stage 3 is recorded complete without altering canonical data or launching the external-effect pipeline.
 
 
-## Stage 4: Resume generation with RenderCV — **not started / unverified**
+## Stage 4: Resume generation with RenderCV — **in progress**
 
 **Goal:** Replace legacy resume generation with RenderCV-produced ATS PDF output.
 
-1. Inventory current generator inputs and output paths.
-2. Add a minimal RenderCV render fixture and test before changing the workflow.
-3. Keep generated resumes out of Git and store per-vacancy output metadata in the canonical DB.
-4. Update `ResumeGenerationCrew` only after the renderer path is verified.
+### 4A: ATS resume model audit — **planned**
+
+1. Inventory candidate input, vacancy, evaluator, `Resume` and `ResumeCrewAI` fields against ATS-friendly RenderCV requirements without exposing personal data.
+2. Record the smallest required model/schema changes and metadata needed for later cleanup; do not change production models or data.
+
+### 4B: Resume model and schema — **not started**
+
+1. Add only fields proven missing by 4A, including durable per-vacancy render metadata where required.
+2. Verify fresh schema and a disposable SQLite migration path before changing canonical `data/app.db`.
+
+### 4C: Evaluator and CrewAI resume data — **not started**
+
+1. Update evaluator and `ResumeGenerationCrew` to create a factual structured resume for one saved eligible vacancy.
+2. Preserve the configured OpenAI-compatible LLM/embedding gateway and prohibit fabricated candidate data.
+
+### 4D: RenderCV output and one operator-reviewed PDF — **not started**
+
+1. Add a minimal RenderCV service and hermetic render fixture before changing the workflow.
+2. Keep generated resumes out of Git and store per-vacancy output metadata in the canonical DB.
+3. With explicit operator authorization, run evaluator and generator for one saved vacancy, render one PDF in the ignored resume directory, and leave it for visual review. Do not submit, email, or message.
+
+### 4E: Resume cleanup — **not started**
+
+1. Delete generated resumes for vacancies sent more than two months ago.
+2. Delete generated resumes that were never sent.
+3. Define and test the exact sent-state evidence before enabling cleanup; never delete source candidate data or submission history.
 
 ## Stage 5: Database and models — **partially complete**
 
