@@ -84,16 +84,17 @@
 ### Completed
 
 - Unit and acceptance tests cover statuses, fresh metadata bootstrap, contact validation, `submit_url` upsert, sequential JobSpy integration, Compose structure, session paths, and LLM gateway construction.
+- Stage 3.1 completed: Full test suite audited. 83 tests passing, 0 skipped. Removed 0-byte junk file `src/ljpa_reworked/test.py`, duplicate test `tests/test_stage1_e2e.py`, and moved `src/ljpa_reworked/tests/` into `tests/` with deterministic mocks for `SMTPClient` and `Telegram` services (preventing network calls and credential skips).
+- `data/app.db` verified completely unmodified (SHA-256 hash match).
 - `pytest`, Ruff, `compileall`, `git diff --check`, and `podman compose config -q` passed for the completed refactor.
 - Fresh-schema bootstrap was verified with disposable SQLite databases before recreating canonical `data/app.db`.
 
 ### Remaining
 
-1. **Stage 3.1 — Audit and repair the full test suite.** Review every tracked test for meaningful observable assertions, isolation, deterministic inputs, and independence from implementation details. Remove duplicate, empty, and brittle tests only when a focused behavior-level test preserves the required guarantee. Fix only confirmed production defects discovered by the audit. All tests must use temporary SQLite databases; never mutate `data/app.db`. No network, LinkedIn, JobSpy, email, Telegram, submission, or Compose service startup.
-2. Add a coverage threshold only after Stage 3.1 and after measuring meaningful baseline coverage; do not require 100% by decree.
-3. Run `podman compose config -q` after every Compose edit.
-4. Build images and run isolated tests with `--network none`; do not start the full external-effect pipeline as a generic smoke test.
-5. Add a live, opt-in smoke-test script for the LLM gateway and JobSpy. It must not print secrets or profile contents.
+1. Add a coverage threshold after measuring meaningful baseline coverage; do not require 100% by decree.
+2. Run `podman compose config -q` after every Compose edit.
+3. Build images and run isolated tests with `--network none`; do not start the full external-effect pipeline as a generic smoke test.
+4. Add a live, opt-in smoke-test script for the LLM gateway and JobSpy. It must not print secrets or profile contents.
 
 ## Stage 4: Resume generation with RenderCV — **not started / unverified**
 
