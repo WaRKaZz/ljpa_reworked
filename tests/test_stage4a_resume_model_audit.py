@@ -174,3 +174,38 @@ def test_email_created_at_is_row_creation_time():
     assert hasattr(Email, "created_at")
     assert not hasattr(Email, "sent_at")
     assert "sent_at" not in [column.name for column in Email.__table__.columns]
+
+
+def test_languages_and_optional_links_audit_facts():
+    """Verify current representation of languages in skills and partial gaps in optional links."""
+    # Languages are representable via SkillCrewAI
+    lang_skill = SkillCrewAI(
+        title="Languages", elements=["English (Native)", "Spanish (B2)"]
+    )
+    assert lang_skill.title == "Languages"
+    assert "English (Native)" in lang_skill.elements
+
+    # Verify optional link field gaps on current Pydantic models
+    p_info = PersonalInfoCrewAI(
+        name="Candidate",
+        email="c@example.com",
+        phone="123",
+        address="City",
+    )
+    assert not hasattr(p_info, "linkedin_url")
+
+    proj = ProjectCrewAI(title="Project", description="Desc")
+    assert not hasattr(proj, "url")
+
+    cert = CertificationCrewAI(title="Cert")
+    assert not hasattr(cert, "url")
+    assert not hasattr(cert, "issuer")
+
+
+def test_sent_evidence_sources_audit_facts():
+    """Verify multi-table sent evidence check criteria for Stage 4E cleanup rules."""
+    from ljpa_reworked.models.database_models import TelegramStatus
+
+    assert hasattr(Email, "sent")
+    assert hasattr(TelegramStatus, "sent")
+    assert VacancyStatus.applied in VacancyStatus
