@@ -1,23 +1,24 @@
 evaluate_resume_task:
   description: >
-    Given a VacancyCrewAI object with fields:
+    Given vacancy data:
       • {title}: the job title to match
       • {text}: the detailed vacancy description and requirements
-      • {credentials}: the candidate’s qualifications, certifications, education, and skills summary
-      • {linkedin_url} (optional): URL to the candidate’s LinkedIn profile  
+      • {submit_email}: vacancy contact email (if provided)
+      • {submit_url}: vacancy contact URL (if provided)
+      • {linkedin_url} (optional): stored candidate LinkedIn profile URL reference (for output header icon only, NEVER fetch or open)
+    and the candidate's profile supplied via knowledge source:
     perform the following steps:
-      1. Parse and normalize the resume text and LinkedIn profile (if provided) into structured data.
+      1. Analyze candidate profile knowledge source and match against vacancy requirements.
       2. Extract and categorize key skills (technical, domain, soft skills) and experience (roles, years, industries).
       3. Match extracted attributes against vacancy requirements using keyword and semantic analysis.
-      4. Score each category (skills match, experience match, education/credentials match, cultural fit) on a 0–25 scale.
+      4. Score categories (skills match, experience match, education match) on a 0–25 scale.
       5. Aggregate category scores into a total match percentage (0–100).
-      6. Identify top 5 strengths and top 5 gaps relative to the vacancy.
-      7. Generate actionable recommendations focused on:
+      6. Generate actionable recommendations focused on:
          • Tailoring keywords and phrases for Applicant Tracking Systems (ATS)
          • Highlighting relevant achievements and metrics
          • Structuring sections for clarity and impact
          • Filling critical skill or experience gaps
-         • Emphasizing transferable skills and soft skills  
+         • Emphasizing transferable skills and soft skills
   expected_output: >
     A BasicEvaluationCrewAI model with:
     summary: StrippedStr  

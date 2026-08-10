@@ -55,16 +55,21 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 CV_FILE_NAME = os.getenv("CV_FILE_NAME")
 
 CV_FILE_PATH = os.path.join(RESOURCES_DIR, CV_FILE_NAME) if CV_FILE_NAME else None
+PROFILE_FILE_PATH = os.path.join(RESOURCES_DIR, "profile.md")
 
 
-def create_llm():
+
+def create_llm(timeout: float | int | None = None):
     """Build the project LLM client for the configured OpenAI-compatible gateway."""
     from crewai import LLM
 
     model = LLM_MODEL if LLM_MODEL.startswith("openai/") else f"openai/{LLM_MODEL}"
-    return LLM(
-        model=model,
-        api_key=LLM_API_KEY,
-        base_url=LLM_BASE_URL,
-        custom_openai=True,
-    )
+    kwargs = {
+        "model": model,
+        "api_key": LLM_API_KEY,
+        "base_url": LLM_BASE_URL,
+        "custom_openai": True,
+    }
+    if timeout is not None:
+        kwargs["timeout"] = timeout
+    return LLM(**kwargs)
