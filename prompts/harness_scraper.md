@@ -2,9 +2,7 @@ LINKEDIN DIRECT VACANCY DISCOVERY, VALIDATION, PERSISTENCE & SELF-AUDIT
 
 OBJECTIVE
 
-Discover, validate, deduplicate, and persist up to 10 fresh, high-quality LinkedIn vacancies matching the candidate profile directly into:
-
-    data/app.db (vacancy table)
+Discover, validate, deduplicate, and prepare up to 10 fresh, high-quality LinkedIn vacancies matching the candidate profile in a disposable workspace copy of the canonical database. Replace the canonical database only after the final validation succeeds.
 
 Search LinkedIn posts only. Do not analyze the home feed and do not use LinkedIn direct messages.
 
@@ -43,6 +41,23 @@ NON-NEGOTIABLE EXECUTION RULES
 6. If LinkedIn is logged out, or prevents search access, attempt to bypass it. If you could not bypass it stop safely.
 
 7. Do not fabricate missing information. If a mandatory fact cannot be verified, reject the vacancy.
+
+8. Never write to `/app/data/app.db` during collection, review, audit, deduplication, or cleanup. Use the transactional database procedure below.
+
+==================================================
+DATABASE WORKSPACE AND ATOMIC PUBLISHING
+==================================================
+
+The canonical database is `/app/data/app.db`. It is the production input and must remain untouched until the entire run is accepted.
+
+1. Before any SQLite write, copy `/app/data/app.db` to `/workspace/app.db.work`. Run `PRAGMA integrity_check` on both the source and the copy; continue only when each returns exactly `ok`.
+2. Perform every read, insert, update, deduplication check, audit, and deletion only against `/workspace/app.db.work`.
+3. A deletion is permitted only in `/workspace/app.db.work`, only for a row created in this exact run, and only after that row fails the final audit. Never delete, modify, or purge a pre-existing row in either database.
+4. Keep a manifest at `/workspace/run-manifest.json` containing the workspace DB path, canonical DB path, run start time, inserted IDs, updated IDs, deleted current-run IDs, and final validation results. Do not include vacancy text, profiles, cookies, tokens, or secrets in the manifest.
+5. Before publishing, close every SQLite connection to the workspace copy. Run `PRAGMA integrity_check`, `PRAGMA foreign_key_check`, and the complete audit on `/workspace/app.db.work`. Confirm that no candidate accepted in this run violates any gate.
+6. Publish only if every check passes: copy `/workspace/app.db.work` to a temporary sibling file `/app/data/app.db.next`, verify `PRAGMA integrity_check` on `app.db.next`, then atomically replace the canonical DB with `os.replace('/app/data/app.db.next', '/app/data/app.db')`. Do not use `DELETE` or recreate the canonical DB in place.
+7. If any check, copy, or replacement step fails, remove only `/app/data/app.db.next` and retain the original `/app/data/app.db` unchanged. Report the failure and stop.
+8. After successful publish, open the new `/app/data/app.db` read-only and run `PRAGMA integrity_check` plus a count/status summary. Do not make further writes to it during this run.
 
 ==================================================
 PHASE 1 — DYNAMIC CANDIDATE PROFILE INGESTION
@@ -339,7 +354,7 @@ Before persisting, validate contacts independently:
 
 PERSISTENCE
 
-Persist accepted vacancies directly into vacancy using parameterized SQL inside a transaction.
+Persist accepted vacancies only into the `vacancy` table in `/workspace/app.db.work`, using parameterized SQL inside a transaction. Never connect a write-capable SQLite session to `/app/data/app.db`.
 
 If submit_url exists and is new:
 
