@@ -271,3 +271,31 @@ def test_discovery_run_has_zero_calls_to_application_or_messaging_services(
         # Verify zero calls to messaging / submission services
         assert mock_smtp.call_count == 0
         assert mock_telegram.call_count == 0
+
+
+def test_pytest_coverage_gate_configured():
+    """Assert pytest-cov configuration in pyproject.toml has coverage enabled, omissions, and fail_under gate."""
+    from pathlib import Path
+
+    import tomllib
+
+    pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
+    assert pyproject_path.exists()
+
+    with open(pyproject_path, "rb") as f:
+        data = tomllib.load(f)
+
+    pytest_opts = data.get("tool", {}).get("pytest", {}).get("ini_options", {})
+    addopts = pytest_opts.get("addopts", "")
+    assert "--cov=" in addopts
+    assert "--cov-report=term-missing" in addopts
+
+    cov_run = data.get("tool", {}).get("coverage", {}).get("run", {})
+    omit = cov_run.get("omit", [])
+    assert "**/__init__.py" in omit
+    assert "src/ljpa_reworked/main.py" in omit
+
+    cov_report = data.get("tool", {}).get("coverage", {}).get("report", {})
+    fail_under = cov_report.get("fail_under")
+    assert fail_under is not None
+    assert fail_under >= 65

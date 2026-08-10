@@ -19,7 +19,8 @@
 .agents
 .superpowers
 .ruff_cache
-.pytest_cahce
+.pytest_cache
+.coverage
 
 /ollama*
 typescript

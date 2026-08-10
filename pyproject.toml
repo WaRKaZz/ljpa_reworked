@@ -66,3 +66,21 @@ docstring-code-format = true
 exclude = ["src/ljpa_reworked/crews"]
 reportArgumentType = "none"
 reportReturnType = "none"
+
+[dependency-groups]
+dev = [
+    "pytest-cov>=7.1.0",
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov=ljpa_reworked --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src/ljpa_reworked"]
+omit = [
+    "**/__init__.py",
+    "src/ljpa_reworked/main.py",
+]
+
+[tool.coverage.report]
+fail_under = 65
