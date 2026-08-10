@@ -26,10 +26,10 @@
 
 ### Remaining
 
-1. Define and test the exact Harness 1 prompt contract: read candidate profile, use `data/state.json`, collect the requested LinkedIn posts, persist normalized `LinkedinPost`/`Vacancy` records.
-2. Replace stale paths and names in harness prompts and docs; no deleted harness imports may remain.
-3. Add a hermetic Harness 1 contract test with a fake runner. Do not contact LinkedIn in unit tests.
-4. Decide whether host port `8080` is needed. Remove it if Harness calls originate only from `linkedin-bot`.
+1. Define the safe Harness 1 prompt contract and add a hermetic text-level contract test. The prompt must use `data/state.json`, `Vacancy.status='created'`, and `LinkedinPost.processed=False`; it must stop safely on login, CAPTCHA, or access blockers and never bypass access controls.
+2. Implement normalized, transactional `LinkedinPost`/`Vacancy` persistence through project operations and test it with a disposable SQLite database.
+3. Add a hermetic fake-runner test for Harness 1 request/response handling. Do not contact LinkedIn in unit tests.
+4. Replace stale paths and names in harness prompts and docs; then decide whether host port `8080` is needed and remove it if calls originate only from `linkedin-bot`.
 
 ## Stage 2: JobSpy discovery and ETL — **complete for unit scope; live smoke test pending**
 
