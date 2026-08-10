@@ -61,8 +61,9 @@ def create_llm():
     """Build the project LLM client for the configured OpenAI-compatible gateway."""
     from crewai import LLM
 
+    model = LLM_MODEL if LLM_MODEL.startswith("openai/") else f"openai/{LLM_MODEL}"
     return LLM(
-        model=LLM_MODEL,
+        model=model,
         api_key=LLM_API_KEY,
         base_url=LLM_BASE_URL,
         custom_openai=True,

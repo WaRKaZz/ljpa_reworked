@@ -13,9 +13,7 @@ from ljpa_reworked.config import (
     EMBED_BASE_URL,
     EMBED_MODEL,
     EMBED_PROVIDER,
-    LLM_API_KEY,
-    LLM_BASE_URL,
-    LLM_MODEL,
+    create_llm,
 )
 from ljpa_reworked.models.crewai_pydantic_models import BasicEvaluationCrewAI
 
@@ -38,9 +36,6 @@ class ResumeEvaluationCrew:
         embed_model: str = EMBED_MODEL,
         embed_api_key: str = EMBED_API_KEY,
         embed_api_base: str = EMBED_BASE_URL,
-        llm_api_key: str = LLM_API_KEY,
-        llm_model: str = LLM_MODEL,
-        llm_base_url: str = LLM_BASE_URL,
     ) -> None:
         super().__init__()
         pdf_path = Path(cv_file_path)
@@ -52,14 +47,7 @@ class ResumeEvaluationCrew:
                 "api_base": embed_api_base,
             },
         }
-        from crewai import LLM
-
-        self.llm = LLM(
-            model=llm_model,
-            api_key=llm_api_key,
-            base_url=llm_base_url,
-            custom_openai=True,
-        )
+        self.llm = create_llm()
         self.resume_pdf = PDFKnowledgeSource(
             file_paths=[
                 pdf_path,
