@@ -180,3 +180,30 @@ def test_fresh_bootstrap_schema_without_alembic(in_memory_db):
     assert "submit_url" in columns
     assert "credentials" not in columns
     assert "url" not in columns
+
+
+def test_crewai_generate_email_dict_ignores_legacy_fields():
+    from unittest.mock import MagicMock, patch
+
+    from ljpa_reworked.crew_workflow import crewai_generate_email
+
+    legacy_dict = {
+        "text": "Job text",
+        "title": "Job title",
+        "credentials": "legacy_email@example.com",
+        "url": "https://legacy.example.com",
+    }
+    with patch("ljpa_reworked.crew_workflow.EmailGenerationCrew") as mock_crew_cls:
+        mock_crew_instance = MagicMock()
+        mock_crew_cls.return_value.crew.return_value = mock_crew_instance
+        mock_output = MagicMock()
+        mock_output.tasks_output = [MagicMock(pydantic="mock_email")]
+        mock_crew_instance.kickoff.return_value = mock_output
+        mock_crew_instance.usage_metrics.successful_requests = 1
+
+        crewai_generate_email(legacy_dict)
+
+        mock_crew_instance.kickoff.assert_called_once()
+        passed_inputs = mock_crew_instance.kickoff.call_args[1]["inputs"]
+        assert passed_inputs["submit_email"] == ""
+        assert passed_inputs["submit_url"] == ""

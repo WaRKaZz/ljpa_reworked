@@ -59,12 +59,12 @@ def crewai_generate_email(vacancy: "Vacancy") -> EmailCrewAI:
     inputs["text"] = vacancy["text"] if isinstance(vacancy, dict) else vacancy.text
     inputs["title"] = vacancy["title"] if isinstance(vacancy, dict) else vacancy.title
     inputs["submit_email"] = (
-        vacancy.get("submit_email") or vacancy.get("credentials") or ""
+        vacancy.get("submit_email") or ""
         if isinstance(vacancy, dict)
         else (vacancy.submit_email or "")
     )
     inputs["submit_url"] = (
-        vacancy.get("submit_url") or vacancy.get("url") or ""
+        vacancy.get("submit_url") or ""
         if isinstance(vacancy, dict)
         else (vacancy.submit_url or "")
     )

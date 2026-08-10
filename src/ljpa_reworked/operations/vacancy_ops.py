@@ -288,16 +288,8 @@ def upsert_vacancy_by_url(
     If both submit_url and submit_email are absent/blank:
     - Logs warning and returns (None, False).
     """
-    raw_url = (
-        vacancy_data.get("submit_url")
-        if "submit_url" in vacancy_data
-        else vacancy_data.get("url")
-    )
-    raw_email = (
-        vacancy_data.get("submit_email")
-        if "submit_email" in vacancy_data
-        else vacancy_data.get("credentials")
-    )
+    raw_url = vacancy_data.get("submit_url")
+    raw_email = vacancy_data.get("submit_email")
 
     url = str(raw_url).strip() if raw_url and str(raw_url).strip() else None
     email = str(raw_email).strip() if raw_email and str(raw_email).strip() else None
@@ -347,7 +339,6 @@ def upsert_vacancy_by_url(
         if (
             email is not None
             or "submit_email" in vacancy_data
-            or "credentials" in vacancy_data
         ):
             existing.submit_email = email
 

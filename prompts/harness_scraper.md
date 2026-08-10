@@ -264,7 +264,7 @@ Perform deduplication before every insertion.
    - remove inconsequential surrounding punctuation.
 
 5. Skip or upsert based on URL:
-   - If a matching canonical URL exists in vacancy, refresh source-owned fields (title, text, credentials, source, visa_status) and set status='updated'.
+   - If a matching canonical URL exists in vacancy, refresh source-owned fields (title, text, submit_email, submit_url, source, visa_status) and set status='updated'.
    - If identical normalized text or identical company/role/location already exists under another URL created within 30 days, skip insertion.
 
 ==================================================
