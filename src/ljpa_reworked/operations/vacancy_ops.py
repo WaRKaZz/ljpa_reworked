@@ -175,6 +175,7 @@ def transition_vacancy_status(
     vacancy_id: int,
     target_status: VacancyStatus,
     allowed_from_statuses: list[VacancyStatus] | None = None,
+    commit: bool = True,
 ) -> Vacancy:
     """Transition a vacancy's status with validation and terminal status protection."""
     vacancy = get_vacancy_by_id(db, vacancy_id)
@@ -202,8 +203,9 @@ def transition_vacancy_status(
         )
 
     vacancy.status = target_status
-    db.commit()
-    db.refresh(vacancy)
+    if commit:
+        db.commit()
+        db.refresh(vacancy)
     return vacancy
 
 
@@ -217,6 +219,7 @@ def confirm_email_application_submitted(
         db=db,
         vacancy_id=vacancy_id,
         target_status=VacancyStatus.applied,
+        commit=False,
     )
     vacancy.applied_at = applied_at or datetime.utcnow()
     db.commit()

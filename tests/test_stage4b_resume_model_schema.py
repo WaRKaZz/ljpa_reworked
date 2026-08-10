@@ -276,3 +276,39 @@ def test_confirmed_email_submission_sets_applied_at_only_on_success(db_session: 
     assert vacancy.status == VacancyStatus.applied
     assert vacancy.applied_at is not None
     assert isinstance(vacancy.applied_at, datetime)
+
+
+def test_confirm_email_application_submitted_atomicity_on_commit_failure(db_session: Session):
+    """Failure at the combined commit boundary must rollback both status change and applied_at timestamp."""
+    vacancy = Vacancy(
+        title="Full Stack Engineer",
+        text="Full stack web role...",
+        submit_email="jobs@fullstack.com",
+        source=DataSource.linkedin,
+        visa_status=VisaStatus.not_required,
+    )
+    db_session.add(vacancy)
+    db_session.commit()
+
+    assert vacancy.status == VacancyStatus.created
+    assert vacancy.applied_at is None
+
+    real_commit = db_session.commit
+
+    def failing_commit():
+        if vacancy.applied_at is not None:
+            raise RuntimeError("Database commit failed during combined submission")
+        real_commit()
+
+    with patch.object(db_session, "commit", side_effect=failing_commit):
+        with pytest.raises(RuntimeError, match="Database commit failed during combined submission"):
+            confirm_email_application_submitted(db_session, vacancy.id)
+
+    db_session.rollback()
+    db_session.expire_all()
+    reloaded_vacancy = db_session.query(Vacancy).filter(Vacancy.id == vacancy.id).first()
+    assert reloaded_vacancy.status == VacancyStatus.created, (
+        f"Expected status to remain '{VacancyStatus.created.value}', but got '{reloaded_vacancy.status.value}'. "
+        "Partial applied status was committed/persisted!"
+    )
+    assert reloaded_vacancy.applied_at is None
