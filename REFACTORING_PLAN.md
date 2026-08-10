@@ -91,7 +91,7 @@
 
 ### Remaining
 
-1. Add a coverage threshold after measuring meaningful baseline coverage; do not require 100% by decree.
+1. **Stage 3.2 — Measure and gate meaningful test coverage.** Add `pytest-cov` as a development dependency. Measure the whole `src/ljpa_reworked` production package, excluding only package-marker `__init__.py` files and the technical `main.py` entry point. Show the terminal report on every test run. Set `fail_under` to the measured baseline rounded down to the nearest whole percentage point; do not target 100% or add superficial tests solely to inflate the number. Keep test execution isolated: no network, containers, live services, or canonical DB mutation.
 2. Run `podman compose config -q` after every Compose edit.
 3. Build images and run isolated tests with `--network none`; do not start the full external-effect pipeline as a generic smoke test.
 4. Add a live, opt-in smoke-test script for the LLM gateway and JobSpy. It must not print secrets or profile contents.
