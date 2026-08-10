@@ -120,7 +120,19 @@ PHASE 2 — DYNAMIC SEARCH STRATEGY
 PHASE 3 — CANDIDATE EVALUATION PIPELINE
 ==================================================
 
-Evaluate every candidate post in the following order. Reject immediately when any mandatory gate fails.
+MANDATORY FULL-POST REVIEW — BEFORE EVERY GATE
+
+A search result card, snippet, preview, or search URL is discovery metadata only. It is never enough to create, update, or delete a vacancy.
+
+For every candidate:
+
+1. Open the original LinkedIn post itself in the browser. Do not judge from search results.
+2. Expand “see more” and any collapsed text. Read the complete post body, visible application instructions, author/company context, publication date, and linked destination.
+3. If the post contains an application URL, open that URL too and verify the destination before treating it as `submit_url`.
+4. Build an internal structured extraction from the complete post: employer, exact role, employment type if stated, location/remote rules, responsibilities, requirements, visa/work authorization, application instructions, `submit_email`, and verified `submit_url`.
+5. Only then apply the gates below. If the full post cannot be opened/read, reject it. Never save or replace a vacancy from preview data.
+
+Evaluate every fully opened post in the following order. Reject immediately when any mandatory gate fails.
 
 ------------------------------
 GATE A — ACTUAL VACANCY
@@ -294,18 +306,27 @@ TITLE
 
 Use the explicit role title from the post. If no exact title exists, infer a concise title only when the role is unambiguous. Otherwise reject the post.
 
-TEXT
+TEXT — STRUCTURED VACANCY SUMMARY, NOT RAW POST TEXT
 
-Store enough original vacancy text to preserve:
-- employer;
-- role;
-- responsibilities;
-- requirements;
-- location or remote conditions;
-- visa/work-authorization conditions;
-- application instructions.
+`vacancy.text` must be a concise structured summary derived only after reading the complete expanded post. Do not paste the raw post, marketing text, hashtags, greetings, emojis, author biography, engagement comments, generic company promotion, search snippet, or any discovery URL.
 
-Do not add invented requirements or rewrite facts in a way that changes their meaning.
+Use this exact plain-text structure; omit a line only when the full post does not state it:
+
+Employer: <company or "Not stated">
+Role: <exact vacancy title>
+Employment: <type, if stated>
+Location: <location/remote/hybrid conditions>
+Responsibilities: <concise semicolon-separated facts>
+Requirements: <concise semicolon-separated facts>
+Visa/work authorization: <stated condition or "Not stated">
+Application instructions: <how to apply, excluding the raw submit URL/email>
+
+Rules:
+- Preserve the author's factual meaning. Do not invent employer, requirements, salary, eligibility, or application conditions.
+- Include enough detail for a later reviewer to decide fit without reopening LinkedIn.
+- Separate distinct requirements; do not turn vague promotional language into a requirement.
+- The contact values belong only in `submit_email` / `submit_url`; do not duplicate them in `text`.
+- Reject the candidate if the complete post does not contain enough concrete vacancy facts to create this summary.
 
 SUBMIT EMAIL AND SUBMIT URL
 
@@ -326,6 +347,11 @@ If submit_url exists and is new:
     VALUES (:title, :text, :submit_email, :submit_url, 'LinkedIn', 'NOT_SPECIFIED', 'created', 0);
 
 If matching submit_url exists:
+
+- First open and fully review the candidate post and re-verify that exact application destination.
+- Update only when the new structured summary contains materially newer or corrected source facts.
+- Do not repeatedly rewrite a matching row during one run. Keep an in-memory set of processed canonical `submit_url` values; a URL may be evaluated and written at most once per run.
+- Do not replace a complete existing summary with a shorter, weaker, preview-derived, or less specific summary.
 
     UPDATE vacancy
     SET title = :title,
@@ -357,6 +383,8 @@ For each newly created or updated vacancy verify:
 
 - vacancy row exists;
 - title is non-empty and identifies a role;
+- the original post was opened, expanded, and fully read before this row was written;
+- text follows the required structured vacancy-summary format and contains no raw post boilerplate, search content, or discovery URL;
 - text contains an actual vacancy;
 - at least one of submit_email or submit_url is present and valid;
 - submit_email (if present) is a valid email syntax;
