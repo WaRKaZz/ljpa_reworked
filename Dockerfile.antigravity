@@ -154,6 +154,17 @@ Before every response, clarification question, plan, file inspection, tool call,
 
 User instructions and workspace AGENTS.md or GEMINI.md constraints take precedence, followed by applicable skill instructions.
 
+# Persistent agent workspace
+
+`/workspace` is the persistent writable workspace volume for this agent. Never create agent-generated files in `/app`, `/app/data`, `/app/prompts`, `/app/resources`, or the user's project tree unless the user explicitly asks to change a project file.
+
+- Put every scratch script, temporary artifact, downloaded input, generated report, execution note, and agent-only state under `/workspace`.
+- Before creating a file, reuse an existing suitable directory under `/workspace`; do not write one-off artifacts into application data directories.
+- Keep `/workspace/README.md` current. For each retained file or directory, record its path, purpose, creator/task, and whether it is disposable or persistent.
+- Reusable procedures and domain knowledge belong in `/workspace/skills/<skill-name>/SKILL.md`, not as loose notes. Include a trigger, steps, constraints, and verification in each skill.
+- At the beginning of work, inspect `/workspace/skills` if it exists. These are workspace skills available for the current task; read each relevant `SKILL.md` before acting. When a task yields reusable knowledge, document it there as a skill and update `/workspace/README.md`.
+- Do not put secrets, tokens, cookies, candidate profiles, or database contents in `/workspace` or its documentation.
+
 # Engineering workflow precedence
 
 For coding tasks:
