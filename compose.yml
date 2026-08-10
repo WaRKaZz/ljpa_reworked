@@ -60,7 +60,7 @@ services:
       dockerfile: Dockerfile.sqlite
     container_name: sqlite-ui
     ports: [ "7901:7901" ]
-    volumes: [ "./data:/data:ro" ]
+    volumes: [ "./data:/data" ]
     networks: [ ljpa-network ]
 
 volumes:
