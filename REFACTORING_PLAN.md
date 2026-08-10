@@ -103,10 +103,11 @@
 3. Audited Stage 4E cleanup metadata: corrected factual error regarding sent evidence—`Email.sent` is never set by the actual main send path, and `TelegramStatus.sent` records a vacancy notification rather than a sent resume. Verified that only `VacancyStatus.applied` is currently evidence of completed application submission; because its timestamp is absent (`Vacancy` lacks `updated_at` or submission timestamp), Stage 4E requires an explicit application/submission timestamp.
 4. Updated focused unit test suite `tests/test_stage4a_resume_model_audit.py` protecting baseline model validation, DB operations, languages/links audit facts, and verified sent evidence properties.
 
-### 4B: Resume model and schema — **not started**
+### 4B: Resume model and schema — **planned**
 
-1. Add only fields proven missing by 4A, including durable per-vacancy render metadata where required.
-2. Verify fresh schema and a disposable SQLite migration path before changing canonical `data/app.db`.
+1. Add the Stage 4A fields: `location` and `linkedin_url`; project `url`, `start_date`, `end_date`, and `highlights`; certification `issuer`, `date`, and `url`. Keep languages under `skills`.
+2. Add nullable `Resume.rendered_at` and `Vacancy.applied_at`. Set `applied_at` only after confirmed email submission transitions the vacancy to `applied`.
+3. Require a fresh disposable SQLite schema; do not support legacy Resume JSON and do not change canonical `data/app.db`.
 
 ### 4C: Evaluator and CrewAI resume data — **not started**
 
