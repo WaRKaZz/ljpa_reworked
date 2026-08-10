@@ -110,14 +110,15 @@
 3. Implemented `confirm_email_application_submitted()` to stamp `Vacancy.applied_at` only after confirmed email send and transition to `applied`. Unconfirmed transitions leave `applied_at` unset (`None`).
 4. Enforced fresh disposable SQLite schema boundary without touching canonical `data/app.db`.
 
-### 4C: Evaluator and CrewAI resume data — **not started**
+### 4C: Profile-based evaluator, CrewAI data, and render smoke — **planned**
 
-1. Update evaluator and `ResumeGenerationCrew` to create a factual structured resume for one saved eligible vacancy.
-2. Preserve the configured OpenAI-compatible LLM/embedding gateway and prohibit fabricated candidate data.
+1. Make local ignored `resources/profile.md` the sole candidate source. Remove PDF/LinkedIn URL scraping; retain `linkedin_url` as output-only data for a future RenderCV header icon.
+2. Update evaluator and `ResumeGenerationCrew` to produce all Stage 4B ATS fields factually. Unknown optional scalars are `null`; absent lists are `[]`.
+3. With explicit operator authorization, run evaluator and generator against a synthetic vacancy through the configured gateway and render the structured result to a disposable `/tmp` RenderCV PDF. Do not access DB or send anything.
 
 ### 4D: RenderCV output and one operator-reviewed PDF — **not started**
 
-1. Add a minimal RenderCV service and hermetic render fixture before changing the workflow.
+1. Extract the proven disposable RenderCV conversion into the smallest production renderer and persist PDF metadata.
 2. Keep generated resumes out of Git and store per-vacancy output metadata in the canonical DB.
 3. With explicit operator authorization, run evaluator and generator for one saved vacancy, render one PDF in the ignored resume directory, and leave it for visual review. Do not submit, email, or message.
 
