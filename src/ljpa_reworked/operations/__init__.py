@@ -34,6 +34,7 @@ from .resume_ops import (
 )
 from .telegram_ops import mark_vacancy_as_sent
 from .vacancy_ops import (
+    confirm_email_application_submitted,
     create_vacancy,
     get_all_vacancies,
     get_eligble_vacancies,
@@ -78,6 +79,7 @@ __all__ = [
     "search_resumes_by_name",
     "update_resume_path",
     # vacancy_ops
+    "confirm_email_application_submitted",
     "create_vacancy",
     "get_all_vacancies",
     "get_vacancies_by_source",

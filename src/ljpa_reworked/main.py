@@ -9,6 +9,7 @@ from ljpa_reworked.crew_workflow import (
 from ljpa_reworked.database import SessionLocal
 from ljpa_reworked.models.enums import VacancyStatus
 from ljpa_reworked.operations import (
+    confirm_email_application_submitted,
     create_email,
     create_evaluation,
     get_eligble_vacancies,
@@ -93,10 +94,9 @@ def main():
                 resume_path=orm_resume.path,
             )
             send_email(orm_email)
-            transition_vacancy_status(
+            confirm_email_application_submitted(
                 db=db,
                 vacancy_id=vacancy.id,
-                target_status=VacancyStatus.applied,
             )
 
 

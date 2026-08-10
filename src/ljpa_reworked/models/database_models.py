@@ -64,6 +64,9 @@ class Vacancy(Base):
         server_default=VacancyStatus.created.value,
         nullable=False,
     )
+    applied_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=False), nullable=True
+    )
 
     # Relationships
     basic_evaluation: Mapped[Optional["BasicEvaluation"]] = relationship(
@@ -127,6 +130,9 @@ class Resume(Base):
     path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     vacancy_id: Mapped[int] = mapped_column(Integer, ForeignKey("vacancy.id"))
     created_at: Mapped[created_at]
+    rendered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=False), nullable=True
+    )
     # Relationship
     vacancy: Mapped["Vacancy"] = relationship(back_populates="resumes")
 

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from ljpa_reworked.models.crewai_pydantic_models import ResumeCrewAI
@@ -5,7 +7,11 @@ from ljpa_reworked.models.database_models import Resume
 
 
 def create_resume(
-    db: Session, vacancy_id: int, resume_data: ResumeCrewAI, path: str | None = None
+    db: Session,
+    vacancy_id: int,
+    resume_data: ResumeCrewAI,
+    path: str | None = None,
+    rendered_at: datetime | None = None,
 ) -> Resume:
     """Create resume for specific vacancy."""
     personal_info = resume_data.personal_info
@@ -24,6 +30,7 @@ def create_resume(
         projects=[proj.model_dump() for proj in resume_data.projects],
         certifications=[cert.model_dump() for cert in resume_data.certifications],
         path=path,
+        rendered_at=rendered_at,
     )
     db.add(resume)
     db.commit()

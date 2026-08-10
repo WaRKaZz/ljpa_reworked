@@ -28,6 +28,8 @@ class PersonalInfoCrewAI(BaseModel):
     email: Annotated[str, StringConstraints(strip_whitespace=True, max_length=100)]
     phone: Annotated[str, StringConstraints(strip_whitespace=True, max_length=20)]
     address: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
+    location: StrippedStr
+    linkedin_url: StrippedStr | None = None
 
 
 class EducationCrewAI(BaseModel):
@@ -55,10 +57,17 @@ class SkillCrewAI(BaseModel):
 class ProjectCrewAI(BaseModel):
     title: StrippedStr
     description: StrippedStr
+    url: StrippedStr | None = None
+    start_date: StrippedStr | None = None
+    end_date: StrippedStr | None = None
+    highlights: list[StrippedStr] = []
 
 
 class CertificationCrewAI(BaseModel):
     title: StrippedStr
+    issuer: StrippedStr | None = None
+    date: StrippedStr | None = None
+    url: StrippedStr | None = None
 
 
 class ResumeCrewAI(BaseModel):

@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, or_
@@ -201,6 +202,23 @@ def transition_vacancy_status(
         )
 
     vacancy.status = target_status
+    db.commit()
+    db.refresh(vacancy)
+    return vacancy
+
+
+def confirm_email_application_submitted(
+    db: Session,
+    vacancy_id: int,
+    applied_at: datetime | None = None,
+) -> Vacancy:
+    """Transition vacancy to applied status and stamp applied_at timestamp only after confirmed email send."""
+    vacancy = transition_vacancy_status(
+        db=db,
+        vacancy_id=vacancy_id,
+        target_status=VacancyStatus.applied,
+    )
+    vacancy.applied_at = applied_at or datetime.utcnow()
     db.commit()
     db.refresh(vacancy)
     return vacancy

@@ -40,6 +40,7 @@ def test_resume_crewai_model_instantiation():
             email="candidate@example.com",
             phone="+1234567890",
             address="123 Test St, Test City",
+            location="Test City",
         ),
         summary="Experienced Software Engineer with strong Python skills.",
         education=[
@@ -101,6 +102,7 @@ def test_create_and_query_resume_orm(db_session: Session):
             email="john@example.com",
             phone="+111222333",
             address="456 Main St",
+            location="State City",
         ),
         summary="Python developer with experience in microservices.",
         education=[
@@ -177,7 +179,7 @@ def test_email_created_at_is_row_creation_time():
 
 
 def test_languages_and_optional_links_audit_facts():
-    """Verify current representation of languages in skills and partial gaps in optional links."""
+    """Verify representation of languages in skills and optional links present on Stage 4B models."""
     # Languages are representable via SkillCrewAI
     lang_skill = SkillCrewAI(
         title="Languages", elements=["English (Native)", "Spanish (B2)"]
@@ -185,25 +187,26 @@ def test_languages_and_optional_links_audit_facts():
     assert lang_skill.title == "Languages"
     assert "English (Native)" in lang_skill.elements
 
-    # Verify optional link field gaps on current Pydantic models
+    # Verify optional link field presence on Stage 4B Pydantic models
     p_info = PersonalInfoCrewAI(
         name="Candidate",
         email="c@example.com",
         phone="123",
         address="City",
+        location="City",
     )
-    assert not hasattr(p_info, "linkedin_url")
+    assert hasattr(p_info, "linkedin_url")
 
     proj = ProjectCrewAI(title="Project", description="Desc")
-    assert not hasattr(proj, "url")
-    assert not hasattr(proj, "start_date")
-    assert not hasattr(proj, "end_date")
-    assert not hasattr(proj, "highlights")
+    assert hasattr(proj, "url")
+    assert hasattr(proj, "start_date")
+    assert hasattr(proj, "end_date")
+    assert hasattr(proj, "highlights")
 
     cert = CertificationCrewAI(title="Cert")
-    assert not hasattr(cert, "url")
-    assert not hasattr(cert, "issuer")
-    assert not hasattr(cert, "date")
+    assert hasattr(cert, "url")
+    assert hasattr(cert, "issuer")
+    assert hasattr(cert, "date")
 
 
 def test_sent_evidence_sources_audit_facts(db_session: Session):
@@ -211,7 +214,7 @@ def test_sent_evidence_sources_audit_facts(db_session: Session):
     1. Email.sent is not set by main send path (defaults to False).
     2. TelegramStatus.sent records vacancy notification, not resume sent.
     3. Only VacancyStatus.applied indicates completed application submission.
-    4. Vacancy has no submission timestamp, so Stage 4E requires explicit timestamp addition.
+    4. Vacancy has applied_at timestamp added in Stage 4B.
     """
     from ljpa_reworked.models.database_models import TelegramStatus
 
@@ -243,6 +246,6 @@ def test_sent_evidence_sources_audit_facts(db_session: Session):
     assert VacancyStatus.applied in VacancyStatus
     assert VacancyStatus.applied.value == "applied"
 
-    # Vacancy lacks updated_at or applied_at timestamp for Stage 4E age tracking
+    # Vacancy lacks updated_at but has applied_at added in Stage 4B
     assert not hasattr(Vacancy, "updated_at")
-    assert not hasattr(Vacancy, "applied_at")
+    assert hasattr(Vacancy, "applied_at")
