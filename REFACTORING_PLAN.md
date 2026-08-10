@@ -7,29 +7,12 @@
 - Canonical SQLite database: `data/app.db`; 39 vacancies; Alembic revision `f6c1f6797747`.
 - `resources/app.db` was an empty obsolete artifact and was removed.
 - The canonical DB passed `PRAGMA integrity_check` after migration.
-- Auth state canonical location: `data/state.json`; it is intentionally ignored by Git.
+- LinkedIn login/session bootstrap is implemented and operational; `data/state.json` remains its canonical ignored state path.
 - LLM gateway: OpenAI-compatible `http://id-vps:20128/v1`, configured by `LLM_BASE_URL`.
 - Quality baseline: `uv run pytest -q`, `uv run --extra dev ruff check src tests`, `uv run python -m compileall -q src`, and `podman compose config -q`.
 - The project has exactly two harnesses: Harness 1 collects LinkedIn posts; Harness 2 applies to vacancies. There is no Harness 3.
 
-## Stage 1: Browser sidecar and session authentication — **partially complete**
-
-**Goal:** Run one internal CloakBrowser sidecar with persistent LinkedIn state.
-
-### Completed
-
-- `cloak-browser` uses `docker.io/cloakhq/cloakbrowser:latest`.
-- CDP is internal-only at `http://cloak-browser:9222`; host port `9222` is removed.
-- State paths in application code use `data/state.json`.
-- `linkedin-bot` and `antigravity-cli` mount `./data` and use the same internal CDP URL.
-
-### Remaining
-
-1. Run an interactive login through CloakBrowser and prove `data/state.json` is valid with `verify_auth_state`.
-2. Add a non-secret readiness check for the browser sidecar if Podman Compose supports it reliably.
-3. Confirm whether the image exposes a separate operator-facing noVNC interface; do not publish CDP merely for debugging.
-
-## Stage 2: Agent-based job collection — **partially complete**
+## Stage 1: Agent-based job collection — **partially complete**
 
 **Goal:** Keep agent work in `antigravity-cli`, not inside the application container.
 
@@ -48,7 +31,7 @@
 3. Add a hermetic Harness 1 contract test with a fake runner. Do not contact LinkedIn in unit tests.
 4. Decide whether host port `8080` is needed. Remove it if Harness calls originate only from `linkedin-bot`.
 
-## Stage 3: JobSpy discovery and ETL — **complete for unit scope; live smoke test pending**
+## Stage 2: JobSpy discovery and ETL — **complete for unit scope; live smoke test pending**
 
 **Goal:** Discover JobSpy vacancies only; never review, generate materials, send messages, or apply.
 
@@ -67,7 +50,7 @@
 2. Remove legacy hard-coded JobSpy calls from the full `main.py` pipeline after Harness 2 is explicitly switched to `JobSpyIntegrationService`.
 3. Do not create a fallback identity for URL-less rows unless JobSpy supplies a proven immutable source ID.
 
-## Stage 4: QA gates — **partially complete**
+## Stage 3: QA gates — **partially complete**
 
 **Goal:** Reliable gates, not an arbitrary 100% coverage target.
 
@@ -84,7 +67,7 @@
 3. Build images and run isolated tests with `--network none`; do not start the full external-effect pipeline as a generic smoke test.
 4. Add a live, opt-in smoke-test script for the LLM gateway and JobSpy. It must not print secrets or profile contents.
 
-## Stage 5: Resume generation with RenderCV — **not started / unverified**
+## Stage 4: Resume generation with RenderCV — **not started / unverified**
 
 **Goal:** Replace legacy resume generation with RenderCV-produced ATS PDF output.
 
@@ -93,7 +76,7 @@
 3. Keep generated resumes out of Git and store per-vacancy output metadata in the canonical DB.
 4. Update `ResumeGenerationCrew` only after the renderer path is verified.
 
-## Stage 6: Database and models — **partially complete**
+## Stage 5: Database and models — **partially complete**
 
 **Goal:** One SQLite database at `data/app.db`, with explicit lifecycle state and repeatable migrations.
 
@@ -110,7 +93,7 @@
 2. Add outbox/delivery-attempt records before enabling automatic email, Telegram or application submission retries.
 3. Audit one-to-one relationships and indexes separately; do not bundle schema redesign into discovery work.
 
-## Stage 7: Vacancy application automation (Harness 2) — **not started / unverified**
+## Stage 6: Vacancy application automation (Harness 2) — **not started / unverified**
 
 **Goal:** Harness 2 applies to a reviewed and explicitly eligible vacancy through an external portal or LinkedIn Easy Apply.
 
@@ -119,7 +102,7 @@
 3. Test with fake browser/portal responses; no real submission in unit tests.
 4. Keep manual operator authorization policy separate from technical retries.
 
-## Stage 8: OpenAI-compatible LLM configuration — **complete for configuration; connectivity pending**
+## Stage 7: OpenAI-compatible LLM configuration — **complete for configuration; connectivity pending**
 
 **Goal:** Every CrewAI crew uses the same gateway configuration.
 
@@ -136,7 +119,7 @@
 2. Run an opt-in non-secret gateway smoke test from the intended Podman network.
 3. Standardize embedding provider separately; it is not automatically covered by `LLM_BASE_URL`.
 
-## Stage 9: Podman Compose operations — **partially complete**
+## Stage 8: Podman Compose operations — **partially complete**
 
 **Goal:** Repeatable Podman Compose lifecycle without embedding mutable data in images.
 
