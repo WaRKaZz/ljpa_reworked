@@ -6,6 +6,7 @@ from sqlalchemy import (
     JSON,
     Boolean,
     DateTime,
+    Enum,
     ForeignKey,
     Integer,
     String,
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from ljpa_reworked.database import Base
 
 from .crewai_pydantic_models import VisaStatus
+from .enums import VacancyStatus
 
 created_at = Annotated[
     datetime, mapped_column(DateTime(timezone=False), server_default=func.now())
@@ -47,7 +49,13 @@ class Vacancy(Base):
     visa_status: Mapped[VisaStatus]
     created_at: Mapped[created_at]
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    processed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+    status: Mapped[VacancyStatus] = mapped_column(
+        Enum(VacancyStatus, name="vacancystatus", native_enum=False),
+        default=VacancyStatus.created,
+        server_default=VacancyStatus.created.value,
+        nullable=False,
+    )
+
 
     # Relationships
     basic_evaluation: Mapped[Optional["BasicEvaluation"]] = relationship(

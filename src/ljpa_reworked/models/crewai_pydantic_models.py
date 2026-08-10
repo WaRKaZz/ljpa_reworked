@@ -3,6 +3,8 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
 
+from .enums import VacancyStatus
+
 # Define the string type with whitespace stripping
 StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
 
