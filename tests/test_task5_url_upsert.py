@@ -111,7 +111,7 @@ def test_preserve_workflow_data_and_status_on_refresh(db):
     vac_refreshed, created = upsert_vacancy_by_url(db, data_scrape2)
     assert created is False
     assert vac_refreshed.id == vac_id
-    assert vac_refreshed.status == VacancyStatus.applied
+    assert vac_refreshed.status == VacancyStatus.updated
     assert vac_refreshed.title == "Backend Dev (Updated)"
     assert vac_refreshed.created_at == original_created_at
 

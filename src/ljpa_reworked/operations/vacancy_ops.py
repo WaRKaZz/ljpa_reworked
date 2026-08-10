@@ -115,7 +115,11 @@ def get_eligble_vacancies(
 ) -> list[Vacancy]:
     """Get eligible vacancies for review."""
     if statuses is None:
-        statuses = [VacancyStatus.created, VacancyStatus.review_error]
+        statuses = [
+            VacancyStatus.created,
+            VacancyStatus.updated,
+            VacancyStatus.review_error,
+        ]
     return (
         db.query(Vacancy)
         .filter(
@@ -286,6 +290,8 @@ def upsert_vacancy_by_url(
         existing.source = vacancy_data["source"]
     if "visa_status" in vacancy_data and vacancy_data["visa_status"] is not None:
         existing.visa_status = vacancy_data["visa_status"]
+
+    existing.status = VacancyStatus.updated
 
     db.commit()
     db.refresh(existing)

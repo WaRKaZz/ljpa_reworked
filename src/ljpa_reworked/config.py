@@ -50,7 +50,7 @@ os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 DATA_DIR = str(BASE_DIR / "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, "app.db")
-DATABASE_URL = f"sqlite:///{DB_PATH}"
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
 CV_FILE_NAME = os.getenv("CV_FILE_NAME")
 

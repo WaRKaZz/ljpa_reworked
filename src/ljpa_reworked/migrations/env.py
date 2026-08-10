@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -8,7 +9,9 @@ from ljpa_reworked.database import Base
 from ljpa_reworked.models.database_models import *  # noqa
 
 config = context.config
-if not config.get_main_option("sqlalchemy.url"):
+if "DATABASE_URL" in os.environ:
+    config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+elif not config.get_main_option("sqlalchemy.url"):
     config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 if config.config_file_name is not None:

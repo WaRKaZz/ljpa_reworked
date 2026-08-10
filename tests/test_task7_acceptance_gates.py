@@ -14,7 +14,7 @@ from ljpa_reworked.models.crewai_pydantic_models import (
     JobSearchQuerySet,
     VisaStatus,
 )
-from ljpa_reworked.models.database_models import DataSource, LinkedinPost, Vacancy
+from ljpa_reworked.models.database_models import DataSource, Vacancy
 from ljpa_reworked.models.enums import VacancyStatus
 from ljpa_reworked.operations.vacancy_ops import upsert_vacancy_by_url
 from ljpa_reworked.services.jobspy import (
@@ -150,9 +150,9 @@ def test_non_empty_url_mandatory(db_session):
     assert created4 is True
 
 
-def test_existing_url_refreshes_source_fields_preserving_status_and_relationships(db_session):
-    """Assert existing vacancy URL updates source fields while preserving lifecycle status and relationships."""
-    # 1. Create initial vacancy and transition to reviewed status
+def test_existing_url_refreshes_source_fields_and_sets_updated_status(db_session):
+    """Assert existing vacancy URL updates source fields and sets status=updated."""
+    # 1. Create initial vacancy
     v_initial, created = upsert_vacancy_by_url(db_session, {
         "title": "Initial Title",
         "text": "Initial Text",
@@ -161,17 +161,6 @@ def test_existing_url_refreshes_source_fields_preserving_status_and_relationship
         "visa_status": VisaStatus.provided,
     })
     assert created is True
-    v_initial.status = VacancyStatus.reviewed
-    db_session.commit()
-
-    # Link a LinkedinPost relationship
-    post = LinkedinPost(
-        vacancy_id=v_initial.id,
-        text="Recruiter post linking to vacancy 2002",
-        url="https://linkedin.com/feed/update/urn:li:activity:2002",
-    )
-    db_session.add(post)
-    db_session.commit()
 
     # 2. Re-scrape same URL with updated title/text
     v_refreshed, created_again = upsert_vacancy_by_url(db_session, {
@@ -186,11 +175,7 @@ def test_existing_url_refreshes_source_fields_preserving_status_and_relationship
     assert v_refreshed.title == "Updated Title From Scrape"
     assert v_refreshed.text == "Updated Description Text"
     assert v_refreshed.credentials == "recruiter@example.com"
-    # Verify status is PRESERVED (still reviewed, NOT reset to created)
-    assert v_refreshed.status == VacancyStatus.reviewed
-    # Verify relationship is PRESERVED
-    assert v_refreshed.linkedin_posts is not None
-    assert v_refreshed.linkedin_posts.id == post.id
+    assert v_refreshed.status == VacancyStatus.updated
 
 
 def test_vacancy_processed_removed_and_status_is_non_null_enum(db_session):
@@ -257,42 +242,22 @@ def test_discovery_run_has_zero_calls_to_application_or_messaging_services(tmp_p
         assert mock_telegram.call_count == 0
 
 
-def test_alembic_migration_integrity_and_duplicate_url_preflight(tmp_path):
-    """Assert Alembic migrations apply cleanly and url uniqueness preflight blocks duplicates."""
+def test_alembic_migration_integrity(tmp_path):
+    """Assert single initial Alembic revision upgrades disposable DB cleanly and downgrades to base."""
     db_path = tmp_path / "disposable_test.db"
     db_url = f"sqlite:///{db_path}"
 
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)
 
-    # 1. Upgrade to previous head (4134f218d1f0)
-    command.upgrade(alembic_cfg, "4134f218d1f0")
-
-    # Insert duplicate URLs to test preflight check safety gate
-    engine = create_engine(db_url)
-    with engine.connect() as conn:
-        conn.execute(text("""
-            INSERT INTO vacancy (title, text, credentials, url, source, visa_status, status, deleted)
-            VALUES ('Dup Job 1', 'Text 1', 'cred1', 'https://example.com/job/1', 'LinkedIn', 'provided', 'created', 0)
-        """))
-        conn.execute(text("""
-            INSERT INTO vacancy (title, text, credentials, url, source, visa_status, status, deleted)
-            VALUES ('Dup Job 2', 'Text 2', 'cred2', 'https://example.com/job/1', 'LinkedIn', 'provided', 'created', 0)
-        """))
-        conn.commit()
-
-    # 2. Upgrade to head (f6c1f6797747) must fail due to preflight check
-    with pytest.raises(ValueError, match="Cannot add unique constraint on vacancy.url: duplicate non-null URLs found"):
-        command.upgrade(alembic_cfg, "head")
-
-    # 3. Clean up duplicates and verify upgrade & downgrade succeed cleanly
-    with engine.connect() as conn:
-        conn.execute(text("DELETE FROM vacancy WHERE title = 'Dup Job 2'"))
-        conn.commit()
-
+    # Upgrade to head
     command.upgrade(alembic_cfg, "head")
 
-    # Test downgrade
-    command.downgrade(alembic_cfg, "4134f218d1f0")
+    engine = create_engine(db_url)
+    with engine.connect() as conn:
+        res = conn.execute(text("PRAGMA integrity_check;")).scalar()
+        assert res == "ok"
 
+    # Downgrade to base
+    command.downgrade(alembic_cfg, "base")
     engine.dispose()

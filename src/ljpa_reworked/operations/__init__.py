@@ -22,19 +22,6 @@ from .evaluation_ops import (
     get_unrated_vacancies,
     update_evaluation,
 )
-from .linkedin_post_ops import (
-    create_linkedin_post,
-    get_all_linkedin_posts,
-    get_duplicate_post,
-    get_linkedin_post_by_id,
-    get_linkedin_posts_by_vacancy,
-    get_unprocessed_linkedin_posts,
-    link_post_to_vacancy,
-    mark_linkedin_post_as_processed,
-    search_linkedin_posts_by_text,
-    soft_delete_linkedin_post,
-    update_linkedin_post,
-)
 from .resume_ops import (
     create_resume,
     delete_resume,
@@ -81,18 +68,6 @@ __all__ = [
     "get_top_rated_vacancies",
     "get_unrated_vacancies",
     "update_evaluation",
-    # linkedin_post_ops
-    "create_linkedin_post",
-    "get_all_linkedin_posts",
-    "get_linkedin_post_by_id",
-    "get_linkedin_posts_by_vacancy",
-    "get_unprocessed_linkedin_posts",
-    "mark_linkedin_post_as_processed",
-    "search_linkedin_posts_by_text",
-    "soft_delete_linkedin_post",
-    "update_linkedin_post",
-    "link_post_to_vacancy",
-    "get_duplicate_post",
     # resume_ops
     "create_resume",
     "delete_resume",

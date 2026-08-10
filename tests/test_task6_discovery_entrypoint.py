@@ -149,7 +149,6 @@ def test_main_runs_jobspy_after_linkedin_harness_before_evaluation():
     events = []
     with patch.object(main_module, "run_linkedin_harness", side_effect=lambda: events.append("harness")), \
          patch.object(main_module, "JobSpyIntegrationService") as service_class, \
-         patch.object(main_module, "get_linkedin_posts", return_value=[]), \
          patch.object(main_module, "get_eligble_vacancies", return_value=[]):
         service_class.return_value.run.side_effect = lambda: events.append("jobspy")
 

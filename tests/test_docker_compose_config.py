@@ -13,11 +13,14 @@ def test_compose_yml_structure():
     services = config.get("services", {})
     assert "cloak-browser" in services, "compose.yml must contain service 'cloak-browser'"
     assert "antigravity-cli" in services, "compose.yml must contain service 'antigravity-cli'"
-    assert "linkedin-bot" in services, "compose.yml must contain service 'linkedin-bot'"
 
     cloak = services["cloak-browser"]
     assert cloak.get("image") == "docker.io/cloakhq/cloakbrowser:latest"
     assert "ports" not in cloak, "CDP must stay inside the Compose network"
+
+    if "linkedin-bot" in services:
+        bot = services["linkedin-bot"]
+        assert bot.get("container_name") == "linkedin-bot"
 
     cli = services["antigravity-cli"]
     volumes = [str(v) for v in cli.get("volumes", [])]

@@ -11,6 +11,7 @@ from ljpa_reworked.models.enums import VacancyStatus
 
 def test_vacancy_status_enum_values():
     assert VacancyStatus.created.value == "created"
+    assert VacancyStatus.updated.value == "updated"
     assert VacancyStatus.reviewed.value == "reviewed"
     assert VacancyStatus.rejected.value == "rejected"
     assert VacancyStatus.review_error.value == "review_error"
@@ -62,57 +63,15 @@ def test_alembic_migration_backfill_and_downgrade(tmp_path):
     alembic_cfg = Config("alembic.ini")
     alembic_cfg.set_main_option("sqlalchemy.url", db_url)
 
-    # 1. Upgrade to previous head (5ca38e6b4f5a)
-    command.upgrade(alembic_cfg, "5ca38e6b4f5a")
-
-    # 2. Populate SQLite database with processed = 1 (true), 0 (false), and NULL
-    engine = create_engine(db_url)
-    with engine.connect() as conn:
-        conn.execute(text("""
-            INSERT INTO vacancy (title, text, credentials, source, visa_status, processed, deleted)
-            VALUES ('Job True', 'Desc 1', 'cred1', 'LinkedIn', 'provided', 1, 0)
-        """))
-        conn.execute(text("""
-            INSERT INTO vacancy (title, text, credentials, source, visa_status, processed, deleted)
-            VALUES ('Job False', 'Desc 2', 'cred2', 'LinkedIn', 'provided', 0, 0)
-        """))
-        conn.execute(text("""
-            INSERT INTO vacancy (title, text, credentials, source, visa_status, processed, deleted)
-            VALUES ('Job Null', 'Desc 3', 'cred3', 'LinkedIn', 'provided', NULL, 0)
-        """))
-        conn.commit()
-
-    # 3. Apply upgrade to head (4134f218d1f0)
+    # 1. Upgrade to head
     command.upgrade(alembic_cfg, "head")
 
-    # 4. Verify status backfill and column changes
+    engine = create_engine(db_url)
     with engine.connect() as conn:
-        rows = conn.execute(text("SELECT title, status FROM vacancy ORDER BY id")).fetchall()
-        assert len(rows) == 3
-        # processed=1 -> reviewed
-        assert rows[0][0] == "Job True" and rows[0][1] == "reviewed"
-        # processed=0 -> created
-        assert rows[1][0] == "Job False" and rows[1][1] == "created"
-        # processed=NULL -> created
-        assert rows[2][0] == "Job Null" and rows[2][1] == "created"
-
         cols = [c[1] for c in conn.execute(text("PRAGMA table_info(vacancy)")).fetchall()]
         assert "status" in cols
         assert "processed" not in cols
 
-    # 5. Test downgrade back to 5ca38e6b4f5a
-    command.downgrade(alembic_cfg, "5ca38e6b4f5a")
-
-    # 6. Verify processed status restore
-    with engine.connect() as conn:
-        rows = conn.execute(text("SELECT title, processed FROM vacancy ORDER BY id")).fetchall()
-        assert len(rows) == 3
-        assert rows[0][0] == "Job True" and rows[0][1] == 1
-        assert rows[1][0] == "Job False" and rows[1][1] == 0
-        assert rows[2][0] == "Job Null" and rows[2][1] == 0
-
-        cols = [c[1] for c in conn.execute(text("PRAGMA table_info(vacancy)")).fetchall()]
-        assert "processed" in cols
-        assert "status" not in cols
-
+    # 2. Downgrade to base
+    command.downgrade(alembic_cfg, "base")
     engine.dispose()

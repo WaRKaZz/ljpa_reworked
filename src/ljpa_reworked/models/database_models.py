@@ -61,9 +61,6 @@ class Vacancy(Base):
     basic_evaluation: Mapped[Optional["BasicEvaluation"]] = relationship(
         back_populates="vacancy"
     )
-    linkedin_posts: Mapped[Optional["LinkedinPost"]] = relationship(
-        back_populates="vacancy"
-    )
     telegram_status: Mapped[Optional["TelegramStatus"]] = relationship(
         back_populates="vacancy"
     )
@@ -88,23 +85,6 @@ class BasicEvaluation(Base):
 
     # Relationship
     vacancy: Mapped["Vacancy"] = relationship(back_populates="basic_evaluation")
-
-
-class LinkedinPost(Base):
-    __tablename__ = "linkedin_post"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    screenshot_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    url: Mapped[str | None] = mapped_column(Text, nullable=True)
-    processed: Mapped[bool] = mapped_column(Boolean, default=False)
-    deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    vacancy_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("vacancy.id"), nullable=True
-    )
-    created_at: Mapped[created_at]
-    # Relationship
-    vacancy: Mapped["Vacancy"] = relationship(back_populates="linkedin_posts")
 
 
 class TelegramStatus(Base):

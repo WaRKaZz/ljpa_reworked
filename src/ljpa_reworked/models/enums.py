@@ -3,6 +3,7 @@ from enum import Enum
 
 class VacancyStatus(str, Enum):
     created = "created"  # discovered/upserted; not yet reviewed
+    updated = "updated"  # source fields refreshed on existing vacancy
     reviewed = "reviewed"  # review completed and candidate may proceed
     rejected = "rejected"  # review completed; not a match
     review_error = "review_error"  # review could not complete; may be retried

@@ -17,12 +17,9 @@ from ljpa_reworked.operations import (
 )
 from ljpa_reworked.services.harness_runner import run_linkedin_harness
 from ljpa_reworked.services.jobspy import JobSpyIntegrationService
-from ljpa_reworked.workflow import (  # noqa
+from ljpa_reworked.workflow import (
     extract_email,
-    get_linkedin_posts,
-    process_linkedin_posts,
     save_resume,
-    save_vacancies,
     send_email,
     send_telegram_post,
     verified_recipient,
@@ -48,11 +45,6 @@ def main():
     # Step 3: Process and Evaluate Vacancies Sequentially
     logger.info("[Step 3/4] Evaluating candidate vacancies sequentially...")
     with SessionLocal() as db:
-        posts = get_linkedin_posts(db)
-        if posts:
-            vacancies = process_linkedin_posts(posts=posts, db=db)
-            save_vacancies(vacancies, db)
-
         vacancies = get_eligble_vacancies(db=db)
         logger.info("Found %d eligible vacancies for evaluation.", len(vacancies))
         for vacancy in vacancies:
