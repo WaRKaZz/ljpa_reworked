@@ -13,7 +13,8 @@ from ljpa_reworked.models.crewai_pydantic_models import (
     SkillCrewAI,
     VisaStatus,
 )
-from ljpa_reworked.models.database_models import DataSource, Vacancy
+from ljpa_reworked.models.database_models import DataSource, Email, Vacancy
+from ljpa_reworked.models.enums import VacancyStatus
 from ljpa_reworked.operations.resume_ops import (
     create_resume,
     get_resume_by_id,
@@ -153,3 +154,23 @@ def test_create_and_query_resume_orm(db_session: Session):
     assert isinstance(data_dict["personal_info"], dict)
     assert isinstance(data_dict["education"], list)
     assert isinstance(data_dict["experience"], list)
+
+
+def test_vacancystatus_has_no_sent_value():
+    """Verify that VacancyStatus enum has no 'sent' member and uses 'applied' for submitted state."""
+    assert not hasattr(VacancyStatus, "sent")
+    assert "sent" not in [status.value for status in VacancyStatus]
+    assert VacancyStatus.applied.value == "applied"
+
+
+def test_vacancy_model_has_no_updated_at_column():
+    """Verify that Vacancy SQLAlchemy model has no updated_at column."""
+    assert not hasattr(Vacancy, "updated_at")
+    assert "updated_at" not in [column.name for column in Vacancy.__table__.columns]
+
+
+def test_email_created_at_is_row_creation_time():
+    """Verify that Email model has created_at row creation time but no sent_at timestamp."""
+    assert hasattr(Email, "created_at")
+    assert not hasattr(Email, "sent_at")
+    assert "sent_at" not in [column.name for column in Email.__table__.columns]

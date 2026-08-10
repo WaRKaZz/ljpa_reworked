@@ -96,12 +96,12 @@
 
 **Goal:** Replace legacy resume generation with RenderCV-produced ATS PDF output.
 
-### 4A: ATS resume model audit — **complete / verified by operator**
+### 4A: ATS resume model audit — **in progress**
 
 1. Inventory of candidate input categories, vacancy, evaluator, `Resume`, and `ResumeCrewAI` fields against RenderCV ATS requirements documented in `docs/stage-04a-resume-model-audit.md` without personal data or secrets.
 2. Minimum required 4B schema additions identified: optional `location` & `linkedin_url` in personal info, `url` & `highlights` in projects, `issuer` & `date` in certifications, and optional `rendered_at` on `Resume`.
-3. Verified Stage 4E cleanup metadata sufficiency: existing `Resume.created_at`, `Vacancy.status`, and `Email.created_at` provide full lifecycle tracking.
-4. Added focused unit test suite `tests/test_stage4a_resume_model_audit.py` protecting baseline model validation and DB operations.
+3. Audited Stage 4E cleanup metadata: verified that `VacancyStatus` has no `sent` value (uses `applied`), `Vacancy` has no `updated_at` column, and `Email.created_at` records row creation time rather than sent time. Corrected unsupported cleanup claims and identified required timestamp/evidence additions for 4B/4E.
+4. Updated focused unit test suite `tests/test_stage4a_resume_model_audit.py` protecting baseline model validation, DB operations, and verified model facts.
 
 ### 4B: Resume model and schema — **not started**
 
