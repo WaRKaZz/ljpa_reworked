@@ -60,7 +60,7 @@
 - Backed up canonical database, recreated fresh `data/app.db` via `init_db()`, and verified with `PRAGMA integrity_check`.
 
 
-## Stage 2: JobSpy search and ETL — **complete for unit scope; sequential integration pending**
+## Stage 2: JobSpy search and ETL — **complete for unit scope**
 
 **Goal:** Search JobSpy and save or refresh vacancies as Step 2, after LinkedIn harness collection and before review.
 
@@ -73,11 +73,9 @@
 - `VacancyStatus` replaced `Vacancy.processed`; lifecycle state is explicit and `submit_url` is unique when present.
 - `JobSpyIntegrationService.run()` returns summary metrics for the Step-2 search.
 
-### Remaining
+### Constraint for future changes
 
-1. Replace legacy hard-coded JobSpy calls in `main.py` with `JobSpyIntegrationService.run()` so JobSpy is the second sequential step.
-2. Verify the sequential hand-off with fakes: harness collection, JobSpy search, then review; do not make a live network run part of this stage.
-3. Do not create a fallback identity for URL-less rows unless JobSpy supplies a proven immutable source ID.
+- Do not create a fallback identity for URL-less rows unless JobSpy supplies a proven immutable source ID.
 
 ## Stage 3: QA gates — **partially complete**
 
