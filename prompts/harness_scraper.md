@@ -143,7 +143,7 @@ For every candidate:
 
 1. Open the original LinkedIn post itself in the browser. Do not judge from search results.
 2. Expand “see more” and any collapsed text. Read the complete post body, visible application instructions, author/company context, publication date, and linked destination.
-3. If the post contains an application URL, open that URL too and verify the destination before treating it as `submit_url`.
+3. If the post contains an application URL, open that URL too and verify the destination before treating it as `submit_url`. If the URL is a LinkedIn job page with an external "Apply" button (not "Easy Apply"), try to click the button, wait for the page to load, and extract the vendor apply URL instead of the LinkedIn URL if possible.
 4. Build an internal structured extraction from the complete post: employer, exact role, employment type if stated, location/remote rules, responsibilities, requirements, visa/work authorization, application instructions, `submit_email`, and verified `submit_url`.
 5. Only then apply the gates below. If the full post cannot be opened/read, reject it. Never save or replace a vacancy from preview data.
 
@@ -348,7 +348,7 @@ SUBMIT EMAIL AND SUBMIT URL
 Before persisting, validate contacts independently:
 
 1. Set `submit_email` only to a valid email address explicitly provided for applications. Otherwise set it to `NULL`.
-2. Set `submit_url` only after opening the candidate URL and confirming it is an application destination with an actual Apply/Easy Apply/application-form path. Otherwise set it to `NULL`.
+2. Set `submit_url` only after opening the candidate URL and confirming it is an application destination with an actual Apply/Easy Apply/application-form path. Otherwise set it to `NULL`. If the URL is a LinkedIn URL containing an external "Apply" button (not "Easy Apply"), try to press this button, wait for page load, and extract the vendor apply URL instead of the LinkedIn URL if possible.
 3. A LinkedIn post URL, search URL, feed URL, profile URL, or “DM me” instruction is never a submission contact. It cannot be stored in either field.
 4. If both final values are `NULL`, reject the vacancy and do not insert or update any row.
 
