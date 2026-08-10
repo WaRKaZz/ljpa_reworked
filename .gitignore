@@ -15,11 +15,17 @@
 
 *test.py 
 /screenshots
-
+/docs
+.agents
+.superpowers
+.ruff_cache
+.pytest_cahce
 
 /ollama*
 typescript
 GEMINI.md
+AGENTS.md
 REFACTORING_PLAN.md
+/prompts
 .gemini/
-data/*.db
+data/*.db*

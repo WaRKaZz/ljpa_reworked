@@ -1,20 +1,17 @@
 import hashlib
-import json
-import pytest
-from pathlib import Path
 from unittest.mock import MagicMock
+
+import pytest
 
 from ljpa_reworked.models.crewai_pydantic_models import (
     JobSearchQuery,
     JobSearchQuerySet,
 )
 from ljpa_reworked.services.jobspy import (
+    JobSpyIntegrationService,
     compute_profile_sha256,
-    load_cached_queries,
-    atomic_write_cache,
     get_or_generate_job_search_queries,
     normalize_and_deduplicate_queries,
-    JobSpyIntegrationService,
 )
 
 

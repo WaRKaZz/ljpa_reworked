@@ -4,7 +4,9 @@ from ..constants.resume_constants import JOB_DETAILS_PARAGRAPH_STYLE
 
 
 class Skill:
-    def __init__(self, title="", elements=[]) -> None:
+    def __init__(self, title="", elements=None) -> None:
+        if elements is None:
+            elements = []
         self.title = title
         self.elements = elements
 

@@ -17,8 +17,10 @@ class Experience:
         location="",
         start_date="",
         end_date="",
-        description=[],
+        description=None,
     ) -> None:
+        if description is None:
+            description = []
         self.company = company
         self.title = title
         self.location = location

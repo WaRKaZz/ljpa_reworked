@@ -1,14 +1,12 @@
-import pytest
-from pathlib import Path
-from alembic.config import Config
 from alembic import command
+from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from ljpa_reworked.database import Base
+from ljpa_reworked.models.crewai_pydantic_models import VacancyCrewAI, VisaStatus
+from ljpa_reworked.models.database_models import DataSource, Vacancy
 from ljpa_reworked.models.enums import VacancyStatus
-from ljpa_reworked.models.database_models import Vacancy, DataSource
-from ljpa_reworked.models.crewai_pydantic_models import VisaStatus, VacancyCrewAI
 
 
 def test_vacancy_status_enum_values():
@@ -46,7 +44,9 @@ def test_vacancy_model_status_default():
 
 
 def test_crewai_pydantic_models_reexports_vacancystatus():
-    from ljpa_reworked.models.crewai_pydantic_models import VacancyStatus as CrewAIVacancyStatus
+    from ljpa_reworked.models.crewai_pydantic_models import (
+        VacancyStatus as CrewAIVacancyStatus,
+    )
     assert CrewAIVacancyStatus is VacancyStatus
 
 

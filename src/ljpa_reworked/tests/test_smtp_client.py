@@ -12,9 +12,7 @@ from ljpa_reworked.services.smtp_client import SMTPClient
 
 class TestSMTPClient(unittest.TestCase):
     def test_send_email(self):
-        """
-        Test sending an email using SMTPClient.
-        """
+        """Test sending an email using SMTPClient."""
         if not all([SMTP_EMAIL, SMTP_PASSWORD, SMTP_SERVER, SMTP_PORT]):
             self.skipTest("SMTP credentials are not configured.")
 

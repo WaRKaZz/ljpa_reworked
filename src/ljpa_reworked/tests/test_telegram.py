@@ -7,17 +7,13 @@ from ljpa_reworked.services.telegram import Telegram
 
 class TestTelegram(unittest.TestCase):
     def setUp(self):
-        """
-        Set up the test case.
-        """
+        """Set up the test case."""
         if not all([TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID]):
             self.skipTest("Telegram credentials are not configured.")
         self.telegram = Telegram()
 
     def test_send_message(self):
-        """
-        Test sending a message using Telegram.
-        """
+        """Test sending a message using Telegram."""
         try:
             result = self.telegram.send_message(
                 "Test message from LJPA Reworked test suite."
@@ -27,9 +23,7 @@ class TestTelegram(unittest.TestCase):
             self.fail(f"Telegram.send_message() raised an exception: {e}")
 
     def test_send_image(self):
-        """
-        Test sending an image using Telegram.
-        """
+        """Test sending an image using Telegram."""
         # Find an image in the screenshots directory
         image_path = None
         if os.path.exists(SCREENSHOTS_DIR) and os.listdir(SCREENSHOTS_DIR):

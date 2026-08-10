@@ -1,4 +1,4 @@
-"""vacancy ID for LinkedinPosts is optional now
+"""vacancy ID for LinkedinPosts is optional now.
 
 Revision ID: c52bfebb9fb5
 Revises: ef82f8b78416

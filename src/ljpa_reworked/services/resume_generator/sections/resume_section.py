@@ -7,7 +7,9 @@ from ..constants.resume_constants import (
 
 
 class Section:
-    def __init__(self, heading: str, elements=[]):
+    def __init__(self, heading: str, elements=None):
+        if elements is None:
+            elements = []
         self.heading = heading
         self.elements = elements
 

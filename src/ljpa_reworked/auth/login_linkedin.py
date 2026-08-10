@@ -4,9 +4,9 @@ import os
 import socket
 import sys
 from pathlib import Path
-from typing import Optional, Union
+
 from dotenv import load_dotenv
-from playwright.async_api import async_playwright, BrowserContext, Page
+from playwright.async_api import BrowserContext, Page, async_playwright
 
 load_dotenv()
 
@@ -32,7 +32,7 @@ def get_cdp_endpoint() -> str:
         url = f"{url}{sep}fingerprint=linkedin_seed"
     return url
 
-def clean_env_val(val: Optional[str]) -> str:
+def clean_env_val(val: str | None) -> str:
     """Helper to strip enclosing quotes from env string values."""
     if not val:
         return ""
@@ -48,10 +48,10 @@ async def fill_login_form(page: Page, email: str, password: str) -> bool:
         if await email_locator.count() > 0:
             logger.info("Found visible email field. Filling email from .env...")
             await email_locator.first.fill(email)
-            
+
             password_locator = page.locator("input[type='password']:visible, #password:visible, input[name='session_password']:visible")
             await password_locator.first.fill(password)
-            
+
             submit_btn = page.locator("button[type='submit']:visible, .btn__primary--large:visible")
             if await submit_btn.count() > 0:
                 await submit_btn.first.click()
@@ -66,12 +66,11 @@ async def fill_login_form(page: Page, email: str, password: str) -> bool:
 async def check_login_success(
     page: Page,
     context: BrowserContext,
-    state_path: Union[str, Path] = DEFAULT_SAVE_PATH,
+    state_path: str | Path = DEFAULT_SAVE_PATH,
     poll_interval: float = 2.0,
     timeout: float = 3600.0,
 ) -> bool:
-    """
-    Polls the browser page until logged-in navigation element or feed URL is present,
+    """Polls the browser page until logged-in navigation element or feed URL is present,
     then saves storage_state to state_path.
     """
     path = Path(state_path)
@@ -100,7 +99,7 @@ async def check_login_success(
 
         await asyncio.sleep(poll_interval)
 
-async def main(state_path: Union[str, Path] = DEFAULT_SAVE_PATH):
+async def main(state_path: str | Path = DEFAULT_SAVE_PATH):
     save_path = Path(state_path)
     cdp_url = get_cdp_endpoint()
     email = clean_env_val(os.getenv("LINKEDIN_EMAIL"))

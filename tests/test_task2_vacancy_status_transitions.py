@@ -5,7 +5,6 @@ from sqlalchemy.pool import StaticPool
 
 from ljpa_reworked.database import Base
 from ljpa_reworked.models.enums import VacancyStatus
-from ljpa_reworked.models.crewai_pydantic_models import VisaStatus
 from ljpa_reworked.operations.vacancy_ops import (
     create_vacancy_direct,
     get_eligble_vacancies,

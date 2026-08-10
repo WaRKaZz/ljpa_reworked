@@ -1,6 +1,6 @@
 # Architecture Overview
 
-This project is an automated job search, candidate evaluation, resume generation, and job application pipeline powered by Python, the Google Antigravity SDK (`agy`), CrewAI, RenderCV, Playwright/CloakBrowser, and SQLite.
+This project is an automated job search, candidate evaluation, resume generation, and job application pipeline powered by Python, the Google Antigravity CLI (`agy`), CrewAI, RenderCV, Playwright/CloakBrowser, and SQLite.
 
 ## 1. System Pipeline Overview
 
@@ -68,7 +68,7 @@ The deployment environment consists of two isolated containers orchestrated via 
 ## 3. Technology Stack Summary
 
 - **Core:** Python 3.11+ managed with `uv`.
-- **Agent Engines:** `google.antigravity` (`agy` SDK) & `crewai`.
+- **Agent Engines:** Google Antigravity CLI (`agy`) & `crewai`.
 - **Browser Automation:** Playwright, `CloakBrowser` (Anti-detect Chromium), Xvfb, noVNC.
 - **Resume Compilation:** `RenderCV` (YAML to ATS PDF engine).
 - **Database & Migrations:** SQLite (`sqlite:///data/app.db`), SQLAlchemy ORM, Alembic migrations.

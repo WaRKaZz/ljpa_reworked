@@ -1,21 +1,20 @@
-"""removed duplicate created_at from LinkedinPost
+"""removed duplicate created_at from LinkedinPost.
 
 Revision ID: 55f99b29f9c6
 Revises: 984fd6ede51c
 Create Date: 2025-08-30 15:41:01.586155
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '55f99b29f9c6'
-down_revision: Union[str, Sequence[str], None] = '984fd6ede51c'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '984fd6ede51c'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

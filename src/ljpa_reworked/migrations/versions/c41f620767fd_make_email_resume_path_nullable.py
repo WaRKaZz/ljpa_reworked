@@ -1,21 +1,17 @@
-"""Make email resume_path nullable
+"""Make email resume_path nullable.
 
 Revision ID: c41f620767fd
 Revises: fd2864f52d45
 Create Date: 2025-07-18 08:40:27.618546
 
 """
-from typing import Sequence, Union
-
-from alembic import op
-import sqlalchemy as sa
-
+from collections.abc import Sequence
 
 # revision identifiers, used by Alembic.
 revision: str = 'c41f620767fd'
-down_revision: Union[str, Sequence[str], None] = 'fd2864f52d45'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'fd2864f52d45'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

@@ -11,7 +11,7 @@ def create_email(
     recipient: str,
     resume_path: str | None = None,  # <-- Fixed type and name
 ) -> Email:
-    """Create email for vacancy application"""
+    """Create email for vacancy application."""
     email = Email(
         vacancy_id=vacancy_id,
         subject=email_data.subject,
@@ -26,27 +26,27 @@ def create_email(
 
 
 def get_email_by_id(db: Session, email_id: int) -> Email | None:
-    """Get email by ID"""
+    """Get email by ID."""
     return db.query(Email).filter(Email.id == email_id).first()
 
 
 def get_emails_by_vacancy(db: Session, vacancy_id: int) -> list[Email]:
-    """Get all emails for specific vacancy"""
+    """Get all emails for specific vacancy."""
     return db.query(Email).filter(Email.vacancy_id == vacancy_id).all()
 
 
 def get_pending_emails(db: Session) -> list[Email]:
-    """Get emails that haven't been sent yet"""
+    """Get emails that haven't been sent yet."""
     return db.query(Email).filter(Email.sent.is_(False)).all()
 
 
 def get_sent_emails(db: Session) -> list[Email]:
-    """Get all sent emails"""
+    """Get all sent emails."""
     return db.query(Email).filter(Email.sent.is_(True)).all()
 
 
 def mark_email_sent(db: Session, email_id: int) -> bool:
-    """Mark email as sent"""
+    """Mark email as sent."""
     email = get_email_by_id(db, email_id)
     if email:
         email.sent = True
@@ -56,17 +56,17 @@ def mark_email_sent(db: Session, email_id: int) -> bool:
 
 
 def get_emails_by_recipient(db: Session, recipient: str) -> list[Email]:
-    """Get all emails sent to specific recipient"""
+    """Get all emails sent to specific recipient."""
     return db.query(Email).filter(Email.recipient == recipient).all()
 
 
 def search_emails_by_subject(db: Session, keyword: str) -> list[Email]:
-    """Search emails by subject"""
+    """Search emails by subject."""
     return db.query(Email).filter(Email.subject.contains(keyword)).all()
 
 
 def update_email(db: Session, email_id: int, **kwargs) -> Email | None:
-    """Update email fields"""
+    """Update email fields."""
     email = get_email_by_id(db, email_id)
     if email:
         for key, value in kwargs.items():
@@ -78,7 +78,7 @@ def update_email(db: Session, email_id: int, **kwargs) -> Email | None:
 
 
 def delete_email(db: Session, email_id: int) -> bool:
-    """Delete email"""
+    """Delete email."""
     email = get_email_by_id(db, email_id)
     if email:
         db.delete(email)

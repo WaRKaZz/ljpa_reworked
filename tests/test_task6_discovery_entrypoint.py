@@ -1,16 +1,17 @@
-import pytest
+from unittest.mock import patch
+
 import pandas as pd
-from unittest.mock import MagicMock, patch
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from ljpa_reworked.models.database_models import Base, Vacancy
-from ljpa_reworked.models.crewai_pydantic_models import JobSearchQuery
-from ljpa_reworked.services.jobspy import (
-    JobSpyIntegrationService,
-    JobSpyDiscoveryRunSummary,
-)
 from ljpa_reworked.main import run_jobspy_discovery
+from ljpa_reworked.models.crewai_pydantic_models import JobSearchQuery
+from ljpa_reworked.models.database_models import Base, Vacancy
+from ljpa_reworked.services.jobspy import (
+    JobSpyDiscoveryRunSummary,
+    JobSpyIntegrationService,
+)
 
 
 @pytest.fixture

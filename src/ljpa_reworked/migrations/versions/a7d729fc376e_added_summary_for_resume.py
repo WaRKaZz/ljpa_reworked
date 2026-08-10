@@ -1,4 +1,4 @@
-"""added summary for resume
+"""added summary for resume.
 
 Revision ID: a7d729fc376e
 Revises: afa84864b87f

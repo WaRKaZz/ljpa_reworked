@@ -1,21 +1,20 @@
-"""summary not optional for resume
+"""summary not optional for resume.
 
 Revision ID: 0713c52d4b9b
 Revises: a7d729fc376e
 Create Date: 2025-07-02 12:31:14.326987
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '0713c52d4b9b'
-down_revision: Union[str, Sequence[str], None] = 'a7d729fc376e'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'a7d729fc376e'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

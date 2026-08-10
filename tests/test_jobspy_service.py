@@ -1,6 +1,9 @@
 from unittest.mock import MagicMock, patch
+
 import pandas as pd
+
 from ljpa_reworked.services.jobspy import fetch_and_store_jobs
+
 
 @patch("ljpa_reworked.services.jobspy.scrape_jobs")
 @patch("ljpa_reworked.services.jobspy.upsert_vacancy_by_url")

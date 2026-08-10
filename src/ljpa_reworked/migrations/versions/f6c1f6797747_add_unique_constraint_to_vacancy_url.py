@@ -1,21 +1,20 @@
-"""add_unique_constraint_to_vacancy_url
+"""add_unique_constraint_to_vacancy_url.
 
 Revision ID: f6c1f6797747
 Revises: 4134f218d1f0
 Create Date: 2026-08-10 07:34:45.739002
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'f6c1f6797747'
-down_revision: Union[str, Sequence[str], None] = '4134f218d1f0'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '4134f218d1f0'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

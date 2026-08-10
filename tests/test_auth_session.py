@@ -1,7 +1,9 @@
 import json
+
 import pytest
-from pathlib import Path
-from ljpa_reworked.auth.session import verify_auth_state, load_auth_state
+
+from ljpa_reworked.auth.session import load_auth_state, verify_auth_state
+
 
 def test_verify_auth_state_missing_file(tmp_path):
     missing_file = tmp_path / "state.json"

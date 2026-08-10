@@ -21,8 +21,7 @@ from .sections.resume_section import Section
 
 class ResumeGenerator:
     def __init__(self, resume_data_json: dict):
-        """
-        Initializes the ResumeGenerator with resume data.
+        """Initializes the ResumeGenerator with resume data.
         :param resume_data_json: A dictionary containing resume data,
                                  typically loaded from a JSON file.
         """
@@ -75,8 +74,7 @@ class ResumeGenerator:
         return e
 
     def generate(self, output_file_path: str) -> None:
-        """
-        Generates the resume as a PDF file.
+        """Generates the resume as a PDF file.
         :param output_file_path: The path to save the generated PDF file.
         """
         resume_doc = SimpleDocTemplate(

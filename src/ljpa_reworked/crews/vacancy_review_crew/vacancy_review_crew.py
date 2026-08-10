@@ -52,7 +52,7 @@ class VacancyReviewCrew:
 
 
 def is_vacancy(output: TaskOutput) -> bool:
-    """Check if we should post a job"""
+    """Check if we should post a job."""
     if output.pydantic:
         return output.pydantic.is_vacancy
     return False

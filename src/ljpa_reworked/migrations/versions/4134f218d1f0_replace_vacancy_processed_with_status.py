@@ -1,21 +1,20 @@
-"""replace_vacancy_processed_with_status
+"""replace_vacancy_processed_with_status.
 
 Revision ID: 4134f218d1f0
 Revises: 5ca38e6b4f5a
 Create Date: 2026-08-10 07:24:20.165922
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '4134f218d1f0'
-down_revision: Union[str, Sequence[str], None] = '5ca38e6b4f5a'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '5ca38e6b4f5a'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 vacancy_status_enum = sa.Enum(
     'created',

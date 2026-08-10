@@ -1,12 +1,14 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from pathlib import Path
+
+import pytest
+
 from ljpa_reworked.auth.login_linkedin import (
     check_login_success,
-    get_cdp_endpoint,
     clean_env_val,
     fill_login_form,
+    get_cdp_endpoint,
 )
+
 
 def test_clean_env_val():
     assert clean_env_val('"email@mail.com"') == "email@mail.com"

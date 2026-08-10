@@ -1,21 +1,20 @@
-"""add linkedin_post table
+"""add linkedin_post table.
 
 Revision ID: 5ca38e6b4f5a
 Revises: 55f99b29f9c6
 Create Date: 2026-08-08 16:26:45.680155
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = '5ca38e6b4f5a'
-down_revision: Union[str, Sequence[str], None] = '55f99b29f9c6'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = '55f99b29f9c6'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

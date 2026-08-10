@@ -6,8 +6,7 @@ from ljpa_reworked.models.database_models import TelegramStatus, Vacancy
 
 
 def mark_vacancy_as_sent(db: Session, vacancy_id: int) -> TelegramStatus:
-    """
-    Marks a vacancy as sent via Telegram. If a TelegramStatus record
+    """Marks a vacancy as sent via Telegram. If a TelegramStatus record
     exists, it's updated. Otherwise, a new one is created.
 
     Args:
@@ -19,6 +18,7 @@ def mark_vacancy_as_sent(db: Session, vacancy_id: int) -> TelegramStatus:
 
     Raises:
         ValueError: If the vacancy with the given ID is not found.
+
     """
     vacancy = (
         db.query(Vacancy)

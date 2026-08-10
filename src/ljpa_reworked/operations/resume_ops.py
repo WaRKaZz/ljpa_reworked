@@ -7,7 +7,7 @@ from ljpa_reworked.models.database_models import Resume
 def create_resume(
     db: Session, vacancy_id: int, resume_data: ResumeCrewAI, path: str | None = None
 ) -> Resume:
-    """Create resume for specific vacancy"""
+    """Create resume for specific vacancy."""
     personal_info = resume_data.personal_info
 
     resume = Resume(
@@ -32,22 +32,22 @@ def create_resume(
 
 
 def get_resume_by_id(db: Session, resume_id: int) -> Resume | None:
-    """Get resume by ID"""
+    """Get resume by ID."""
     return db.query(Resume).filter(Resume.id == resume_id).first()
 
 
 def get_resume_by_vacancy(db: Session, vacancy_id: int) -> Resume | None:
-    """Get resume for specific vacancy"""
+    """Get resume for specific vacancy."""
     return db.query(Resume).filter(Resume.vacancy_id == vacancy_id).first()
 
 
 def get_resumes_by_email(db: Session, email: str) -> list[Resume]:
-    """Get all resumes by email address"""
+    """Get all resumes by email address."""
     return db.query(Resume).filter(Resume.email == email).all()
 
 
 def update_resume_path(db: Session, resume_id: int, path: str) -> Resume | None:
-    """Update resume file path"""
+    """Update resume file path."""
     resume = get_resume_by_id(db, resume_id)
     if resume:
         resume.path = path
@@ -57,17 +57,17 @@ def update_resume_path(db: Session, resume_id: int, path: str) -> Resume | None:
 
 
 def search_resumes_by_name(db: Session, name: str) -> list[Resume]:
-    """Search resumes by full name"""
+    """Search resumes by full name."""
     return db.query(Resume).filter(Resume.fullname.contains(name)).all()
 
 
 def get_all_resumes(db: Session, skip: int = 0, limit: int = 100) -> list[Resume]:
-    """Get all resumes"""
+    """Get all resumes."""
     return db.query(Resume).offset(skip).limit(limit).all()
 
 
 def delete_resume(db: Session, resume_id: int) -> bool:
-    """Delete resume"""
+    """Delete resume."""
     resume = get_resume_by_id(db, resume_id)
     if resume:
         db.delete(resume)

@@ -3,7 +3,7 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 from jobspy import scrape_jobs
 from pydantic import BaseModel, Field, ValidationError
@@ -287,9 +287,9 @@ class JobSpyIntegrationService:
 
 
 
-def _store_jobs_df(jobs_df: Any, source_enum: DataSource, session: Session) -> List[Vacancy]:
+def _store_jobs_df(jobs_df: Any, source_enum: DataSource, session: Session) -> list[Vacancy]:
     seen_urls: set[str] = set()
-    saved_vacancies: List[Vacancy] = []
+    saved_vacancies: list[Vacancy] = []
 
     for _, row in jobs_df.iterrows():
         raw_url = row.get("job_url")
@@ -329,7 +329,7 @@ def fetch_and_store_jobs(
     location: str = "Remote",
     results_wanted: int = 10,
     db: Session | None = None,
-) -> List[Vacancy]:
+) -> list[Vacancy]:
     """Fetch job postings via python-jobspy ETL pipeline and store them as Vacancy records in SQLite."""
     logger.info("Executing JobSpy scrape for '%s' in '%s' on %s...", search_term, location, site_name)
     jobs_df = scrape_jobs(

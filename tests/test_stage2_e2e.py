@@ -1,4 +1,5 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
+
 import pandas as pd
 import pytest
 from sqlalchemy import create_engine
@@ -6,15 +7,15 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from ljpa_reworked.database import Base
-from ljpa_reworked.models.database_models import DataSource, LinkedinPost, Vacancy
 from ljpa_reworked.models.crewai_pydantic_models import VisaStatus
-from ljpa_reworked.services.jobspy import fetch_and_store_jobs
+from ljpa_reworked.models.database_models import DataSource
 from ljpa_reworked.operations.linkedin_post_ops import (
     get_all_linkedin_posts,
     link_post_to_vacancy,
     save_linkedin_post,
 )
 from ljpa_reworked.operations.vacancy_ops import get_all_vacancies
+from ljpa_reworked.services.jobspy import fetch_and_store_jobs
 
 
 @pytest.fixture
@@ -129,7 +130,7 @@ def test_stage2_combined_collection_pipeline(db_session):
         url="https://www.linkedin.com/feed/update/urn:li:activity:888888/",
         db=db_session,
     )
-    post2 = save_linkedin_post(
+    save_linkedin_post(
         text="Looking for Product Manager in Berlin.",
         url="https://www.linkedin.com/feed/update/urn:li:activity:999999/",
         db=db_session,
