@@ -1,9 +1,7 @@
-from os import getcwd, path
+from os import path
 from pathlib import Path
 
-from reportlab.lib.enums import TA_JUSTIFY, TA_RIGHT
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics, ttfonts
 

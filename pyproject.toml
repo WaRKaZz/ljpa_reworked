@@ -53,8 +53,8 @@ ignore = [
     "E501",  # line too long (handled by formatter)
     "B008",  # do not perform function calls in argument defaults
     "D417",  # Missing argument descriptions (optional for now)
-    "ASYNC210",  # Ignore if not fully async yet
-    "D100", "D101", "D102", "D103", "D401"
+    "ASYNC210", "ASYNC220",  # Ignore async warnings
+    "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107", "D200", "D205", "D401", "D404"
 ]
 
 [tool.ruff.format]

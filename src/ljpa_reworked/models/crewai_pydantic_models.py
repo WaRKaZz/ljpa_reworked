@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
-from .enums import VacancyStatus
+from ljpa_reworked.models.enums import VacancyStatus as VacancyStatus  # noqa: F401
 
 # Define the string type with whitespace stripping
 StrippedStr = Annotated[str, StringConstraints(strip_whitespace=True)]
