@@ -17,11 +17,13 @@ def test_clean_env_val():
     assert clean_env_val("plain") == "plain"
     assert clean_env_val(None) == ""
 
+
 def test_get_cdp_endpoint():
     with patch.dict("os.environ", {"CDP_URL": "http://localhost:9222"}):
         assert "fingerprint=linkedin_seed" in get_cdp_endpoint()
     with patch.dict("os.environ", {}, clear=True):
         assert "http://localhost:9222" in get_cdp_endpoint()
+
 
 @pytest.mark.asyncio
 async def test_fill_login_form():
@@ -52,6 +54,7 @@ async def test_fill_login_form():
     mock_pass_locator.first.fill.assert_called_once_with("secret")
     mock_btn_locator.first.click.assert_called_once()
 
+
 @pytest.mark.asyncio
 async def test_check_login_success_detected(tmp_path):
     mock_page = MagicMock()
@@ -64,7 +67,9 @@ async def test_check_login_success_detected(tmp_path):
     mock_context.storage_state = AsyncMock()
     state_file = tmp_path / "resources" / "state.json"
 
-    result = await check_login_success(mock_page, mock_context, state_path=state_file, poll_interval=0.01, timeout=1.0)
+    result = await check_login_success(
+        mock_page, mock_context, state_path=state_file, poll_interval=0.01, timeout=1.0
+    )
     assert result is True
     mock_context.storage_state.assert_called_once_with(path=str(state_file))
 

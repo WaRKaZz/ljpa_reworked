@@ -1,7 +1,14 @@
+import re
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from ljpa_reworked.models.enums import VacancyStatus as VacancyStatus  # noqa: F401
 
@@ -70,12 +77,37 @@ class VacancyCrewAI(BaseModel):
         StringConstraints(strip_whitespace=True, max_length=200),
     ]
     text: Annotated[str, StringConstraints(strip_whitespace=True, max_length=3000)]
-    url: StrippedStr | None = None
-    credentials: Annotated[
-        str, StringConstraints(strip_whitespace=True, max_length=500)
-    ]
+    submit_email: StrippedStr | None = None
+    submit_url: StrippedStr | None = None
     visa_status: VisaStatus
     post_id: int | None = None
+
+    @field_validator("submit_email", "submit_url", mode="before")
+    @classmethod
+    def empty_string_to_none(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return None
+        return v
+
+    @field_validator("submit_email", mode="after")
+    @classmethod
+    def validate_email_syntax(cls, v):
+        if v is not None:
+            if not re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", v):
+                raise ValueError("Invalid email syntax")
+        return v
+
+    @model_validator(mode="after")
+    def validate_at_least_one_contact(self):
+        email_clean = self.submit_email.strip() if self.submit_email else None
+        url_clean = self.submit_url.strip() if self.submit_url else None
+        if not email_clean and not url_clean:
+            raise ValueError(
+                "Vacancy must have at least one contact method (submit_email or submit_url)."
+            )
+        return self
 
 
 class EmailCrewAI(BaseModel):
@@ -119,4 +151,3 @@ class JobSearchQuerySet(BaseModel):
         if len(keys) != len(self.queries):
             raise ValueError("duplicate normalized job search queries are not allowed")
         return self
-

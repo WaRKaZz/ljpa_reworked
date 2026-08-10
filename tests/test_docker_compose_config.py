@@ -11,8 +11,12 @@ def test_compose_yml_structure():
         config = yaml.safe_load(f)
 
     services = config.get("services", {})
-    assert "cloak-browser" in services, "compose.yml must contain service 'cloak-browser'"
-    assert "antigravity-cli" in services, "compose.yml must contain service 'antigravity-cli'"
+    assert "cloak-browser" in services, (
+        "compose.yml must contain service 'cloak-browser'"
+    )
+    assert "antigravity-cli" in services, (
+        "compose.yml must contain service 'antigravity-cli'"
+    )
 
     cloak = services["cloak-browser"]
     assert cloak.get("image") == "docker.io/cloakhq/cloakbrowser:latest"
@@ -24,9 +28,16 @@ def test_compose_yml_structure():
 
     cli = services["antigravity-cli"]
     volumes = [str(v) for v in cli.get("volumes", [])]
-    assert any("./resources:/app/resources" in v for v in volumes), "antigravity-cli must mount ./resources:/app/resources"
-    assert any("./data:/app/data" in v for v in volumes), "antigravity-cli must mount ./data:/app/data"
-    assert any("./.gemini:/home/agent/.gemini" in v for v in volumes), "antigravity-cli must mount .gemini to /home/agent/.gemini"
+    assert any("./resources:/app/resources" in v for v in volumes), (
+        "antigravity-cli must mount ./resources:/app/resources"
+    )
+    assert any("./data:/app/data" in v for v in volumes), (
+        "antigravity-cli must mount ./data:/app/data"
+    )
+    assert any("./.gemini:/home/agent/.gemini" in v for v in volumes), (
+        "antigravity-cli must mount .gemini to /home/agent/.gemini"
+    )
+
 
 def test_dockerfile_antigravity_config():
     dockerfile_path = Path("Dockerfile.antigravity")
@@ -34,4 +45,3 @@ def test_dockerfile_antigravity_config():
 
     content = dockerfile_path.read_text(encoding="utf-8")
     assert "uv" in content, "Dockerfile.antigravity must install uv"
-

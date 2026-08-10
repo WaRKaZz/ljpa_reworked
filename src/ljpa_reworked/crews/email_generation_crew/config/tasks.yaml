@@ -9,9 +9,10 @@ email_generation_task:
     {text}
 
     Contact person or methods what should be used to apply:
-    {credentials}
+    Email: {submit_email} URL: {submit_url}
     
-    If it is possible extract name of person from text or credentials, start email with Dear *extracted name*, or Dear Mr./Mrs. *extracted surname*
+    If it is possible extract name of person from text or submit_email / submit_url, start email with Dear *extracted name*, or Dear Mr./Mrs. *extracted surname*
+
     but use this if you are confident in name or surname end sex.
 
     Analyze the provided resume content and job vacancy details to generate a 

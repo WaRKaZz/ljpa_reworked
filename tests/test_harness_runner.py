@@ -14,4 +14,3 @@ def test_run_linkedin_harness_sends_http_request():
     req = mock_urlopen.call_args.args[0]
     assert req.full_url == "http://localhost:8080/run-harness"
     assert req.get_method() == "POST"
-

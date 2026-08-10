@@ -14,10 +14,12 @@ def run_linkedin_harness(
     api_url: str = "http://antigravity-cli:8080/run-harness",
 ) -> int:
     """Run the LinkedIn harness by sending a request to the Antigravity CLI container's API."""
-    payload = json.dumps({
-        "prompt_file": prompt_file,
-        "timeout": timeout,
-    }).encode("utf-8")
+    payload = json.dumps(
+        {
+            "prompt_file": prompt_file,
+            "timeout": timeout,
+        }
+    ).encode("utf-8")
 
     req = urllib.request.Request(
         api_url,

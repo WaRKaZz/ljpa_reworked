@@ -24,7 +24,8 @@ def crewai_evaluate_vacancy(vacancy: "Vacancy") -> BasicEvaluationCrewAI:
     inputs = {}
     inputs["text"] = vacancy.text
     inputs["title"] = vacancy.title
-    inputs["credentials"] = vacancy.credentials
+    inputs["submit_email"] = vacancy.submit_email or ""
+    inputs["submit_url"] = vacancy.submit_url or ""
     inputs["linkedin_url"] = LINKEDIN_PROFILE_URL
     crew_output = crew.kickoff(inputs=inputs)
     rate_limitter.record(crew.usage_metrics.successful_requests)
@@ -40,7 +41,8 @@ def crewai_generate_resume(
     inputs = {}
     inputs["text"] = vacancy.text
     inputs["title"] = vacancy.title
-    inputs["credentials"] = vacancy.credentials
+    inputs["submit_email"] = vacancy.submit_email or ""
+    inputs["submit_url"] = vacancy.submit_url or ""
     inputs["linkedin_url"] = LINKEDIN_PROFILE_URL
     inputs["rating"] = evaluation.rating
     inputs["summary"] = evaluation.summary
@@ -54,9 +56,18 @@ def crewai_generate_resume(
 def crewai_generate_email(vacancy: "Vacancy") -> EmailCrewAI:
     crew = EmailGenerationCrew().crew()
     inputs = {}
-    inputs["text"] = vacancy["text"]
-    inputs["title"] = vacancy["title"]
-    inputs["credentials"] = vacancy["credentials"]
+    inputs["text"] = vacancy["text"] if isinstance(vacancy, dict) else vacancy.text
+    inputs["title"] = vacancy["title"] if isinstance(vacancy, dict) else vacancy.title
+    inputs["submit_email"] = (
+        vacancy.get("submit_email") or vacancy.get("credentials") or ""
+        if isinstance(vacancy, dict)
+        else (vacancy.submit_email or "")
+    )
+    inputs["submit_url"] = (
+        vacancy.get("submit_url") or vacancy.get("url") or ""
+        if isinstance(vacancy, dict)
+        else (vacancy.submit_url or "")
+    )
     inputs["email_signature"] = EMAIL_SIGNATURE
     crew_output = crew.kickoff(inputs=inputs)
     rate_limitter.record(crew.usage_metrics.successful_requests)

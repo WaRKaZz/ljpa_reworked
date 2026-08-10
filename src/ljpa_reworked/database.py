@@ -35,3 +35,12 @@ class Base(DeclarativeBase):
 
     def to_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+
+def init_db(bind_engine=None) -> None:
+    """Initialize SQLite database schema directly using SQLAlchemy metadata."""
+    if bind_engine is None:
+        bind_engine = engine
+    import ljpa_reworked.models.database_models  # noqa: F401
+
+    Base.metadata.create_all(bind=bind_engine)

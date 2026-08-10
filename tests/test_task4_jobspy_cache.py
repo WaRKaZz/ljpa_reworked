@@ -42,7 +42,9 @@ def test_unchanged_profile_reuses_valid_cache(temp_resource_dir):
     profile_path.write_text(profile_text, encoding="utf-8")
     _, expected_sha = compute_profile_sha256(profile_path)
 
-    query1 = JobSearchQuery(search_term="Python Engineer", location="Remote", site_name="linkedin")
+    query1 = JobSearchQuery(
+        search_term="Python Engineer", location="Remote", site_name="linkedin"
+    )
     cached_query_set = JobSearchQuerySet(profile_sha256=expected_sha, queries=[query1])
     cache_path.write_text(cached_query_set.model_dump_json(indent=2), encoding="utf-8")
 
@@ -60,16 +62,22 @@ def test_unchanged_profile_reuses_valid_cache(temp_resource_dir):
     assert result.queries[0].search_term == "Python Engineer"
 
 
-def test_changed_profile_retriggers_crewai_generation_and_updates_cache(temp_resource_dir):
+def test_changed_profile_retriggers_crewai_generation_and_updates_cache(
+    temp_resource_dir,
+):
     profile_path = temp_resource_dir / "profile.md"
     cache_path = temp_resource_dir / "profile_search_query.json"
 
     # Initial profile and cache
     profile_path.write_text("Old Profile Text", encoding="utf-8")
     _, old_sha = compute_profile_sha256(profile_path)
-    old_query = JobSearchQuery(search_term="Old Role", location="Remote", site_name="linkedin")
+    old_query = JobSearchQuery(
+        search_term="Old Role", location="Remote", site_name="linkedin"
+    )
     cache_path.write_text(
-        JobSearchQuerySet(profile_sha256=old_sha, queries=[old_query]).model_dump_json(),
+        JobSearchQuerySet(
+            profile_sha256=old_sha, queries=[old_query]
+        ).model_dump_json(),
         encoding="utf-8",
     )
 
@@ -78,7 +86,9 @@ def test_changed_profile_retriggers_crewai_generation_and_updates_cache(temp_res
     profile_path.write_text(new_profile_text, encoding="utf-8")
     _, new_sha = compute_profile_sha256(profile_path)
 
-    new_query = JobSearchQuery(search_term="AI Architect", location="Remote", site_name="linkedin")
+    new_query = JobSearchQuery(
+        search_term="AI Architect", location="Remote", site_name="linkedin"
+    )
     mock_new_query_set = JobSearchQuerySet(profile_sha256=new_sha, queries=[new_query])
 
     mock_crew_runner = MagicMock(return_value=mock_new_query_set)
@@ -97,7 +107,9 @@ def test_changed_profile_retriggers_crewai_generation_and_updates_cache(temp_res
     assert result.queries[0].search_term == "AI Architect"
 
     # Check updated cache file on disk
-    saved_data = JobSearchQuerySet.model_validate_json(cache_path.read_text(encoding="utf-8"))
+    saved_data = JobSearchQuerySet.model_validate_json(
+        cache_path.read_text(encoding="utf-8")
+    )
     assert saved_data.profile_sha256 == new_sha
     assert saved_data.queries[0].search_term == "AI Architect"
 
@@ -113,8 +125,12 @@ def test_corrupt_cache_file_forces_regeneration(temp_resource_dir):
     # Write corrupted JSON
     cache_path.write_text("{ corrupt json data ...", encoding="utf-8")
 
-    new_query = JobSearchQuery(search_term="Backend Engineer", location="Remote", site_name="linkedin")
-    generated_query_set = JobSearchQuerySet(profile_sha256=current_sha, queries=[new_query])
+    new_query = JobSearchQuery(
+        search_term="Backend Engineer", location="Remote", site_name="linkedin"
+    )
+    generated_query_set = JobSearchQuerySet(
+        profile_sha256=current_sha, queries=[new_query]
+    )
     mock_crew_runner = MagicMock(return_value=generated_query_set)
 
     result = get_or_generate_job_search_queries(
@@ -130,19 +146,27 @@ def test_corrupt_cache_file_forces_regeneration(temp_resource_dir):
     assert result.profile_sha256 == current_sha
 
     # Verify cache file is now valid JSON
-    saved_data = JobSearchQuerySet.model_validate_json(cache_path.read_text(encoding="utf-8"))
+    saved_data = JobSearchQuerySet.model_validate_json(
+        cache_path.read_text(encoding="utf-8")
+    )
     assert saved_data.profile_sha256 == current_sha
 
 
-def test_crewai_failure_raises_exception_and_preserves_previous_valid_cache_file(temp_resource_dir):
+def test_crewai_failure_raises_exception_and_preserves_previous_valid_cache_file(
+    temp_resource_dir,
+):
     profile_path = temp_resource_dir / "profile.md"
     cache_path = temp_resource_dir / "profile_search_query.json"
 
     # Write old profile and valid cache
     profile_path.write_text("Old Profile", encoding="utf-8")
     _, old_sha = compute_profile_sha256(profile_path)
-    old_query = JobSearchQuery(search_term="Old Role", location="Remote", site_name="linkedin")
-    cache_content = JobSearchQuerySet(profile_sha256=old_sha, queries=[old_query]).model_dump_json(indent=2)
+    old_query = JobSearchQuery(
+        search_term="Old Role", location="Remote", site_name="linkedin"
+    )
+    cache_content = JobSearchQuerySet(
+        profile_sha256=old_sha, queries=[old_query]
+    ).model_dump_json(indent=2)
     cache_path.write_text(cache_content, encoding="utf-8")
 
     # Update profile to trigger generation
@@ -165,10 +189,18 @@ def test_crewai_failure_raises_exception_and_preserves_previous_valid_cache_file
 
 def test_duplicate_queries_deduplication():
     queries = [
-        JobSearchQuery(search_term=" Python Engineer ", location="Remote ", site_name="linkedin"),
-        JobSearchQuery(search_term="python engineer", location="remote", site_name="linkedin"),
-        JobSearchQuery(search_term="PYTHON ENGINEER", location="REMOTE", site_name="linkedin"),
-        JobSearchQuery(search_term="Python Engineer", location="Remote", site_name="indeed"),
+        JobSearchQuery(
+            search_term=" Python Engineer ", location="Remote ", site_name="linkedin"
+        ),
+        JobSearchQuery(
+            search_term="python engineer", location="remote", site_name="linkedin"
+        ),
+        JobSearchQuery(
+            search_term="PYTHON ENGINEER", location="REMOTE", site_name="linkedin"
+        ),
+        JobSearchQuery(
+            search_term="Python Engineer", location="Remote", site_name="indeed"
+        ),
     ]
 
     deduped = normalize_and_deduplicate_queries(queries)
@@ -186,7 +218,9 @@ def test_jobspy_integration_service_queries(temp_resource_dir):
     profile_path.write_text(profile_text, encoding="utf-8")
     _, current_sha = compute_profile_sha256(profile_path)
 
-    query1 = JobSearchQuery(search_term="Software Engineer", location="Remote", site_name="linkedin")
+    query1 = JobSearchQuery(
+        search_term="Software Engineer", location="Remote", site_name="linkedin"
+    )
     query_set = JobSearchQuerySet(profile_sha256=current_sha, queries=[query1])
 
     mock_crew_runner = MagicMock(return_value=query_set)
@@ -213,7 +247,14 @@ def test_generation_rejects_mismatched_profile_hash_and_preserves_cache(tmp_path
     def crew_runner(**_):
         return {
             "profile_sha256": "0" * 64,
-            "queries": [{"search_term": "Python Engineer", "location": "Remote", "site_name": "linkedin", "results_wanted": 10}],
+            "queries": [
+                {
+                    "search_term": "Python Engineer",
+                    "location": "Remote",
+                    "site_name": "linkedin",
+                    "results_wanted": 10,
+                }
+            ],
         }
 
     with pytest.raises(RuntimeError, match="profile_sha256 does not match"):

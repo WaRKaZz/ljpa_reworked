@@ -9,7 +9,8 @@ resume_generation_task:
     {text}
 
     Contact person or methods what should be used to apply:
-    {credentials}
+    Email: {submit_email} URL: {submit_url}
+
 
     URL to the candidate’s LinkedIn profile (optional)
     {linkedin_url} (optional): 

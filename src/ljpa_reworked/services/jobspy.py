@@ -5,6 +5,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
 from jobspy import scrape_jobs
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
@@ -48,7 +49,9 @@ def compute_profile_sha256(profile_path: Path) -> tuple[str, str]:
     return profile_text, profile_sha256
 
 
-def load_cached_queries(cache_path: Path, expected_sha256: str) -> JobSearchQuerySet | None:
+def load_cached_queries(
+    cache_path: Path, expected_sha256: str
+) -> JobSearchQuerySet | None:
     """Load and validate cached JobSearchQuerySet if present and profile_sha256 matches."""
     if not cache_path.exists():
         logger.info("Cache file %s does not exist.", cache_path)
@@ -90,14 +93,23 @@ def generate_and_cache_queries(
     profile_text, profile_sha256 = compute_profile_sha256(profile_path)
     try:
         if crew_runner is not None:
-            result = crew_runner(profile_text=profile_text, profile_sha256=profile_sha256)
+            result = crew_runner(
+                profile_text=profile_text, profile_sha256=profile_sha256
+            )
         else:
             from ljpa_reworked.crews.query_generation_crew.query_generation_crew import (
                 QueryGenerationCrew,
             )
 
-            kickoff_res = QueryGenerationCrew().crew().kickoff(
-                inputs={"profile_text": profile_text, "profile_sha256": profile_sha256}
+            kickoff_res = (
+                QueryGenerationCrew()
+                .crew()
+                .kickoff(
+                    inputs={
+                        "profile_text": profile_text,
+                        "profile_sha256": profile_sha256,
+                    }
+                )
             )
             if hasattr(kickoff_res, "pydantic") and kickoff_res.pydantic:
                 result = kickoff_res.pydantic
@@ -139,14 +151,18 @@ def get_or_generate_job_search_queries(
 
     cached_set = load_cached_queries(c_path, current_sha)
     if cached_set is not None:
-        logger.info("Using cached JobSearchQuerySet with matching SHA256: %s", current_sha)
+        logger.info(
+            "Using cached JobSearchQuerySet with matching SHA256: %s", current_sha
+        )
         return cached_set
 
     logger.info("Cache miss or profile changed. Generating queries via CrewAI...")
     return generate_and_cache_queries(p_path, c_path, crew_runner=crew_runner)
 
 
-def normalize_and_deduplicate_queries(queries: list[JobSearchQuery]) -> list[JobSearchQuery]:
+def normalize_and_deduplicate_queries(
+    queries: list[JobSearchQuery],
+) -> list[JobSearchQuery]:
     """Normalize and deduplicate queries by key (site_name, search_term.lower().strip(), location.lower().strip())."""
     seen = set()
     deduped: list[JobSearchQuery] = []
@@ -212,9 +228,15 @@ class JobSpyIntegrationService:
                     q_dict = (
                         q.model_dump()
                         if hasattr(q, "model_dump")
-                        else {"search_term": q.search_term, "site_name": q.site_name, "location": q.location}
+                        else {
+                            "search_term": q.search_term,
+                            "site_name": q.site_name,
+                            "location": q.location,
+                        }
                     )
-                    summary.failures_by_query.append({"query": q_dict, "error": str(err)})
+                    summary.failures_by_query.append(
+                        {"query": q_dict, "error": str(err)}
+                    )
                     continue
 
                 if jobs_df is None or jobs_df.empty:
@@ -240,22 +262,26 @@ class JobSpyIntegrationService:
                         trimmed_url = str(raw_url).strip()
 
                     if not trimmed_url or trimmed_url.lower() == "nan":
-                        logger.info("Skipping JobSpy row with empty or invalid job_url.")
+                        logger.info(
+                            "Skipping JobSpy row with empty or invalid job_url."
+                        )
                         summary.skipped_without_url_count += 1
                         continue
 
                     raw_emails = row.get("emails")
-                    credentials_val = (
-                        str(raw_emails)
-                        if raw_emails is not None and not pd.isna(raw_emails)
+                    email_val = (
+                        str(raw_emails).strip()
+                        if raw_emails is not None
+                        and not pd.isna(raw_emails)
+                        and str(raw_emails).strip()
                         else None
                     )
 
                     vacancy_data = {
                         "title": str(row.get("title") or "Unknown Title"),
                         "text": str(row.get("description") or ""),
-                        "credentials": credentials_val,
-                        "url": trimmed_url,
+                        "submit_email": email_val,
+                        "submit_url": trimmed_url,
                         "source": source_enum,
                         "visa_status": VisaStatus.not_mentioned,
                     }
@@ -288,8 +314,9 @@ class JobSpyIntegrationService:
         return summary
 
 
-
-def _store_jobs_df(jobs_df: Any, source_enum: DataSource, session: Session) -> list[Vacancy]:
+def _store_jobs_df(
+    jobs_df: Any, source_enum: DataSource, session: Session
+) -> list[Vacancy]:
     seen_urls: set[str] = set()
     saved_vacancies: list[Vacancy] = []
 
@@ -303,16 +330,27 @@ def _store_jobs_df(jobs_df: Any, source_enum: DataSource, session: Session) -> l
             continue
 
         if trimmed_url in seen_urls:
-            logger.info("Skipping duplicate job_url '%s' within same scrape batch.", trimmed_url)
+            logger.info(
+                "Skipping duplicate job_url '%s' within same scrape batch.", trimmed_url
+            )
             continue
 
         seen_urls.add(trimmed_url)
 
+        raw_emails = row.get("emails")
+        email_val = (
+            str(raw_emails).strip()
+            if raw_emails is not None
+            and not pd.isna(raw_emails)
+            and str(raw_emails).strip()
+            else None
+        )
+
         vacancy_data = {
             "title": str(row.get("title") or "Unknown Title"),
             "text": str(row.get("description") or ""),
-            "credentials": str(row.get("emails")) if row.get("emails") is not None else None,
-            "url": trimmed_url,
+            "submit_email": email_val,
+            "submit_url": trimmed_url,
             "source": source_enum,
             "visa_status": VisaStatus.not_mentioned,
         }
@@ -333,7 +371,12 @@ def fetch_and_store_jobs(
     db: Session | None = None,
 ) -> list[Vacancy]:
     """Fetch job postings via python-jobspy ETL pipeline and store them as Vacancy records in SQLite."""
-    logger.info("Executing JobSpy scrape for '%s' in '%s' on %s...", search_term, location, site_name)
+    logger.info(
+        "Executing JobSpy scrape for '%s' in '%s' on %s...",
+        search_term,
+        location,
+        site_name,
+    )
     jobs_df = scrape_jobs(
         site_name=[site_name],
         search_term=search_term,
@@ -345,7 +388,9 @@ def fetch_and_store_jobs(
         logger.warning("JobSpy returned no results.")
         return []
 
-    source_enum = DataSource.linkedin if site_name.lower() == "linkedin" else DataSource.other
+    source_enum = (
+        DataSource.linkedin if site_name.lower() == "linkedin" else DataSource.other
+    )
 
     if db is not None:
         return _store_jobs_df(jobs_df, source_enum, db)
@@ -354,4 +399,3 @@ def fetch_and_store_jobs(
 
     with SessionLocal() as session:
         return _store_jobs_df(jobs_df, source_enum, session)
-

@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from ljpa_reworked.database import Base
+from ljpa_reworked.database import init_db
 from ljpa_reworked.models.crewai_pydantic_models import VisaStatus
 from ljpa_reworked.models.database_models import BasicEvaluation, DataSource, Vacancy
 from ljpa_reworked.models.enums import VacancyStatus
@@ -20,7 +20,7 @@ from ljpa_reworked.services.jobspy import fetch_and_store_jobs
 @pytest.fixture
 def db():
     engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
+    init_db(bind_engine=engine)
     TestingSessionLocal = sessionmaker(bind=engine)
     session = TestingSessionLocal()
     try:
@@ -33,8 +33,8 @@ def test_create_vacancy_on_first_url_scrape(db):
     data = {
         "title": "Python Engineer",
         "text": "Job details text",
-        "credentials": "contact@example.com",
-        "url": "https://example.com/jobs/123",
+        "submit_email": "contact@example.com",
+        "submit_url": "https://example.com/jobs/123",
         "source": DataSource.linkedin,
         "visa_status": VisaStatus.provided,
     }
@@ -44,7 +44,8 @@ def test_create_vacancy_on_first_url_scrape(db):
     assert vacancy.id is not None
     assert vacancy.title == "Python Engineer"
     assert vacancy.text == "Job details text"
-    assert vacancy.url == "https://example.com/jobs/123"
+    assert vacancy.submit_url == "https://example.com/jobs/123"
+    assert vacancy.submit_email == "contact@example.com"
     assert vacancy.status == VacancyStatus.created
 
 
@@ -52,8 +53,8 @@ def test_refresh_source_owned_fields_on_second_scrape(db):
     data1 = {
         "title": "Original Title",
         "text": "Original text",
-        "credentials": "old@example.com",
-        "url": "https://example.com/jobs/456",
+        "submit_email": "old@example.com",
+        "submit_url": "https://example.com/jobs/456",
         "source": DataSource.linkedin,
         "visa_status": VisaStatus.not_mentioned,
     }
@@ -64,8 +65,8 @@ def test_refresh_source_owned_fields_on_second_scrape(db):
     data2 = {
         "title": "Updated Title",
         "text": "Updated description",
-        "credentials": "new@example.com",
-        "url": "https://example.com/jobs/456",
+        "submit_email": "new@example.com",
+        "submit_url": "https://example.com/jobs/456",
         "source": DataSource.other,
         "visa_status": VisaStatus.provided,
     }
@@ -74,7 +75,7 @@ def test_refresh_source_owned_fields_on_second_scrape(db):
     assert vac2.id == vac1_id
     assert vac2.title == "Updated Title"
     assert vac2.text == "Updated description"
-    assert vac2.credentials == "new@example.com"
+    assert vac2.submit_email == "new@example.com"
     assert vac2.source == DataSource.other
     assert vac2.visa_status == VisaStatus.provided
 
@@ -83,8 +84,8 @@ def test_preserve_workflow_data_and_status_on_refresh(db):
     data = {
         "title": "Backend Dev",
         "text": "Python job",
-        "credentials": "hr@corp.com",
-        "url": "https://example.com/jobs/789",
+        "submit_email": "hr@corp.com",
+        "submit_url": "https://example.com/jobs/789",
         "source": DataSource.linkedin,
         "visa_status": VisaStatus.not_mentioned,
     }
@@ -103,8 +104,8 @@ def test_preserve_workflow_data_and_status_on_refresh(db):
     data_scrape2 = {
         "title": "Backend Dev (Updated)",
         "text": "Python job with more details",
-        "credentials": "hr@corp.com",
-        "url": "https://example.com/jobs/789",
+        "submit_email": "hr@corp.com",
+        "submit_url": "https://example.com/jobs/789",
         "source": DataSource.linkedin,
         "visa_status": VisaStatus.provided,
     }
@@ -122,12 +123,16 @@ def test_preserve_workflow_data_and_status_on_refresh(db):
     assert reloaded.basic_evaluation.summary == "Great match"
 
 
-def test_skip_missing_or_empty_url(db):
-    res1, created1 = upsert_vacancy_by_url(db, {"title": "No URL", "url": None})
+def test_skip_missing_or_empty_url_and_email(db):
+    res1, created1 = upsert_vacancy_by_url(
+        db, {"title": "No URL", "submit_url": None, "submit_email": None}
+    )
     assert res1 is None
     assert created1 is False
 
-    res2, created2 = upsert_vacancy_by_url(db, {"title": "Empty URL", "url": "   "})
+    res2, created2 = upsert_vacancy_by_url(
+        db, {"title": "Empty URL", "submit_url": "   ", "submit_email": ""}
+    )
     assert res2 is None
     assert created2 is False
 
@@ -170,7 +175,9 @@ def test_repeated_same_url_in_single_scrape_batch(db):
         ]
     )
 
-    with patch("ljpa_reworked.services.jobspy.scrape_jobs", return_value=mock_jobs_data):
+    with patch(
+        "ljpa_reworked.services.jobspy.scrape_jobs", return_value=mock_jobs_data
+    ):
         vacancies = fetch_and_store_jobs(
             site_name="linkedin",
             search_term="Python",
@@ -183,7 +190,7 @@ def test_repeated_same_url_in_single_scrape_batch(db):
     assert len(vacancies) == 2
     assert db.query(Vacancy).count() == 2
 
-    urls_in_db = {v.url for v in db.query(Vacancy).all()}
+    urls_in_db = {v.submit_url for v in db.query(Vacancy).all()}
     assert urls_in_db == {
         "https://example.com/jobs/duplicate",
         "https://example.com/jobs/unique",

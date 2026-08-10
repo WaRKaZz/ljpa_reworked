@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, or_
@@ -20,6 +21,35 @@ TERMINAL_STATUSES = {
     VacancyStatus.archived,
 }
 
+EMAIL_REGEX = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+
+
+def _normalize_and_validate_contacts(
+    submit_email: str | None,
+    submit_url: str | None,
+) -> tuple[str | None, str | None]:
+    email_clean = (
+        submit_email.strip()
+        if isinstance(submit_email, str) and submit_email.strip()
+        else None
+    )
+    url_clean = (
+        submit_url.strip()
+        if isinstance(submit_url, str) and submit_url.strip()
+        else None
+    )
+
+    if email_clean is not None:
+        if not re.match(EMAIL_REGEX, email_clean):
+            raise ValueError(f"Invalid email syntax: {email_clean}")
+
+    if email_clean is None and url_clean is None:
+        raise ValueError(
+            "Vacancy must have at least one contact method (submit_email or submit_url)."
+        )
+
+    return email_clean, url_clean
+
 
 def create_vacancy(
     db: Session,
@@ -27,12 +57,15 @@ def create_vacancy(
     source: DataSource = DataSource.linkedin,
 ) -> Vacancy:
     """Create a new vacancy from CrewAI data."""
+    submit_email, submit_url = _normalize_and_validate_contacts(
+        vacancy_data.submit_email, vacancy_data.submit_url
+    )
     vacancy = Vacancy(
         title=vacancy_data.title,
         text=vacancy_data.text,
-        credentials=vacancy_data.credentials,
+        submit_email=submit_email,
+        submit_url=submit_url,
         visa_status=vacancy_data.visa_status,
-        url=vacancy_data.url,
         source=source,
     )
     db.add(vacancy)
@@ -45,17 +78,18 @@ def create_vacancy_direct(
     db: Session,
     title: str,
     text: str,
-    credentials: str | None = None,
-    url: str | None = None,
+    submit_email: str | None = None,
+    submit_url: str | None = None,
     source: DataSource = DataSource.linkedin,
     visa_status: VisaStatus = VisaStatus.not_mentioned,
 ) -> Vacancy:
     """Create a new vacancy record from direct field attributes."""
+    clean_email, clean_url = _normalize_and_validate_contacts(submit_email, submit_url)
     vacancy = Vacancy(
         title=title,
         text=text,
-        credentials=credentials,
-        url=url,
+        submit_email=clean_email,
+        submit_url=clean_url,
         source=source,
         visa_status=visa_status,
     )
@@ -68,8 +102,8 @@ def create_vacancy_direct(
 def save_vacancy(
     title: str,
     text: str,
-    credentials: str | None = None,
-    url: str | None = None,
+    submit_email: str | None = None,
+    submit_url: str | None = None,
     source: DataSource = DataSource.linkedin,
     visa_status: VisaStatus = VisaStatus.not_mentioned,
     db: Session | None = None,
@@ -80,8 +114,8 @@ def save_vacancy(
             db=db,
             title=title,
             text=text,
-            credentials=credentials,
-            url=url,
+            submit_email=submit_email,
+            submit_url=submit_url,
             source=source,
             visa_status=visa_status,
         )
@@ -93,8 +127,8 @@ def save_vacancy(
             db=session,
             title=title,
             text=text,
-            credentials=credentials,
-            url=url,
+            submit_email=submit_email,
+            submit_url=submit_url,
             source=source,
             visa_status=visa_status,
         )
@@ -124,7 +158,9 @@ def get_eligble_vacancies(
         db.query(Vacancy)
         .filter(
             and_(
-                Vacancy.visa_status.in_([VisaStatus.provided, VisaStatus.not_mentioned]),
+                Vacancy.visa_status.in_(
+                    [VisaStatus.provided, VisaStatus.not_mentioned]
+                ),
                 Vacancy.deleted.is_(False),
                 Vacancy.status.in_(statuses),
             )
@@ -153,8 +189,13 @@ def transition_vacancy_status(
                 f"Cannot transition vacancy {vacancy_id} from terminal status '{vacancy.status.value}' to '{target_status.value}'."
             )
 
-    if allowed_from_statuses is not None and vacancy.status not in allowed_from_statuses:
-        allowed_str = [s.value if hasattr(s, "value") else str(s) for s in allowed_from_statuses]
+    if (
+        allowed_from_statuses is not None
+        and vacancy.status not in allowed_from_statuses
+    ):
+        allowed_str = [
+            s.value if hasattr(s, "value") else str(s) for s in allowed_from_statuses
+        ]
         raise ValueError(
             f"Cannot transition vacancy {vacancy_id} from status '{vacancy.status.value}' to '{target_status.value}'. Transition is not allowed (allowed source statuses: {allowed_str})."
         )
@@ -237,63 +278,101 @@ def upsert_vacancy_by_url(
     db: Session,
     vacancy_data: dict,
 ) -> tuple[Vacancy | None, bool]:
-    """Upsert a vacancy by URL.
+    """Upsert a vacancy by URL or submit_email.
 
-    If the vacancy URL is new, creates a new Vacancy record with status=VacancyStatus.created.
-    If the vacancy URL exists in the database, refreshes only source-owned fields:
-    title, text, credentials, source, visa_status.
-
-    Preserves all workflow data (id, created_at, status, deleted, evaluations, resumes, emails, etc.).
-    Returns (vacancy, is_created). If url is missing or empty, logs skip and returns (None, False).
+    If submit_url is present:
+    - If submit_url exists in DB: refreshes source-owned fields and sets status=VacancyStatus.updated.
+    - If submit_url is new: creates a new Vacancy with status=VacancyStatus.created.
+    If submit_url is absent but submit_email is present:
+    - Inserts a new Vacancy (email-only) with status=VacancyStatus.created without URL deduplication.
+    If both submit_url and submit_email are absent/blank:
+    - Logs warning and returns (None, False).
     """
-    raw_url = vacancy_data.get("url")
-    if not raw_url or not str(raw_url).strip():
-        logger.warning("Skipping vacancy upsert: missing or blank url.")
-        return None, False
+    raw_url = (
+        vacancy_data.get("submit_url")
+        if "submit_url" in vacancy_data
+        else vacancy_data.get("url")
+    )
+    raw_email = (
+        vacancy_data.get("submit_email")
+        if "submit_email" in vacancy_data
+        else vacancy_data.get("credentials")
+    )
 
-    url = str(raw_url).strip()
-    existing = db.query(Vacancy).filter(Vacancy.url == url).first()
+    url = str(raw_url).strip() if raw_url and str(raw_url).strip() else None
+    email = str(raw_email).strip() if raw_email and str(raw_email).strip() else None
+
+    if email is not None:
+        if not re.match(EMAIL_REGEX, email):
+            logger.warning("Skipping vacancy upsert: invalid email syntax '%s'", email)
+            return None, False
+
+    if not url and not email:
+        logger.warning(
+            "Skipping vacancy upsert: missing both submit_url and submit_email."
+        )
+        return None, False
 
     source = vacancy_data.get("source", DataSource.linkedin)
     visa_status = vacancy_data.get("visa_status", VisaStatus.not_mentioned)
 
-    if existing is None:
+    if url is not None:
+        existing = db.query(Vacancy).filter(Vacancy.submit_url == url).first()
+        if existing is None:
+            vacancy = Vacancy(
+                title=str(vacancy_data.get("title") or "Unknown Title"),
+                text=str(vacancy_data.get("text") or ""),
+                submit_email=email,
+                submit_url=url,
+                source=source,
+                visa_status=visa_status,
+                status=VacancyStatus.created,
+            )
+            try:
+                db.add(vacancy)
+                db.commit()
+                db.refresh(vacancy)
+                return vacancy, True
+            except IntegrityError:
+                db.rollback()
+                existing = db.query(Vacancy).filter(Vacancy.submit_url == url).first()
+                if existing is None:
+                    raise
+
+        # Refresh source-owned fields on existing record
+        if "title" in vacancy_data and vacancy_data["title"] is not None:
+            existing.title = str(vacancy_data["title"])
+        if "text" in vacancy_data and vacancy_data["text"] is not None:
+            existing.text = str(vacancy_data["text"])
+        if (
+            email is not None
+            or "submit_email" in vacancy_data
+            or "credentials" in vacancy_data
+        ):
+            existing.submit_email = email
+
+        if "source" in vacancy_data and vacancy_data["source"] is not None:
+            existing.source = vacancy_data["source"]
+        if "visa_status" in vacancy_data and vacancy_data["visa_status"] is not None:
+            existing.visa_status = vacancy_data["visa_status"]
+
+        existing.status = VacancyStatus.updated
+
+        db.commit()
+        db.refresh(existing)
+        return existing, False
+    else:
+        # Email-only vacancy insertion without URL deduplication
         vacancy = Vacancy(
             title=str(vacancy_data.get("title") or "Unknown Title"),
             text=str(vacancy_data.get("text") or ""),
-            credentials=vacancy_data.get("credentials") or "",
-            url=url,
+            submit_email=email,
+            submit_url=None,
             source=source,
             visa_status=visa_status,
             status=VacancyStatus.created,
         )
-        try:
-            db.add(vacancy)
-            db.commit()
-            db.refresh(vacancy)
-            return vacancy, True
-        except IntegrityError:
-            db.rollback()
-            existing = db.query(Vacancy).filter(Vacancy.url == url).first()
-            if existing is None:
-                raise
-
-    # Refresh source-owned fields on existing record
-    if "title" in vacancy_data and vacancy_data["title"] is not None:
-        existing.title = str(vacancy_data["title"])
-    if "text" in vacancy_data and vacancy_data["text"] is not None:
-        existing.text = str(vacancy_data["text"])
-    if "credentials" in vacancy_data:
-        existing.credentials = vacancy_data["credentials"] if vacancy_data["credentials"] is not None else ""
-
-    if "source" in vacancy_data and vacancy_data["source"] is not None:
-        existing.source = vacancy_data["source"]
-    if "visa_status" in vacancy_data and vacancy_data["visa_status"] is not None:
-        existing.visa_status = vacancy_data["visa_status"]
-
-    existing.status = VacancyStatus.updated
-
-    db.commit()
-    db.refresh(existing)
-    return existing, False
-
+        db.add(vacancy)
+        db.commit()
+        db.refresh(vacancy)
+        return vacancy, True

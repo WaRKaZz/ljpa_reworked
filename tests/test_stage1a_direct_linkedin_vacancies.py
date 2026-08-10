@@ -1,14 +1,12 @@
 import inspect
 
 import pytest
-from alembic import command
-from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import sessionmaker
 
 from ljpa_reworked import main as main_module
-from ljpa_reworked.database import Base
+from ljpa_reworked.database import Base, init_db
 from ljpa_reworked.models import database_models
 from ljpa_reworked.models.database_models import DataSource, Vacancy
 from ljpa_reworked.models.enums import VacancyStatus
@@ -22,7 +20,7 @@ from ljpa_reworked.operations.vacancy_ops import (
 def db_session():
     """Create an in-memory SQLite database session for unit testing."""
     engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
+    init_db(bind_engine=engine)
     session_factory = sessionmaker(bind=engine)
     session = session_factory()
     yield session
@@ -31,15 +29,15 @@ def db_session():
 
 def test_orm_has_no_linkedin_post():
     """Verify ORM model, relationships, and Base metadata have no LinkedinPost or linkedin_post table."""
-    assert not hasattr(
-        database_models, "LinkedinPost"
-    ), "LinkedinPost model should be deleted from database_models"
-    assert not hasattr(
-        Vacancy, "linkedin_posts"
-    ), "Vacancy should not have linkedin_posts relationship"
-    assert (
-        "linkedin_post" not in Base.metadata.tables
-    ), "linkedin_post table should not exist in Base.metadata"
+    assert not hasattr(database_models, "LinkedinPost"), (
+        "LinkedinPost model should be deleted from database_models"
+    )
+    assert not hasattr(Vacancy, "linkedin_posts"), (
+        "Vacancy should not have linkedin_posts relationship"
+    )
+    assert "linkedin_post" not in Base.metadata.tables, (
+        "linkedin_post table should not exist in Base.metadata"
+    )
 
 
 def test_new_direct_upsert_creates_created_status(db_session):
@@ -49,8 +47,8 @@ def test_new_direct_upsert_creates_created_status(db_session):
         {
             "title": "Senior Python Developer",
             "text": "Join our team to write Python code.",
-            "credentials": "recruiter@example.com",
-            "url": "https://www.linkedin.com/jobs/view/10001/",
+            "submit_email": "recruiter@example.com",
+            "submit_url": "https://www.linkedin.com/jobs/view/10001/",
             "source": DataSource.linkedin,
         },
     )
@@ -69,8 +67,8 @@ def test_matching_url_upsert_refreshes_source_fields_and_sets_updated_status(
         {
             "title": "Initial Title",
             "text": "Initial text content",
-            "credentials": "old@example.com",
-            "url": "https://www.linkedin.com/jobs/view/10002/",
+            "submit_email": "old@example.com",
+            "submit_url": "https://www.linkedin.com/jobs/view/10002/",
             "source": DataSource.linkedin,
         },
     )
@@ -82,8 +80,8 @@ def test_matching_url_upsert_refreshes_source_fields_and_sets_updated_status(
         {
             "title": "Updated Title",
             "text": "Updated text content",
-            "credentials": "new@example.com",
-            "url": "https://www.linkedin.com/jobs/view/10002/",
+            "submit_email": "new@example.com",
+            "submit_url": "https://www.linkedin.com/jobs/view/10002/",
             "source": DataSource.linkedin,
         },
     )
@@ -91,7 +89,7 @@ def test_matching_url_upsert_refreshes_source_fields_and_sets_updated_status(
     assert v_updated.id == v_initial.id
     assert v_updated.title == "Updated Title"
     assert v_updated.text == "Updated text content"
-    assert v_updated.credentials == "new@example.com"
+    assert v_updated.submit_email == "new@example.com"
     assert v_updated.status == VacancyStatus.updated
 
 
@@ -102,8 +100,8 @@ def test_eligible_vacancies_includes_created_updated_and_review_error(db_session
     v_created = Vacancy(
         title="Job 1",
         text="Text 1",
-        credentials="c1",
-        url="https://example.com/job/1",
+        submit_email="c1@example.com",
+        submit_url="https://example.com/job/1",
         status=VacancyStatus.created,
         source=DataSource.linkedin,
         visa_status=VisaStatus.not_mentioned,
@@ -113,8 +111,8 @@ def test_eligible_vacancies_includes_created_updated_and_review_error(db_session
         v_updated = Vacancy(
             title="Job 2",
             text="Text 2",
-            credentials="c2",
-            url="https://example.com/job/2",
+            submit_email="c2@example.com",
+            submit_url="https://example.com/job/2",
             status=VacancyStatus.updated,
             source=DataSource.linkedin,
             visa_status=VisaStatus.not_mentioned,
@@ -124,8 +122,8 @@ def test_eligible_vacancies_includes_created_updated_and_review_error(db_session
     v_error = Vacancy(
         title="Job 3",
         text="Text 3",
-        credentials="c3",
-        url="https://example.com/job/3",
+        submit_email="c3@example.com",
+        submit_url="https://example.com/job/3",
         status=VacancyStatus.review_error,
         source=DataSource.linkedin,
         visa_status=VisaStatus.not_mentioned,
@@ -133,8 +131,8 @@ def test_eligible_vacancies_includes_created_updated_and_review_error(db_session
     v_reviewed = Vacancy(
         title="Job 4",
         text="Text 4",
-        credentials="c4",
-        url="https://example.com/job/4",
+        submit_email="c4@example.com",
+        submit_url="https://example.com/job/4",
         status=VacancyStatus.reviewed,
         source=DataSource.linkedin,
         visa_status=VisaStatus.not_mentioned,
@@ -160,18 +158,13 @@ def test_main_does_not_process_raw_posts():
     assert "save_vacancies" not in source_code
 
 
-def test_fresh_migration_has_one_head_and_no_linkedin_post(tmp_path):
-    """Verify single initial Alembic revision upgrades disposable DB cleanly with no linkedin_post table."""
+def test_fresh_bootstrap_has_no_linkedin_post(tmp_path):
+    """Verify metadata bootstrap creates disposable DB cleanly with no linkedin_post table."""
     db_path = tmp_path / "fresh_test.db"
     db_url = f"sqlite:///{db_path}"
 
-    alembic_cfg = Config("alembic.ini")
-    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
-
-    # Upgrade disposable DB to head
-    command.upgrade(alembic_cfg, "head")
-
     engine = create_engine(db_url)
+    init_db(bind_engine=engine)
     inspector = sa_inspect(engine)
     tables = inspector.get_table_names()
 

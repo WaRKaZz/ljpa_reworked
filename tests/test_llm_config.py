@@ -11,8 +11,10 @@ def test_create_llm_uses_configured_openai_compatible_gateway(monkeypatch):
     with patch("crewai.LLM", return_value=llm) as llm_class:
         assert config.create_llm() is llm
     llm_class.assert_called_once_with(
-        model="openai/test-model", api_key="test-key",
-        base_url="http://id-vps:20128/v1", custom_openai=True,
+        model="openai/test-model",
+        api_key="test-key",
+        base_url="http://id-vps:20128/v1",
+        custom_openai=True,
     )
 
 

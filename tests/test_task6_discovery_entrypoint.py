@@ -39,43 +39,49 @@ def test_jobspy_search_run_counters(db_session):
         ),
     ]
 
-    df_q1 = pd.DataFrame([
-        {
-            "title": "Python Dev 1",
-            "description": "desc 1",
-            "emails": "dev1@test.com",
-            "job_url": "https://linkedin.com/jobs/1",
-        },
-        {
-            "title": "Python Dev 2",
-            "description": "desc 2",
-            "emails": None,
-            "job_url": "https://linkedin.com/jobs/2",
-        },
-        {
-            "title": "Python Dev No URL",
-            "description": "desc 3",
-            "emails": None,
-            "job_url": "",
-        },
-    ])
+    df_q1 = pd.DataFrame(
+        [
+            {
+                "title": "Python Dev 1",
+                "description": "desc 1",
+                "emails": "dev1@test.com",
+                "job_url": "https://linkedin.com/jobs/1",
+            },
+            {
+                "title": "Python Dev 2",
+                "description": "desc 2",
+                "emails": None,
+                "job_url": "https://linkedin.com/jobs/2",
+            },
+            {
+                "title": "Python Dev No URL",
+                "description": "desc 3",
+                "emails": None,
+                "job_url": "",
+            },
+        ]
+    )
 
-    df_q2 = pd.DataFrame([
-        {
-            "title": "Backend Dev 1 Refreshed",
-            "description": "desc 1 updated",
-            "emails": "dev1@test.com",
-            "job_url": "https://linkedin.com/jobs/1",
-        },
-        {
-            "title": "Backend Dev 3",
-            "description": "desc 4",
-            "emails": None,
-            "job_url": "https://linkedin.com/jobs/3",
-        },
-    ])
+    df_q2 = pd.DataFrame(
+        [
+            {
+                "title": "Backend Dev 1 Refreshed",
+                "description": "desc 1 updated",
+                "emails": "dev1@test.com",
+                "job_url": "https://linkedin.com/jobs/1",
+            },
+            {
+                "title": "Backend Dev 3",
+                "description": "desc 4",
+                "emails": None,
+                "job_url": "https://linkedin.com/jobs/3",
+            },
+        ]
+    )
 
-    def mock_scrape_jobs(site_name, search_term, location, results_wanted, hours_old=72):
+    def mock_scrape_jobs(
+        site_name, search_term, location, results_wanted, hours_old=72
+    ):
         if search_term == "Python Engineer":
             return df_q1
         return df_q2
@@ -83,7 +89,9 @@ def test_jobspy_search_run_counters(db_session):
     service = JobSpyIntegrationService()
 
     with patch.object(service, "get_queries", return_value=queries):
-        with patch("ljpa_reworked.services.jobspy.scrape_jobs", side_effect=mock_scrape_jobs):
+        with patch(
+            "ljpa_reworked.services.jobspy.scrape_jobs", side_effect=mock_scrape_jobs
+        ):
             summary = service.run(db=db_session)
 
     assert isinstance(summary, JobSpyRunSummary)
@@ -114,16 +122,20 @@ def test_jobspy_search_handles_query_failure(db_session):
         ),
     ]
 
-    df_success = pd.DataFrame([
-        {
-            "title": "Success Dev",
-            "description": "desc",
-            "emails": None,
-            "job_url": "https://indeed.com/jobs/99",
-        }
-    ])
+    df_success = pd.DataFrame(
+        [
+            {
+                "title": "Success Dev",
+                "description": "desc",
+                "emails": None,
+                "job_url": "https://indeed.com/jobs/99",
+            }
+        ]
+    )
 
-    def mock_scrape_jobs(site_name, search_term, location, results_wanted, hours_old=72):
+    def mock_scrape_jobs(
+        site_name, search_term, location, results_wanted, hours_old=72
+    ):
         if search_term == "Failed Query":
             raise RuntimeError("JobSpy connection failed")
         return df_success
@@ -131,7 +143,9 @@ def test_jobspy_search_handles_query_failure(db_session):
     service = JobSpyIntegrationService()
 
     with patch.object(service, "get_queries", return_value=queries):
-        with patch("ljpa_reworked.services.jobspy.scrape_jobs", side_effect=mock_scrape_jobs):
+        with patch(
+            "ljpa_reworked.services.jobspy.scrape_jobs", side_effect=mock_scrape_jobs
+        ):
             summary = service.run(db=db_session)
 
     assert summary.queries_attempted == 2
@@ -147,9 +161,15 @@ def test_main_runs_jobspy_after_linkedin_harness_before_evaluation():
     from ljpa_reworked import main as main_module
 
     events = []
-    with patch.object(main_module, "run_linkedin_harness", side_effect=lambda: events.append("harness")), \
-         patch.object(main_module, "JobSpyIntegrationService") as service_class, \
-         patch.object(main_module, "get_eligble_vacancies", return_value=[]):
+    with (
+        patch.object(
+            main_module,
+            "run_linkedin_harness",
+            side_effect=lambda: events.append("harness"),
+        ),
+        patch.object(main_module, "JobSpyIntegrationService") as service_class,
+        patch.object(main_module, "get_eligble_vacancies", return_value=[]),
+    ):
         service_class.return_value.run.side_effect = lambda: events.append("jobspy")
 
         main_module.main()

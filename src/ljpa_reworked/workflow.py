@@ -130,8 +130,8 @@ def send_telegram_post(vacancy: Vacancy, db: Session) -> None:
 
     text = (
         f"Title: {vacancy.title}\n\n"
-        f"URL: {vacancy.url}\n\n"
-        f"TO: {vacancy.credentials}\n\n"
+        f"URL: {vacancy.submit_url or ''}\n\n"
+        f"TO: {vacancy.submit_email or ''}\n\n"
         f"Rating: {vacancy.basic_evaluation.rating}\n\n"
         f"{vacancy.text}"
     )

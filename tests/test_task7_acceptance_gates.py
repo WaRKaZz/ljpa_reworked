@@ -3,12 +3,10 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from alembic import command
-from alembic.config import Config
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from ljpa_reworked.database import Base
+from ljpa_reworked.database import init_db
 from ljpa_reworked.models.crewai_pydantic_models import (
     JobSearchQuery,
     JobSearchQuerySet,
@@ -28,7 +26,7 @@ from ljpa_reworked.services.jobspy import (
 def db_session():
     """Create an in-memory SQLite database session for unit testing."""
     engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
+    init_db(bind_engine=engine)
     session_factory = sessionmaker(bind=engine)
     session = session_factory()
     yield session
@@ -119,33 +117,48 @@ def test_job_search_query_set_strict_deduplicated_json():
     assert "Backend Engineer" in json_str
 
     # Test deduplication helper
-    q1 = JobSearchQuery(site_name="linkedin", search_term="Python", location="Remote", results_wanted=10)
-    q2 = JobSearchQuery(site_name="linkedin", search_term="python ", location="remote", results_wanted=5)
+    q1 = JobSearchQuery(
+        site_name="linkedin", search_term="Python", location="Remote", results_wanted=10
+    )
+    q2 = JobSearchQuery(
+        site_name="linkedin", search_term="python ", location="remote", results_wanted=5
+    )
     from ljpa_reworked.services.jobspy import normalize_and_deduplicate_queries
+
     deduped = normalize_and_deduplicate_queries([q1, q2])
     assert len(deduped) == 1
 
 
-def test_non_empty_url_mandatory(db_session):
-    """Assert JobSpy upsert skips and returns None for empty or null URLs."""
-    v1, created1 = upsert_vacancy_by_url(db_session, {"title": "No URL", "url": ""})
+def test_non_empty_url_or_email_mandatory(db_session):
+    """Assert JobSpy upsert skips and returns None when both submit_url and submit_email are empty/null."""
+    v1, created1 = upsert_vacancy_by_url(
+        db_session, {"title": "No Contact", "submit_url": "", "submit_email": ""}
+    )
     assert v1 is None
     assert created1 is False
 
-    v2, created2 = upsert_vacancy_by_url(db_session, {"title": "None URL", "url": None})
+    v2, created2 = upsert_vacancy_by_url(
+        db_session, {"title": "None Contact", "submit_url": None, "submit_email": None}
+    )
     assert v2 is None
     assert created2 is False
 
-    v3, created3 = upsert_vacancy_by_url(db_session, {"title": "Whitespace URL", "url": "   "})
+    v3, created3 = upsert_vacancy_by_url(
+        db_session,
+        {"title": "Whitespace Contact", "submit_url": "   ", "submit_email": "   "},
+    )
     assert v3 is None
     assert created3 is False
 
-    # Valid non-empty URL succeeds
-    v4, created4 = upsert_vacancy_by_url(db_session, {
-        "title": "Valid URL Job",
-        "url": "https://linkedin.com/jobs/view/1001",
-        "source": DataSource.linkedin,
-    })
+    # Valid non-empty submit_url succeeds
+    v4, created4 = upsert_vacancy_by_url(
+        db_session,
+        {
+            "title": "Valid URL Job",
+            "submit_url": "https://linkedin.com/jobs/view/1001",
+            "source": DataSource.linkedin,
+        },
+    )
     assert v4 is not None
     assert created4 is True
 
@@ -153,28 +166,34 @@ def test_non_empty_url_mandatory(db_session):
 def test_existing_url_refreshes_source_fields_and_sets_updated_status(db_session):
     """Assert existing vacancy URL updates source fields and sets status=updated."""
     # 1. Create initial vacancy
-    v_initial, created = upsert_vacancy_by_url(db_session, {
-        "title": "Initial Title",
-        "text": "Initial Text",
-        "url": "https://linkedin.com/jobs/view/2002",
-        "source": DataSource.linkedin,
-        "visa_status": VisaStatus.provided,
-    })
+    v_initial, created = upsert_vacancy_by_url(
+        db_session,
+        {
+            "title": "Initial Title",
+            "text": "Initial Text",
+            "submit_url": "https://linkedin.com/jobs/view/2002",
+            "source": DataSource.linkedin,
+            "visa_status": VisaStatus.provided,
+        },
+    )
     assert created is True
 
-    # 2. Re-scrape same URL with updated title/text
-    v_refreshed, created_again = upsert_vacancy_by_url(db_session, {
-        "title": "Updated Title From Scrape",
-        "text": "Updated Description Text",
-        "url": "https://linkedin.com/jobs/view/2002",
-        "credentials": "recruiter@example.com",
-    })
+    # 2. Re-scrape same URL with updated title/text/email
+    v_refreshed, created_again = upsert_vacancy_by_url(
+        db_session,
+        {
+            "title": "Updated Title From Scrape",
+            "text": "Updated Description Text",
+            "submit_url": "https://linkedin.com/jobs/view/2002",
+            "submit_email": "recruiter@example.com",
+        },
+    )
 
     assert created_again is False
     assert v_refreshed.id == v_initial.id
     assert v_refreshed.title == "Updated Title From Scrape"
     assert v_refreshed.text == "Updated Description Text"
-    assert v_refreshed.credentials == "recruiter@example.com"
+    assert v_refreshed.submit_email == "recruiter@example.com"
     assert v_refreshed.status == VacancyStatus.updated
 
 
@@ -184,7 +203,7 @@ def test_vacancy_processed_removed_and_status_is_non_null_enum(db_session):
     v = Vacancy(
         title="Test Job",
         text="Test Text",
-        credentials="cred",
+        submit_email="cred@example.com",
         source=DataSource.linkedin,
         visa_status=VisaStatus.not_mentioned,
     )
@@ -194,7 +213,9 @@ def test_vacancy_processed_removed_and_status_is_non_null_enum(db_session):
     assert v.status == VacancyStatus.created
 
 
-def test_discovery_run_has_zero_calls_to_application_or_messaging_services(tmp_path, db_session):
+def test_discovery_run_has_zero_calls_to_application_or_messaging_services(
+    tmp_path, db_session
+):
     """Assert JobSpy discovery run invokes ZERO calls to email, Telegram, resume materials, or submitter."""
     profile_file = tmp_path / "profile.md"
     cache_file = tmp_path / "profile_search_query.json"
@@ -206,19 +227,27 @@ def test_discovery_run_has_zero_calls_to_application_or_messaging_services(tmp_p
     mock_crew.return_value = JobSearchQuerySet(
         profile_sha256=sha,
         queries=[
-            JobSearchQuery(site_name="linkedin", search_term="Python", location="Remote", results_wanted=5)
+            JobSearchQuery(
+                site_name="linkedin",
+                search_term="Python",
+                location="Remote",
+                results_wanted=5,
+            )
         ],
     )
 
     import pandas as pd
-    mock_df = pd.DataFrame([
-        {
-            "job_url": "https://linkedin.com/jobs/view/3003",
-            "title": "Python Specialist",
-            "description": "Awesome Python position.",
-            "emails": "hr@pythoncompany.com",
-        }
-    ])
+
+    mock_df = pd.DataFrame(
+        [
+            {
+                "job_url": "https://linkedin.com/jobs/view/3003",
+                "title": "Python Specialist",
+                "description": "Awesome Python position.",
+                "emails": "hr@pythoncompany.com",
+            }
+        ]
+    )
 
     service = JobSpyIntegrationService(
         profile_path=profile_file,
@@ -227,7 +256,9 @@ def test_discovery_run_has_zero_calls_to_application_or_messaging_services(tmp_p
     )
 
     with (
-        patch("ljpa_reworked.services.jobspy.scrape_jobs", return_value=mock_df) as mock_scrape,
+        patch(
+            "ljpa_reworked.services.jobspy.scrape_jobs", return_value=mock_df
+        ) as mock_scrape,
         patch("ljpa_reworked.services.smtp_client.SMTPClient") as mock_smtp,
         patch("ljpa_reworked.services.telegram.Telegram") as mock_telegram,
     ):
@@ -240,24 +271,3 @@ def test_discovery_run_has_zero_calls_to_application_or_messaging_services(tmp_p
         # Verify zero calls to messaging / submission services
         assert mock_smtp.call_count == 0
         assert mock_telegram.call_count == 0
-
-
-def test_alembic_migration_integrity(tmp_path):
-    """Assert single initial Alembic revision upgrades disposable DB cleanly and downgrades to base."""
-    db_path = tmp_path / "disposable_test.db"
-    db_url = f"sqlite:///{db_path}"
-
-    alembic_cfg = Config("alembic.ini")
-    alembic_cfg.set_main_option("sqlalchemy.url", db_url)
-
-    # Upgrade to head
-    command.upgrade(alembic_cfg, "head")
-
-    engine = create_engine(db_url)
-    with engine.connect() as conn:
-        res = conn.execute(text("PRAGMA integrity_check;")).scalar()
-        assert res == "ok"
-
-    # Downgrade to base
-    command.downgrade(alembic_cfg, "base")
-    engine.dispose()

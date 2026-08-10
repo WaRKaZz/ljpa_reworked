@@ -21,10 +21,10 @@ def test_full_auth_state_lifecycle(tmp_path):
                 "expires": -1,
                 "httpOnly": True,
                 "secure": True,
-                "sameSite": "None"
+                "sameSite": "None",
             }
         ],
-        "origins": []
+        "origins": [],
     }
     state_file.write_text(json.dumps(sample_state), encoding="utf-8")
 

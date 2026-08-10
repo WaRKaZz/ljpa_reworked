@@ -2075,7 +2075,6 @@ name = "ljpa-reworked"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "alembic" },
     { name = "crewai", extra = ["tools"] },
     { name = "google-antigravity" },
     { name = "playwright" },
@@ -2096,7 +2095,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "alembic", specifier = ">=1.16.2" },
     { name = "crewai", extras = ["tools"], specifier = ">=0.148.0" },
     { name = "google-antigravity", specifier = ">=0.1.10" },
     { name = "playwright", specifier = ">=1.55.0" },

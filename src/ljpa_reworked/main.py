@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import logging
-from typing import cast
 
 from ljpa_reworked.crew_workflow import (
     crewai_evaluate_vacancy,
@@ -48,7 +47,6 @@ def main():
         vacancies = get_eligble_vacancies(db=db)
         logger.info("Found %d eligible vacancies for evaluation.", len(vacancies))
         for vacancy in vacancies:
-            vacancy_credentials = cast(str, vacancy.credentials or "")
             evaluation = crewai_evaluate_vacancy(vacancy=vacancy)
             create_evaluation(
                 db=db,
@@ -66,7 +64,10 @@ def main():
             resume = crewai_generate_resume(vacancy=vacancy, evaluation=evaluation)
             orm_resume = save_resume(resume, vacancy, db)
 
-            recipient_email = extract_email(vacancy_credentials)
+            recipient_email = vacancy.submit_email or (
+                extract_email(vacancy.submit_url or "") if vacancy.submit_url else None
+            )
+
             if not recipient_email:
                 send_telegram_post(vacancy=vacancy, db=db)
                 transition_vacancy_status(
@@ -101,4 +102,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

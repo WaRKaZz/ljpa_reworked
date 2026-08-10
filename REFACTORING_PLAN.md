@@ -33,24 +33,23 @@
 
 - Keep its prompt, schema terminology, and tests aligned when the collector changes. This is maintenance, not an open implementation stage.
 
-## Stage 1A: Direct LinkedIn vacancies and fresh database baseline — **planned**
+## Stage 1A: Direct LinkedIn vacancies and fresh database baseline — **complete / verified by operator**
 
 **Goal:** Harness 1 validates LinkedIn posts itself and writes final vacancies directly to `data/app.db`; no raw-post table or post-review crew remains.
 
-### Required outcome
+## Stage 1B: Vacancy submission contact model and fresh database — **complete / verified by operator**
 
-1. Remove `LinkedinPost`, its table, operations, relationship, tests, and the LinkedIn Post Review Crew completely.
-2. Harness 1 writes accepted, complete vacancies directly to `vacancy`: a new record has `status=created`; a matching existing source record is refreshed and has `status=updated`.
-3. Remove the historical Alembic chain and replace it with one initial revision for the current schema. Historical databases are intentionally unsupported.
-4. Back up, delete, and recreate canonical `data/app.db` from that revision; prove its schema and integrity.
-5. After implementation checks pass, run only Harness 1 through the Python runner to repopulate the fresh database. Do not run JobSpy, review, resume generation, email, Telegram, or the application harness.
+**Goal:** Replace legacy `Vacancy.credentials` and `Vacancy.url` with explicit nullable `submit_email` and `submit_url`, enforce database-level contact check constraint, and replace Alembic with explicit SQLAlchemy metadata bootstrap (`init_db()`).
 
-### Safety and verification
+### Completed
 
-- The only authorized live effect is deleting/recreating `data/app.db` after a verified backup, then writing LinkedIn vacancies through Harness 1.
-- `data/state.json`, `.env`, `resources/`, CDP exposure, email, Telegram, JobSpy, and application submission remain untouched.
-- Test schema and migrations on disposable SQLite copies before replacing the canonical DB.
-- A failed migration, integrity check, or Harness result requires restoring the verified database backup and reporting the blocker.
+- Removed legacy fields `credentials` and `url` from `Vacancy` model and Pydantic schemas.
+- Added explicit nullable `submit_email` and `submit_url` with SQLite database-level `CHECK` constraint `(submit_email IS NOT NULL AND TRIM(submit_email) != '') OR (submit_url IS NOT NULL AND TRIM(submit_url) != '')`.
+- Pydantic models normalize blank strings to `None`, validate email syntax, and enforce at least one contact method.
+- Updated Harness prompt, JobSpy mapping, Crew task templates, operations, and main workflow to use `submit_email` and `submit_url`.
+- Removed Alembic configuration and dependency; added explicit SQLAlchemy metadata bootstrap `init_db()`.
+- Backed up canonical database, recreated fresh `data/app.db` via `init_db()`, and verified with `PRAGMA integrity_check`.
+
 
 ## Stage 2: JobSpy search and ETL — **complete for unit scope; sequential integration pending**
 

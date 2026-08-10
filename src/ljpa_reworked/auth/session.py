@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_STATE_PATH = Path("data/state.json")
 
+
 def verify_auth_state(state_path: str | Path = DEFAULT_STATE_PATH) -> bool:
     """Validates whether the Playwright storage_state JSON file exists, is well-formed,
     and contains required authentication cookies (such as 'li_at' for LinkedIn).
@@ -40,6 +41,7 @@ def verify_auth_state(state_path: str | Path = DEFAULT_STATE_PATH) -> bool:
     except (json.JSONDecodeError, OSError) as e:
         logger.error(f"Failed to read or parse auth state file {path}: {e}")
         return False
+
 
 def load_auth_state(state_path: str | Path = DEFAULT_STATE_PATH) -> dict[str, Any]:
     """Loads and returns the storage_state dictionary from state_path.

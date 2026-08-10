@@ -5,6 +5,7 @@ from typing import Annotated, Optional
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
@@ -39,12 +40,20 @@ class DataSource(enum.Enum):
 
 class Vacancy(Base):
     __tablename__ = "vacancy"
+    __table_args__ = (
+        CheckConstraint(
+            "(submit_email IS NOT NULL AND TRIM(submit_email) != '') OR (submit_url IS NOT NULL AND TRIM(submit_url) != '')",
+            name="check_vacancy_has_contact_method",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    credentials: Mapped[str | None] = mapped_column(String(500), nullable=False)
-    url: Mapped[str | None] = mapped_column(String(500), nullable=True, unique=True)
+    submit_email: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    submit_url: Mapped[str | None] = mapped_column(
+        String(1000), nullable=True, unique=True
+    )
     source: Mapped[DataSource]
     visa_status: Mapped[VisaStatus]
     created_at: Mapped[created_at]
@@ -55,7 +64,6 @@ class Vacancy(Base):
         server_default=VacancyStatus.created.value,
         nullable=False,
     )
-
 
     # Relationships
     basic_evaluation: Mapped[Optional["BasicEvaluation"]] = relationship(
