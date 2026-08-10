@@ -10,9 +10,9 @@
 - LinkedIn login/session bootstrap is implemented and operational; `data/state.json` remains its canonical ignored state path.
 - LLM gateway: OpenAI-compatible `http://id-vps:20128/v1`, configured by `LLM_BASE_URL`.
 - Quality baseline: `uv run pytest -q`, `uv run --extra dev ruff check src tests`, `uv run python -m compileall -q src`, and `podman compose config -q`.
-- The project has exactly two harnesses: Harness 1 collects LinkedIn posts; Harness 2 applies to vacancies. There is no Harness 3.
+- Pipeline components: LinkedIn Post Vacancy Collector collects LinkedIn post vacancies; JobSpy Vacancy Discovery discovers JobSpy vacancies; Application Submission Automation is planned and not yet verified.
 
-## Stage 1: Agent-based job collection — **partially complete**
+## Stage 1: LinkedIn Post Vacancy Collector — **complete / verified by operator**
 
 **Goal:** Keep agent work in `antigravity-cli`, not inside the application container.
 
@@ -24,12 +24,14 @@
 - Harness runner sends requests to `http://antigravity-cli:8080/run-harness` over the internal network.
 - `main.py` calls the full pipeline by design.
 
-### Remaining
+### Completed
 
-1. Define the safe Harness 1 prompt contract and add a hermetic text-level contract test. The prompt must use `data/state.json`, `Vacancy.status='created'`, and `LinkedinPost.processed=False`; it must stop safely on login, CAPTCHA, or access blockers and never bypass access controls.
-2. Implement normalized, transactional `LinkedinPost`/`Vacancy` persistence through project operations and test it with a disposable SQLite database.
-3. Add a hermetic fake-runner test for Harness 1 request/response handling. Do not contact LinkedIn in unit tests.
-4. Replace stale paths and names in harness prompts and docs; then decide whether host port `8080` is needed and remove it if calls originate only from `linkedin-bot`.
+- The LinkedIn Post Vacancy Collector is implemented, working, and tested by the operator.
+- It reads candidate material, uses the canonical ignored `data/state.json` session state, collects LinkedIn post vacancies, and persists normalized `LinkedinPost`/`Vacancy` records.
+
+### Follow-up maintenance
+
+- Keep its prompt, schema terminology, and tests aligned when the collector changes. This is maintenance, not an open implementation stage.
 
 ## Stage 2: JobSpy discovery and ETL — **complete for unit scope; live smoke test pending**
 
@@ -46,8 +48,8 @@
 
 ### Remaining
 
-1. Execute one controlled network-enabled `--discovery` run only after verifying credentials/provider settings; inspect its summary and DB writes.
-2. Remove legacy hard-coded JobSpy calls from the full `main.py` pipeline after Harness 2 is explicitly switched to `JobSpyIntegrationService`.
+1. Execute one controlled network-enabled `--discovery` run only after verifying credentials/provider settings; inspect its summary and DB writes. See `docs/plans/2026-08-10_stage-02_jobspy-discovery-smoke.md`.
+2. Remove legacy hard-coded JobSpy calls from the full `main.py` pipeline after the full pipeline is explicitly switched to `JobSpyIntegrationService`.
 3. Do not create a fallback identity for URL-less rows unless JobSpy supplies a proven immutable source ID.
 
 ## Stage 3: QA gates — **partially complete**
@@ -93,9 +95,9 @@
 2. Add outbox/delivery-attempt records before enabling automatic email, Telegram or application submission retries.
 3. Audit one-to-one relationships and indexes separately; do not bundle schema redesign into discovery work.
 
-## Stage 6: Vacancy application automation (Harness 2) — **not started / unverified**
+## Stage 6: Application Submission Automation — **not started / unverified**
 
-**Goal:** Harness 2 applies to a reviewed and explicitly eligible vacancy through an external portal or LinkedIn Easy Apply.
+**Goal:** Submit a reviewed and explicitly eligible vacancy through an external portal or LinkedIn Easy Apply.
 
 1. Define safe input/output contract and permitted lifecycle transitions.
 2. Require idempotency and an application-attempt record before invoking a portal.
@@ -142,7 +144,7 @@ Before changing a stage, the agent must read this file, inspect `git status`, ru
 
 - one database: `data/app.db`;
 - one session path: `data/state.json`;
-- two harnesses only;
+- LinkedIn Post Vacancy Collector, JobSpy Vacancy Discovery, and Application Submission Automation remain separate components;
 - `main.py` is the complete pipeline; `--discovery` is isolated;
 - Podman Compose is the runtime; CDP is internal-only;
 - no secrets, cookies, DB files, generated resumes or caches are committed.

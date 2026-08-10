@@ -57,17 +57,17 @@ def run_jobspy_discovery(db: Session | None = None) -> JobSpyDiscoveryRunSummary
 def main():
     logger.info("=== STARTING SEQUENTIAL AGENTIC PIPELINE ===")
 
-    # Step 1: Execute Harness Scraper (LinkedIn Posts Search Agent)
-    logger.info("[Step 1/4] Executing Harness Scraper (LinkedIn Posts Search Agent)...")
+    # Step 1: Run LinkedIn Post Vacancy Collector.
+    logger.info("[Step 1/4] Running LinkedIn Post Vacancy Collector...")
     run_linkedin_harness()
 
-    # Step 2: Execute Harness 2 (JobSpy Official Job Postings) synchronously
-    logger.info("[Step 2/4] Executing Harness 2 (Official LinkedIn Job Postings ETL)...")
+    # Step 2: Run JobSpy Vacancy Discovery synchronously.
+    logger.info("[Step 2/4] Running JobSpy Vacancy Discovery...")
     try:
         fetch_and_store_jobs(search_term="Automation Engineer", results_wanted=5)
         fetch_and_store_jobs(search_term="PLC Programmer", results_wanted=5)
     except Exception as e:
-        logger.error(f"Harness 2 execution warning: {e}")
+        logger.error(f"JobSpy Vacancy Discovery warning: {e}")
 
     # Step 3: Process and Evaluate Vacancies Sequentially
     logger.info("[Step 3/4] Evaluating candidate vacancies sequentially...")

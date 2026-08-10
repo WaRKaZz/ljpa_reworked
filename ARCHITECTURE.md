@@ -18,7 +18,7 @@ linkedin-bot
 
 antigravity-cli
   ├─ runs agy/MCP agent tasks only
-  ├─ executes Harness 1 (LinkedIn posts collection)
+  ├─ runs LinkedIn Post Vacancy Collector
   └─ serves internal API at http://antigravity-cli:8080/run-harness
 
 sqlite-ui (optional debug profile)
@@ -40,10 +40,11 @@ Development TODOs under `docs/plans/` run directly on `id-laptop` with `agy --pr
 - `python -m ljpa_reworked.main`: intentional full pipeline: collection, evaluation, materials and delivery/application paths.
 - `python -m ljpa_reworked.main --discovery`: JobSpy discovery only. It does not review vacancies, create resumes, send messages or apply.
 
-## Harnesses
+## Pipeline components
 
-1. **Harness 1:** Antigravity/Playwright LinkedIn posts collector.
-2. **Harness 2:** Vacancy application automation. It is planned, not yet verified.
+1. **LinkedIn Post Vacancy Collector:** Antigravity/Playwright component that collects LinkedIn post vacancies.
+2. **JobSpy Vacancy Discovery:** database-only JobSpy discovery component.
+3. **Application Submission Automation:** planned component for submitting an explicitly eligible vacancy; it is not yet verified.
 
 ## LLM configuration
 
