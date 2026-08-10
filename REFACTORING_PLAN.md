@@ -96,10 +96,10 @@
 
 **Goal:** Replace legacy resume generation with RenderCV-produced ATS PDF output.
 
-### 4A: ATS resume model audit — **in progress**
+### 4A: ATS resume model audit — **complete / verified by operator**
 
 1. Inventory of candidate input categories, vacancy, evaluator, `Resume`, and `ResumeCrewAI` fields against RenderCV ATS requirements (including optional links and languages representation) documented in `docs/stage-04a-resume-model-audit.md` without personal data or secrets.
-2. Minimum required 4B schema additions identified: optional `location` & `linkedin_url` in personal info, `url` & `highlights` in projects, `issuer` & `date` in certifications, optional `rendered_at` on `Resume`, and verified languages representation (sufficient under `skills` JSON, optional dedicated `languages` list in 4B).
+2. Minimum required 4B schema additions identified: optional `location` & `linkedin_url` in personal info, `url`, `start_date`, `end_date` & `highlights` in projects, `issuer`, `date` & `url` in certifications, optional `rendered_at` on `Resume`, and verified languages representation (sufficient under `skills` JSON, optional dedicated `languages` list in 4B).
 3. Audited Stage 4E cleanup metadata: corrected factual error regarding sent evidence—`Email.sent` is never set by the actual main send path, and `TelegramStatus.sent` records a vacancy notification rather than a sent resume. Verified that only `VacancyStatus.applied` is currently evidence of completed application submission; because its timestamp is absent (`Vacancy` lacks `updated_at` or submission timestamp), Stage 4E requires an explicit application/submission timestamp.
 4. Updated focused unit test suite `tests/test_stage4a_resume_model_audit.py` protecting baseline model validation, DB operations, languages/links audit facts, and verified sent evidence properties.
 

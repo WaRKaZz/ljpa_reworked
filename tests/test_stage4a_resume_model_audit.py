@@ -196,10 +196,14 @@ def test_languages_and_optional_links_audit_facts():
 
     proj = ProjectCrewAI(title="Project", description="Desc")
     assert not hasattr(proj, "url")
+    assert not hasattr(proj, "start_date")
+    assert not hasattr(proj, "end_date")
+    assert not hasattr(proj, "highlights")
 
     cert = CertificationCrewAI(title="Cert")
     assert not hasattr(cert, "url")
     assert not hasattr(cert, "issuer")
+    assert not hasattr(cert, "date")
 
 
 def test_sent_evidence_sources_audit_facts(db_session: Session):
