@@ -245,16 +245,15 @@ Perform deduplication before every insertion.
 
 2. Compare the candidate vacancy against existing vacancy rows using:
 
-   - canonicalized vacancy URL;
-   - canonicalized application URL;
+   - canonicalized `submit_url` only when it is a verified application destination;
    - normalized vacancy text;
    - clearly identical vacancy identity.
 
-3. URL canonicalization must:
+3. URL canonicalization applies only to `submit_url`:
    - remove fragments;
    - remove obvious tracking parameters;
-   - normalize trailing slashes;
-   - preserve LinkedIn post IDs and job IDs.
+   - normalize trailing slashes.
+   - Never canonicalize, store, or deduplicate using a LinkedIn search-result URL, post permalink, author profile, company profile, feed URL, or query URL.
 
 4. Text normalization must:
    - apply Unicode normalization;
@@ -275,12 +274,21 @@ For each accepted vacancy, extract:
 
 - title;
 - complete relevant vacancy text;
-- submit_email (application/recruiter email address if present);
-- submit_url (application/submission URL or LinkedIn post/job URL if present);
+- submit_email: only a syntactically valid recruiter/application email address explicitly stated in the vacancy;
+- submit_url: only a verified URL where the candidate can actually start or complete an application;
 - source;
 - visa status.
 
 At least one of submit_email or submit_url MUST be present.
+
+HARD DATA GUARDRAIL — NEVER VIOLATE
+
+- `submit_email` must contain exactly one application/recruiter email address, or `NULL`. Never place a URL, LinkedIn post text, a recruiter name, or a search query in it.
+- `submit_url` must contain exactly one verified application destination, or `NULL`. It must lead to an ATS/application form, company careers application, LinkedIn Jobs vacancy with an actual Apply/Easy Apply action, or another page where an application can be started.
+- Never store a LinkedIn search URL, search-result URL, post permalink, feed URL, author/person profile, company profile, hashtag, query URL, tracking-only redirect, or a URL merely used to discover/inspect the post in `submit_url`.
+- Never infer or manufacture either value. A URL in a post is not a `submit_url` unless opening it proves it is an application destination.
+- If the post says only “DM me”, “message me”, “contact me”, or equivalent and supplies no valid email and no verified application destination: reject it. Do not save the post URL as a substitute.
+- Search queries are transient browser input only. Never write any search query, search URL, generated query text, or LinkedIn search result identifier into any database column, audit output, or vacancy field.
 
 TITLE
 
@@ -301,7 +309,12 @@ Do not add invented requirements or rewrite facts in a way that changes their me
 
 SUBMIT EMAIL AND SUBMIT URL
 
-Store the validated application email address in submit_email and/or application URL in submit_url. Do not store “DM me” as a contact method.
+Before persisting, validate contacts independently:
+
+1. Set `submit_email` only to a valid email address explicitly provided for applications. Otherwise set it to `NULL`.
+2. Set `submit_url` only after opening the candidate URL and confirming it is an application destination with an actual Apply/Easy Apply/application-form path. Otherwise set it to `NULL`.
+3. A LinkedIn post URL, search URL, feed URL, profile URL, or “DM me” instruction is never a submission contact. It cannot be stored in either field.
+4. If both final values are `NULL`, reject the vacancy and do not insert or update any row.
 
 PERSISTENCE
 
@@ -347,7 +360,7 @@ For each newly created or updated vacancy verify:
 - text contains an actual vacancy;
 - at least one of submit_email or submit_url is present and valid;
 - submit_email (if present) is a valid email syntax;
-- submit_url (if present) is a valid application/source URL;
+- submit_url (if present) is a verified application destination, never a search/post/feed/profile/source URL;
 - source equals LinkedIn;
 - visa_status equals NOT_SPECIFIED;
 - status is created or updated;
