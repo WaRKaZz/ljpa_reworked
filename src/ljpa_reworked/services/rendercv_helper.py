@@ -23,6 +23,23 @@ def _normalize_date(date_str: str | None) -> str | None:
     return date_clean
 
 
+def _normalize_phone(phone_str: str | None) -> str | None:
+    if not phone_str:
+        return None
+    phone_clean = phone_str.strip()
+    try:
+        import phonenumbers
+        parsed = phonenumbers.parse(phone_clean, None)
+        if phonenumbers.is_valid_number(parsed):
+            return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+        parsed_us = phonenumbers.parse(phone_clean, "US")
+        if phonenumbers.is_valid_number(parsed_us):
+            return phonenumbers.format_number(parsed_us, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+    except Exception:
+        pass
+    return None
+
+
 def convert_resume_crewai_to_rendercv_input(resume: ResumeCrewAI) -> dict[str, Any]:
     """Convert a ResumeCrewAI model into a RenderCV input dictionary."""
     info = resume.personal_info
@@ -32,8 +49,9 @@ def convert_resume_crewai_to_rendercv_input(resume: ResumeCrewAI) -> dict[str, A
     }
     if info.email:
         cv["email"] = info.email
-    if info.phone:
-        cv["phone"] = info.phone
+    phone = _normalize_phone(info.phone)
+    if phone:
+        cv["phone"] = phone
     if info.location:
         cv["location"] = info.location
 
@@ -123,3 +141,35 @@ def convert_resume_crewai_to_rendercv_input(resume: ResumeCrewAI) -> dict[str, A
 
     cv["sections"] = sections
     return {"cv": cv}
+
+
+def render_resume_crewai_to_pdf(resume: ResumeCrewAI, output_pdf_path: str) -> str:
+    """Convert a ResumeCrewAI model to RenderCV input YAML and render a PDF using RenderCV."""
+    import os
+    import subprocess
+    import tempfile
+
+    import yaml
+
+    input_dict = convert_resume_crewai_to_rendercv_input(resume)
+    # ponytail: RenderCV always creates an output folder; isolate it in a temp dir.
+    with tempfile.TemporaryDirectory(prefix="rendercv-") as temp_dir:
+        temp_yaml_path = os.path.join(temp_dir, "resume.yaml")
+        with open(temp_yaml_path, "w", encoding="utf-8") as f:
+            yaml.dump(input_dict, f, allow_unicode=True)
+        cmd = [
+            "rendercv",
+            "render",
+            temp_yaml_path,
+            "--pdf-path",
+            output_pdf_path,
+            "--dont-generate-markdown",
+            "--dont-generate-html",
+            "--dont-generate-png",
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True, cwd=temp_dir)
+        if res.returncode != 0 or not os.path.exists(output_pdf_path):
+            raise RuntimeError(
+                f"RenderCV rendering failed with exit code {res.returncode}: {res.stderr}\n{res.stdout}"
+            )
+    return output_pdf_path

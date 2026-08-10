@@ -70,6 +70,7 @@ class ResumeGenerationCrew:
         return Task(
             config=self.tasks_config["resume_generation_task"],
             output_pydantic=ResumeCrewAI,
+            max_execution_time=300,
         )
 
     @crew

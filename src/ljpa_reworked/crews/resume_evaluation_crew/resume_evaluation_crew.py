@@ -34,8 +34,14 @@ class ResumeEvaluationCrew:
         embed_model: str | None = EMBED_MODEL,
         embed_api_key: str | None = EMBED_API_KEY,
         embed_api_base: str | None = EMBED_BASE_URL,
+        llm_timeout: float | int | None = None,
+        max_execution_time: int = 300,
+        max_iter: int | None = None,
     ) -> None:
         super().__init__()
+        self.llm_timeout = llm_timeout
+        self.max_execution_time = max_execution_time
+        self.max_iter = max_iter
         profile_path = Path(profile_file_path).resolve()
         if embed_provider and embed_model:
             self.embedder = {
@@ -49,7 +55,7 @@ class ResumeEvaluationCrew:
         else:
             self.embedder = None
 
-        self.llm = create_llm()
+        self.llm = create_llm(timeout=llm_timeout)
         self.profile_md = TextFileKnowledgeSource(
             file_paths=[
                 profile_path,
@@ -58,12 +64,15 @@ class ResumeEvaluationCrew:
 
     @agent
     def resume_evaluation_agent(self) -> Agent:
-        return Agent(
-            config=self.agents_config["resume_evaluation_agent"],
-            llm=self.llm,
-            tools=[],
-            max_execution_time=300,
-        )
+        agent_kwargs = {
+            "config": self.agents_config["resume_evaluation_agent"],
+            "llm": self.llm,
+            "tools": [],
+            "max_execution_time": self.max_execution_time,
+        }
+        if self.max_iter is not None:
+            agent_kwargs["max_iter"] = self.max_iter
+        return Agent(**agent_kwargs)
 
     @task
     def evaluate_resume_task(self) -> Task:

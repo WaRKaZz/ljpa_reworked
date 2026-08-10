@@ -1,69 +1,13 @@
 resume_generation_task:
   description: >
-    Given data:
-      Job title: {title}
-      Vacancy description and requirements: {text}
-      Vacancy submit email: {submit_email}
-      Vacancy submit URL: {submit_url}
-      Candidate LinkedIn profile URL (optional reference): {linkedin_url}
-      Evaluator rating: {rating}
-      Evaluator recommendations summary: {summary}
+    Generate candidate resume for:
+    Title: {title}
+    Vacancy: {text}
+    LinkedIn: {linkedin_url}
 
-    And the candidate's profile supplied via knowledge source:
-
-    CRITICAL INSTRUCTIONS:
-    - PRIORITIZE VACANCY MATCHING: Identify key requirements, skills, and qualifications from the vacancy and ensure they are prominently featured when present in candidate profile knowledge source.
-    - STRATEGIC CONTENT POSITIONING: Reorder and emphasize experiences, skills, and achievements that directly address vacancy requirements.
-    - Do NOT create, invent, or fabricate any information not present in source materials.
-    - DO NOT fetch or open any external URLs. If linkedin_url is provided, populate it only as a literal string output in personal_info.linkedin_url for header display.
-    - Unknown optional scalar fields must be null. Absent lists must be empty [].
-    - Create a compelling professional summary (2-3 concise sentences) distilling qualifications and value proposition.
-    - SKILLS ALIGNMENT: Group skills that match vacancy requirements. Avoid duplicate category/skill names.
-
+    Extract personal_info, summary, education, experience, skills, projects, and certifications from candidate profile.
+    Keep text concise (2-sentence summary, 1-2 highlights per experience/project).
+    Do not access external URLs. Set linkedin_url literally in personal_info if provided.
   expected_output: >
-    A complete ResumeCrewAI object with the following structure:
-    
-    - personal_info: PersonalInfoCrewAI object containing:
-      * name: string (candidate's full name)
-      * email: string (professional email)
-      * phone: string (contact phone number)
-      * address: string (address)
-      * location: string (city, country)
-      * linkedin_url: string or null (optional candidate LinkedIn profile URL)
-    
-    - summary: string (2-3 sentence summary)
-    
-    - education: List of EducationCrewAI objects:
-      * course: string
-      * institution: string
-      * location: string
-      * start_date: string
-      * end_date: string (or "Present")
-    
-    - experience: List of ExperienceCrewAI objects:
-      * title: string
-      * company: string
-      * location: string
-      * start_date: string
-      * end_date: string (or "Present")
-      * description: list of strings
-    
-    - skills: List of SkillCrewAI objects:
-      * title: string
-      * elements: list of strings
-    
-    - projects: List of ProjectCrewAI objects (or []):
-      * title: string
-      * description: string
-      * url: string or null
-      * start_date: string or null
-      * end_date: string or null
-      * highlights: list of strings
-    
-    - certifications: List of CertificationCrewAI objects (or []):
-      * title: string
-      * issuer: string or null
-      * date: string or null
-      * url: string or null
-
+    A ResumeCrewAI object.
   agent: resume_agent

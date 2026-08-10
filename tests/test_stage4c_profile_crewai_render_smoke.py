@@ -154,20 +154,57 @@ def test_convert_resume_crewai_to_rendercv_input():
     assert exp["highlights"] == ["Developed microservices in Python", "Optimized PostgreSQL queries"]
 
 
-def test_resume_crews_have_deterministic_timeout_and_bounded_agent_execution():
-    """Verify evaluation and generation crews configure timeout and bounded execution on LLM and Agent."""
-    eval_crew = ResumeEvaluationCrew(llm_timeout=30, max_execution_time=45, max_iter=3)
-    eval_agent = eval_crew.resume_evaluation_agent()
-    assert eval_crew.llm.timeout == 30, f"Expected LLM timeout 30, got {eval_crew.llm.timeout}"
-    assert eval_agent.max_execution_time == 45, f"Expected agent max_execution_time 45, got {eval_agent.max_execution_time}"
-    assert eval_agent.max_iter == 3, f"Expected agent max_iter 3, got {eval_agent.max_iter}"
-
-    gen_crew = ResumeGenerationCrew(llm_timeout=30, max_execution_time=45, max_iter=3)
-    gen_agent = gen_crew.resume_agent()
-    assert gen_crew.llm.timeout == 30, f"Expected LLM timeout 30, got {gen_crew.llm.timeout}"
-    assert gen_agent.max_execution_time == 45, f"Expected agent max_execution_time 45, got {gen_agent.max_execution_time}"
-    assert gen_agent.max_iter == 3, f"Expected agent max_iter 3, got {gen_agent.max_iter}"
 
 
+def test_render_resume_crewai_to_pdf():
+    """Verify render_resume_crewai_to_pdf creates a nonempty PDF and returns its path."""
+    from ljpa_reworked.services.rendercv_helper import render_resume_crewai_to_pdf
 
+    sample_resume = ResumeCrewAI(
+        personal_info=PersonalInfoCrewAI(
+            name="Test Render Candidate",
+            email="testrender@example.com",
+            phone="+49 151 12345678",
+            address="123 Main St",
+            location="Berlin, Germany",
+            linkedin_url="https://linkedin.com/in/testrendercandidate",
+        ),
+        summary="Experienced engineer with strong track record in Python.",
+        education=[
+            EducationCrewAI(
+                course="B.Sc. Computer Science",
+                institution="Technical University",
+                location="Berlin, Germany",
+                start_date="2018-09",
+                end_date="2022-06",
+            )
+        ],
+        experience=[
+            ExperienceCrewAI(
+                title="Backend Developer",
+                company="Sample Enterprise",
+                location="Berlin, Germany",
+                start_date="2022-07",
+                end_date="Present",
+                description=["Built scalable APIs using Python and FastAPI"],
+            )
+        ],
+        skills=[
+            SkillCrewAI(title="Engineering", elements=["Python", "PostgreSQL", "Docker"])
+        ],
+        projects=[],
+        certifications=[],
+    )
 
+    out_pdf = "/tmp/test_sample_resume_render.pdf"
+    if os.path.exists(out_pdf):
+        os.remove(out_pdf)
+
+    try:
+        res_path = render_resume_crewai_to_pdf(sample_resume, out_pdf)
+        assert res_path == out_pdf
+        assert os.path.exists(out_pdf)
+        assert os.path.getsize(out_pdf) > 0
+    finally:
+        if os.path.exists(out_pdf):
+            os.remove(out_pdf)

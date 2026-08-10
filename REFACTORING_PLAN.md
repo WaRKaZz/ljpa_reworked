@@ -110,11 +110,13 @@
 3. Implemented `confirm_email_application_submitted()` to stamp `Vacancy.applied_at` only after confirmed email send and transition to `applied`. Unconfirmed transitions leave `applied_at` unset (`None`).
 4. Enforced fresh disposable SQLite schema boundary without touching canonical `data/app.db`.
 
-### 4C: Profile-based evaluator, CrewAI data, and render smoke — **planned**
+### 4C: Profile-based evaluator, CrewAI data, and render smoke — **complete**
 
-1. Make local ignored `resources/profile.md` the sole candidate source. Remove PDF/LinkedIn URL scraping; retain `linkedin_url` as output-only data for a future RenderCV header icon.
-2. Update evaluator and `ResumeGenerationCrew` to produce all Stage 4B ATS fields factually. Unknown optional scalars are `null`; absent lists are `[]`.
-3. With explicit operator authorization, run evaluator and generator against a synthetic vacancy through the configured gateway and render the structured result to a disposable `/tmp` RenderCV PDF. Do not access DB or send anything.
+1. Replaced legacy CV PDF and URL scraping in resume evaluator and generator CrewAI prompts/code with local candidate source `resources/profile.md`. Retained `linkedin_url` strictly as an output field for RenderCV header display.
+2. Minimized evaluator and generator YAML prompts to prevent long prompt overheads and ensure deterministic execution under 75 seconds per call.
+3. Added `rendercv[full]` dependency and `render_resume_crewai_to_pdf` helper service in `src/ljpa_reworked/services/rendercv_helper.py` with `phonenumbers` validation for RenderCV compatibility.
+4. Executed permitted real end-to-end smoke test using `resources/profile.md` and a synthetic vacancy through configured gateway: evaluator succeeded, generator produced valid `ResumeCrewAI`, RenderCV compiled a non-empty PDF under `/tmp`, verified non-zero size, and deleted the PDF afterwards.
+5. All hermetic contract tests and real smoke tests passed (109 passed, 71.10% coverage).
 
 ### 4D: RenderCV output and one operator-reviewed PDF — **not started**
 

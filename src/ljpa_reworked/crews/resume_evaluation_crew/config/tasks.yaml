@@ -1,29 +1,13 @@
 evaluate_resume_task:
   description: >
-    Given vacancy data:
-      • {title}: the job title to match
-      • {text}: the detailed vacancy description and requirements
-      • {submit_email}: vacancy contact email (if provided)
-      • {submit_url}: vacancy contact URL (if provided)
-      • {linkedin_url} (optional): stored candidate LinkedIn profile URL reference (for output header icon only, NEVER fetch or open)
-    and the candidate's profile supplied via knowledge source:
-    perform the following steps:
-      1. Analyze candidate profile knowledge source and match against vacancy requirements.
-      2. Extract and categorize key skills (technical, domain, soft skills) and experience (roles, years, industries).
-      3. Match extracted attributes against vacancy requirements using keyword and semantic analysis.
-      4. Score categories (skills match, experience match, education match) on a 0–25 scale.
-      5. Aggregate category scores into a total match percentage (0–100).
-      6. Generate actionable recommendations focused on:
-         • Tailoring keywords and phrases for Applicant Tracking Systems (ATS)
-         • Highlighting relevant achievements and metrics
-         • Structuring sections for clarity and impact
-         • Filling critical skill or experience gaps
-         • Emphasizing transferable skills and soft skills
+    Evaluate candidate profile for:
+    Title: {title}
+    Vacancy: {text}
+    LinkedIn: {linkedin_url}
+
+    Match candidate profile skills and experience to vacancy.
+    Calculate rating (0-100) and actionable summary recommendations.
+    Do not access external URLs.
   expected_output: >
-    A BasicEvaluationCrewAI model with:
-    summary: StrippedStr  
-    A concise set of actionable recommendations for enhancing the resume
-    to better align with the vacancy requirements
-    rating: int (0–100)  
-    An integer representing the percentage match between resume and vacancy
+    A BasicEvaluationCrewAI object with summary (str) and rating (int 0-100).
   agent: resume_evaluation_agent
