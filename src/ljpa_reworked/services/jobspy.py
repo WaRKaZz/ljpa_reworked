@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, List
 
 from jobspy import scrape_jobs
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
 from ljpa_reworked.models.crewai_pydantic_models import (
@@ -18,6 +18,18 @@ from ljpa_reworked.models.database_models import DataSource, Vacancy
 from ljpa_reworked.operations.vacancy_ops import upsert_vacancy_by_url
 
 logger = logging.getLogger(__name__)
+
+
+class JobSpyDiscoveryRunSummary(BaseModel):
+    """Summary of a JobSpy discovery run."""
+
+    queries_attempted: int = 0
+    rows_received: int = 0
+    created_count: int = 0
+    refreshed_count: int = 0
+    skipped_without_url_count: int = 0
+    failures_by_query: list[dict] = Field(default_factory=list)
+
 
 # Dynamic resolution of project/package root directory (NOT dependent on os.getcwd())
 # src/ljpa_reworked/services/jobspy.py -> parents[3] is project root
@@ -169,6 +181,110 @@ class JobSpyIntegrationService:
             crew_runner=self.crew_runner,
         )
         return normalize_and_deduplicate_queries(query_set.queries)
+
+    def run(self, db: Session | None = None) -> JobSpyDiscoveryRunSummary:
+        """Run JobSpy discovery pipeline over all derived search queries.
+
+        Obtains queries via get_queries(), iterates over queries, calls scrape_jobs for each,
+        upserts vacancies by URL, aggregates counters, and returns JobSpyDiscoveryRunSummary.
+        Strictly discovery-only: no review, resume generation, email, Telegram, or application submission.
+        """
+        import pandas as pd
+
+        queries = self.get_queries()
+        summary = JobSpyDiscoveryRunSummary()
+
+        def _execute_discovery(session: Session) -> None:
+            for q in queries:
+                summary.queries_attempted += 1
+                try:
+                    jobs_df = scrape_jobs(
+                        site_name=[q.site_name],
+                        search_term=q.search_term,
+                        location=q.location,
+                        results_wanted=q.results_wanted,
+                        hours_old=72,
+                    )
+                except Exception as err:
+                    logger.error("JobSpy scrape failed for query %s: %s", q, err)
+                    q_dict = (
+                        q.model_dump()
+                        if hasattr(q, "model_dump")
+                        else {"search_term": q.search_term, "site_name": q.site_name, "location": q.location}
+                    )
+                    summary.failures_by_query.append({"query": q_dict, "error": str(err)})
+                    continue
+
+                if jobs_df is None or jobs_df.empty:
+                    continue
+
+                site_str = q.site_name.lower()
+                source_enum = (
+                    DataSource.linkedin
+                    if site_str == "linkedin"
+                    else (
+                        DataSource[site_str]
+                        if site_str in DataSource.__members__
+                        else DataSource.other
+                    )
+                )
+
+                for _, row in jobs_df.iterrows():
+                    summary.rows_received += 1
+                    raw_url = row.get("job_url")
+                    if raw_url is None or pd.isna(raw_url):
+                        trimmed_url = ""
+                    else:
+                        trimmed_url = str(raw_url).strip()
+
+                    if not trimmed_url or trimmed_url.lower() == "nan":
+                        logger.info("Skipping JobSpy row with empty or invalid job_url.")
+                        summary.skipped_without_url_count += 1
+                        continue
+
+                    raw_emails = row.get("emails")
+                    credentials_val = (
+                        str(raw_emails)
+                        if raw_emails is not None and not pd.isna(raw_emails)
+                        else None
+                    )
+
+                    vacancy_data = {
+                        "title": str(row.get("title") or "Unknown Title"),
+                        "text": str(row.get("description") or ""),
+                        "credentials": credentials_val,
+                        "url": trimmed_url,
+                        "source": source_enum,
+                        "visa_status": VisaStatus.not_mentioned,
+                    }
+
+                    vacancy, is_created = upsert_vacancy_by_url(session, vacancy_data)
+                    if vacancy is None:
+                        summary.skipped_without_url_count += 1
+                    elif is_created:
+                        summary.created_count += 1
+                    else:
+                        summary.refreshed_count += 1
+
+        if db is not None:
+            _execute_discovery(db)
+        else:
+            from ljpa_reworked.database import SessionLocal
+
+            with SessionLocal() as session:
+                _execute_discovery(session)
+
+        logger.info(
+            "JobSpy Discovery completed: attempted=%d, rows=%d, created=%d, refreshed=%d, skipped=%d, failures=%d",
+            summary.queries_attempted,
+            summary.rows_received,
+            summary.created_count,
+            summary.refreshed_count,
+            summary.skipped_without_url_count,
+            len(summary.failures_by_query),
+        )
+        return summary
+
 
 
 def _store_jobs_df(jobs_df: Any, source_enum: DataSource, session: Session) -> List[Vacancy]:

@@ -257,7 +257,7 @@ def upsert_vacancy_by_url(
         vacancy = Vacancy(
             title=str(vacancy_data.get("title") or "Unknown Title"),
             text=str(vacancy_data.get("text") or ""),
-            credentials=vacancy_data.get("credentials"),
+            credentials=vacancy_data.get("credentials") or "",
             url=url,
             source=source,
             visa_status=visa_status,
@@ -280,7 +280,8 @@ def upsert_vacancy_by_url(
     if "text" in vacancy_data and vacancy_data["text"] is not None:
         existing.text = str(vacancy_data["text"])
     if "credentials" in vacancy_data:
-        existing.credentials = vacancy_data["credentials"]
+        existing.credentials = vacancy_data["credentials"] if vacancy_data["credentials"] is not None else ""
+
     if "source" in vacancy_data and vacancy_data["source"] is not None:
         existing.source = vacancy_data["source"]
     if "visa_status" in vacancy_data and vacancy_data["visa_status"] is not None:
