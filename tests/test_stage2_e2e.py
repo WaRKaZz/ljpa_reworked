@@ -8,8 +8,7 @@ from sqlalchemy.pool import StaticPool
 from ljpa_reworked.database import Base
 from ljpa_reworked.models.database_models import DataSource, LinkedinPost, Vacancy
 from ljpa_reworked.models.crewai_pydantic_models import VisaStatus
-from ljpa_reworked.services.harness_jobspy import fetch_and_store_jobs
-from ljpa_reworked.services.harness_posts_scraper import run_agy_harness_1
+from ljpa_reworked.services.jobspy import fetch_and_store_jobs
 from ljpa_reworked.operations.linkedin_post_ops import (
     get_all_linkedin_posts,
     link_post_to_vacancy,
@@ -51,7 +50,7 @@ def test_stage2_jobspy_integration(db_session):
         }
     ])
 
-    with patch("ljpa_reworked.services.harness_jobspy.scrape_jobs", return_value=mock_df):
+    with patch("ljpa_reworked.services.jobspy.scrape_jobs", return_value=mock_df):
         vacancies = fetch_and_store_jobs(
             site_name="linkedin",
             search_term="Backend Engineer",
@@ -115,7 +114,7 @@ def test_stage2_combined_collection_pipeline(db_session):
         },
     ])
 
-    with patch("ljpa_reworked.services.harness_jobspy.scrape_jobs", return_value=mock_df):
+    with patch("ljpa_reworked.services.jobspy.scrape_jobs", return_value=mock_df):
         jobspy_vacancies = fetch_and_store_jobs(
             site_name="linkedin",
             search_term="Developer",

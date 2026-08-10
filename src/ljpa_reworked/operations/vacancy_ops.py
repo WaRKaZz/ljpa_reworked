@@ -7,6 +7,14 @@ if TYPE_CHECKING:
     from ljpa_reworked.models.crewai_pydantic_models import VacancyCrewAI
 from ljpa_reworked.models.crewai_pydantic_models import VisaStatus
 from ljpa_reworked.models.database_models import DataSource, Vacancy
+from ljpa_reworked.models.enums import VacancyStatus
+
+TERMINAL_STATUSES = {
+    VacancyStatus.applied,
+    VacancyStatus.withdrawn,
+    VacancyStatus.expired,
+    VacancyStatus.archived,
+}
 
 
 def create_vacancy(
@@ -88,7 +96,6 @@ def save_vacancy(
         )
 
 
-
 def get_vacancy_by_id(db: Session, vacancy_id: int) -> Vacancy | None:
     """Get vacancy by ID."""
     return (
@@ -98,15 +105,56 @@ def get_vacancy_by_id(db: Session, vacancy_id: int) -> Vacancy | None:
     )
 
 
-def get_eligble_vacancies(db: Session) -> list[Vacancy]:
-    """Get eligible vacancies."""
-    return db.query(Vacancy).filter(
-        and_(
-            Vacancy.visa_status.in_([VisaStatus.provided, VisaStatus.not_mentioned]),
-            Vacancy.deleted.is_(False),
-            Vacancy.processed.is_(False),
+def get_eligble_vacancies(
+    db: Session,
+    statuses: list[VacancyStatus] | None = None,
+) -> list[Vacancy]:
+    """Get eligible vacancies for review."""
+    if statuses is None:
+        statuses = [VacancyStatus.created, VacancyStatus.review_error]
+    return (
+        db.query(Vacancy)
+        .filter(
+            and_(
+                Vacancy.visa_status.in_([VisaStatus.provided, VisaStatus.not_mentioned]),
+                Vacancy.deleted.is_(False),
+                Vacancy.status.in_(statuses),
+            )
         )
+        .all()
     )
+
+
+def transition_vacancy_status(
+    db: Session,
+    vacancy_id: int,
+    target_status: VacancyStatus,
+    allowed_from_statuses: list[VacancyStatus] | None = None,
+) -> Vacancy:
+    """Transition a vacancy's status with validation and terminal status protection."""
+    vacancy = get_vacancy_by_id(db, vacancy_id)
+    if not vacancy:
+        raise ValueError(f"Vacancy with id {vacancy_id} not found.")
+
+    if vacancy.status == target_status:
+        return vacancy
+
+    if vacancy.status in TERMINAL_STATUSES:
+        if allowed_from_statuses is None or vacancy.status not in allowed_from_statuses:
+            raise ValueError(
+                f"Cannot transition vacancy {vacancy_id} from terminal status '{vacancy.status.value}' to '{target_status.value}'."
+            )
+
+    if allowed_from_statuses is not None and vacancy.status not in allowed_from_statuses:
+        allowed_str = [s.value if hasattr(s, "value") else str(s) for s in allowed_from_statuses]
+        raise ValueError(
+            f"Cannot transition vacancy {vacancy_id} from status '{vacancy.status.value}' to '{target_status.value}'. Transition is not allowed (allowed source statuses: {allowed_str})."
+        )
+
+    vacancy.status = target_status
+    db.commit()
+    db.refresh(vacancy)
+    return vacancy
 
 
 def get_all_vacancies(db: Session, skip: int = 0, limit: int = 100) -> list[Vacancy]:
@@ -166,9 +214,13 @@ def update_vacancy(db: Session, vacancy_id: int, **kwargs) -> Vacancy | None:
     """Update vacancy fields."""
     vacancy = get_vacancy_by_id(db, vacancy_id)
     if vacancy:
+        if "status" in kwargs:
+            target_status = kwargs.pop("status")
+            transition_vacancy_status(db, vacancy_id, target_status)
         for key, value in kwargs.items():
             if hasattr(vacancy, key):
                 setattr(vacancy, key, value)
         db.commit()
         db.refresh(vacancy)
     return vacancy
+

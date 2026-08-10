@@ -55,13 +55,13 @@ from .vacancy_ops import (
     get_vacancy_by_id,
     search_vacancies,
     soft_delete_vacancy,
+    transition_vacancy_status,
     update_vacancy,
 )
 
 __all__ = [
     # email_ops
     "create_email",
-    "mark_vacancy_as_sentcreate_email",
     "delete_email",
     "get_email_by_id",
     "get_emails_by_recipient",
@@ -92,7 +92,7 @@ __all__ = [
     "soft_delete_linkedin_post",
     "update_linkedin_post",
     "link_post_to_vacancy",
-    "get_duplicate_post"
+    "get_duplicate_post",
     # resume_ops
     "create_resume",
     "delete_resume",
@@ -110,6 +110,7 @@ __all__ = [
     "get_vacancy_by_id",
     "search_vacancies",
     "soft_delete_vacancy",
+    "transition_vacancy_status",
     "update_vacancy",
     # telegram_ops
     "mark_vacancy_as_sent",

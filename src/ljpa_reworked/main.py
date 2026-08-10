@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import logging
 from typing import cast
 
 from ljpa_reworked.crew_workflow import (
@@ -7,12 +8,15 @@ from ljpa_reworked.crew_workflow import (
     crewai_generate_resume,
 )
 from ljpa_reworked.database import SessionLocal
+from ljpa_reworked.models.enums import VacancyStatus
 from ljpa_reworked.operations import (
     create_email,
     create_evaluation,
     get_eligble_vacancies,
-    update_vacancy,
+    transition_vacancy_status,
 )
+from ljpa_reworked.services.harness_runner import run_linkedin_harness
+from ljpa_reworked.services.jobspy import fetch_and_store_jobs
 from ljpa_reworked.workflow import (  # noqa
     extract_email,
     get_linkedin_posts,
@@ -24,19 +28,15 @@ from ljpa_reworked.workflow import (  # noqa
     verified_recipient,
 )
 
-
-from ljpa_reworked.services.harness_jobspy import fetch_and_store_jobs
-from ljpa_reworked.services.harness_posts_scraper import run_agy_harness_1
-
 logger = logging.getLogger(__name__)
 
 
 def main():
     logger.info("=== STARTING SEQUENTIAL AGENTIC PIPELINE ===")
 
-    # Step 1: Execute Harness 1 (AGY LinkedIn Posts Agent in container) synchronously
-    logger.info("[Step 1/4] Executing Harness 1 (LinkedIn Posts Search Agent)...")
-    run_agy_harness_1()
+    # Step 1: Execute Harness Scraper (LinkedIn Posts Search Agent)
+    logger.info("[Step 1/4] Executing Harness Scraper (LinkedIn Posts Search Agent)...")
+    run_linkedin_harness()
 
     # Step 2: Execute Harness 2 (JobSpy Official Job Postings) synchronously
     logger.info("[Step 2/4] Executing Harness 2 (Official LinkedIn Job Postings ETL)...")
@@ -65,7 +65,11 @@ def main():
                 evaluation_data=evaluation,
             )
             if not evaluation.rating > 50:
-                update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
+                transition_vacancy_status(
+                    db=db,
+                    vacancy_id=vacancy.id,
+                    target_status=VacancyStatus.rejected,
+                )
                 continue
 
             resume = crewai_generate_resume(vacancy=vacancy, evaluation=evaluation)
@@ -74,10 +78,18 @@ def main():
             recipient_email = extract_email(vacancy_credentials)
             if not recipient_email:
                 send_telegram_post(vacancy=vacancy, db=db)
-                update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
+                transition_vacancy_status(
+                    db=db,
+                    vacancy_id=vacancy.id,
+                    target_status=VacancyStatus.application_prepared,
+                )
                 continue
             elif not verified_recipient(recipient_email, db):
-                update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
+                transition_vacancy_status(
+                    db=db,
+                    vacancy_id=vacancy.id,
+                    target_status=VacancyStatus.application_prepared,
+                )
                 continue
 
             email = crewai_generate_email(vacancy=vacancy)
@@ -89,7 +101,11 @@ def main():
                 resume_path=orm_resume.path,
             )
             send_email(orm_email)
-            update_vacancy(db=db, vacancy_id=vacancy.id, processed=True)
+            transition_vacancy_status(
+                db=db,
+                vacancy_id=vacancy.id,
+                target_status=VacancyStatus.applied,
+            )
 
 
 if __name__ == "__main__":
