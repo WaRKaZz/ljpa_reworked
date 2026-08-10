@@ -7,24 +7,24 @@ services:
     volumes:
       - ./data:/app/data
     command: cloakserve --host 0.0.0.0 --port 9222
-    networks: [ljpa-network]
+    networks: [ ljpa-network ]
 
-  linkedin-bot:
-    build: .
-    container_name: linkedin-bot
-    depends_on:
-      cloak-browser:
-        condition: service_started
-      antigravity-cli:
-        condition: service_started
-    volumes:
-      - ./data:/app/data
-      - ./resources:/app/resources:ro
-    env_file: [.env]
-    environment:
-      CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
-    command: uv run python -m ljpa_reworked.main
-    networks: [ljpa-network]
+  # linkedin-bot:
+  #   build: .
+  #   container_name: linkedin-bot
+  #   depends_on:
+  #     cloak-browser:
+  #       condition: service_started
+  #     antigravity-cli:
+  #       condition: service_started
+  #   volumes:
+  #     - ./data:/app/data
+  #     - ./resources:/app/resources:ro
+  #   env_file: [.env]
+  #   environment:
+  #     CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
+  #   command: uv run python -m ljpa_reworked.main
+  #   networks: [ljpa-network]
 
   antigravity-cli:
     build:
@@ -32,7 +32,7 @@ services:
       dockerfile: Dockerfile.antigravity
     container_name: antigravity-cli
     userns_mode: keep-id
-    ports: ["8080:8080"]
+    ports: [ "8080:8080" ]
     depends_on:
       cloak-browser:
         condition: service_started
@@ -44,24 +44,23 @@ services:
       - ./.agents:/app/.agents:ro
       - ./.gemini:/home/agent/.gemini
       - ./data/gcloud:/home/agent/.config/gcloud:ro
-    env_file: [.env]
+    env_file: [ .env ]
     environment:
       CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
       GOOGLE_APPLICATION_CREDENTIALS: /home/agent/.config/gcloud/application_default_credentials.json
     stdin_open: true
     tty: true
     command: python3 /app/harness_server.py
-    networks: [ljpa-network]
+    networks: [ ljpa-network ]
 
   sqlite-ui:
-    profiles: [debug]
     build:
       context: .
       dockerfile: Dockerfile.sqlite
     container_name: sqlite-ui
-    ports: ["7901:7901"]
-    volumes: ["./data:/data:ro"]
-    networks: [ljpa-network]
+    ports: [ "7901:7901" ]
+    volumes: [ "./data:/data:ro" ]
+    networks: [ ljpa-network ]
 
 networks:
   ljpa-network:
