@@ -15,7 +15,7 @@ sys.stdout.reconfigure(line_buffering=True)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
-DEFAULT_SAVE_PATH = Path("resources/state.json")
+DEFAULT_SAVE_PATH = Path("data/state.json")
 
 def get_cdp_endpoint() -> str:
     """Returns the CDP endpoint HTTP/WS URL from env or defaults to http://localhost:9222?fingerprint=linkedin_seed."""

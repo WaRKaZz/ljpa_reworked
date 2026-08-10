@@ -4,75 +4,64 @@ services:
     container_name: cloak-browser
     security_opt:
       - seccomp:unconfined
-    ports:
-      - "9222:9222"
     volumes:
-      - ./resources:/app/resources
+      - ./data:/app/data
     command: cloakserve --host 0.0.0.0 --port 9222
-    networks:
-      - ljpa-network
+    networks: [ljpa-network]
 
-#  linkedin-bot:
-#    build: .
-#    container_name: linkedin-bot
-#    depends_on:
-#      cloak-browser:
-#        condition: service_started
-#    volumes:
-#      - ./resources:/app/resources
-#      - ./data:/app/data
-#      - ./src:/app/src
-#      - ./tests:/app/tests
-#      - ./compose.yml:/app/compose.yml
-#    env_file:
-#      - .env
-#    environment:
-#      - CDP_URL=${CDP_URL:-http://cloak-browser:9222}
-#    command: uv run src/ljpa_reworked/main.py
-#    networks:
-#      - ljpa-network
+  linkedin-bot:
+    build: .
+    container_name: linkedin-bot
+    depends_on:
+      cloak-browser:
+        condition: service_started
+      antigravity-cli:
+        condition: service_started
+    volumes:
+      - ./data:/app/data
+      - ./resources:/app/resources:ro
+    env_file: [.env]
+    environment:
+      CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
+    command: uv run python -m ljpa_reworked.main
+    networks: [ljpa-network]
 
   antigravity-cli:
     build:
       context: .
       dockerfile: Dockerfile.antigravity
     container_name: antigravity-cli
-    userns_mode: "keep-id"
-    ports:
-      - "8080:8080"
+    userns_mode: keep-id
+    ports: ["8080:8080"]
     depends_on:
       cloak-browser:
         condition: service_started
     volumes:
-      - ./resources:/app/resources
       - ./data:/app/data
-      - ./prompts:/app/prompts
+      - ./resources:/app/resources:ro
+      - ./prompts:/app/prompts:ro
       - ./src/ljpa_reworked/services/harness:/app:ro
-      - ./.agents:/app/.agents
+      - ./.agents:/app/.agents:ro
       - ./.gemini:/home/agent/.gemini
-      - ./data/gcloud:/home/agent/.config/gcloud
-    env_file:
-      - .env
+      - ./data/gcloud:/home/agent/.config/gcloud:ro
+    env_file: [.env]
     environment:
-      - CDP_URL=${CDP_URL:-http://cloak-browser:9222}
-      - GOOGLE_APPLICATION_CREDENTIALS=/home/agent/.config/gcloud/application_default_credentials.json
+      CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
+      GOOGLE_APPLICATION_CREDENTIALS: /home/agent/.config/gcloud/application_default_credentials.json
     stdin_open: true
     tty: true
     command: python3 /app/harness_server.py
-    networks:
-      - ljpa-network
+    networks: [ljpa-network]
 
   sqlite-ui:
+    profiles: [debug]
     build:
       context: .
       dockerfile: Dockerfile.sqlite
     container_name: sqlite-ui
-    ports:
-      - "7901:7901"
-    volumes:
-      - ./data:/data
-    networks:
-      - ljpa-network
+    ports: ["7901:7901"]
+    volumes: ["./data:/data:ro"]
+    networks: [ljpa-network]
 
 networks:
   ljpa-network:

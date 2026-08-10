@@ -1,10 +1,10 @@
 import os
 
-from crewai import LLM, Agent, Crew, Process, Task
+from crewai import Agent, Crew, Process, Task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
 
-from ljpa_reworked.config import LLM_API_KEY, LLM_MODEL
+from ljpa_reworked.config import create_llm
 from ljpa_reworked.models.crewai_pydantic_models import JobSearchQuerySet
 
 config_dir = os.path.join(os.path.dirname(__file__), "config")
@@ -20,7 +20,7 @@ class QueryGenerationCrew:
 
     @agent
     def query_strategist(self) -> Agent:
-        llm = LLM(api_key=LLM_API_KEY, model=LLM_MODEL)
+        llm = create_llm()
         return Agent(config=self.agents_config["query_strategist"], llm=llm)
 
     @task

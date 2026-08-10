@@ -1,5 +1,6 @@
 import os
 import os.path
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -19,6 +20,7 @@ LINKEDIN_SEARCH_URL = os.getenv("LINKEDIN_SEARCH_URL")
 LINKEDIN_URL = os.getenv("LINKEDIN_URL")
 LLM_API_KEY = os.getenv("LLM_API_KEY")
 LLM_MODEL = os.getenv("LLM_MODEL")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://id-vps:20128/v1")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 EMBED_PROVIDER = os.getenv("EMBED_PROVIDER")
@@ -39,17 +41,29 @@ SELENIUM_COMMAND_EXECUTOR = f"http://{SELENIUM_HOST}:{SELENIUM_PORT}/wd/hub"
 # =============================================================================
 # File Paths and Resource Settings
 # =============================================================================
-BASE_DIR = os.getcwd()
-RESOURCES_DIR = os.path.join(BASE_DIR, "resources")
+BASE_DIR = Path(__file__).resolve().parents[2]
+RESOURCES_DIR = str(BASE_DIR / "resources")
 SCREENSHOTS_DIR = os.path.join("/tmp", "screenshots")
 os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
 
-DATA_DIR = os.path.join(BASE_DIR, "data")
+DATA_DIR = str(BASE_DIR / "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, "app.db")
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 CV_FILE_NAME = os.getenv("CV_FILE_NAME")
 
-CV_FILE_PATH = os.path.join(RESOURCES_DIR, CV_FILE_NAME)
+CV_FILE_PATH = os.path.join(RESOURCES_DIR, CV_FILE_NAME) if CV_FILE_NAME else None
+
+
+def create_llm():
+    """Build the project LLM client for the configured OpenAI-compatible gateway."""
+    from crewai import LLM
+
+    return LLM(
+        model=LLM_MODEL,
+        api_key=LLM_API_KEY,
+        base_url=LLM_BASE_URL,
+        custom_openai=True,
+    )

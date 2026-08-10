@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from crewai import LLM, Agent, Crew, Process, Task
+from crewai import Agent, Crew, Process, Task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.knowledge.source.pdf_knowledge_source import PDFKnowledgeSource
 from crewai.project import CrewBase, agent, crew, task
@@ -14,6 +14,7 @@ from ljpa_reworked.config import (
     EMBED_MODEL,
     EMBED_PROVIDER,
     LLM_API_KEY,
+    LLM_BASE_URL,
     LLM_MODEL,
 )
 from ljpa_reworked.models.crewai_pydantic_models import BasicEvaluationCrewAI
@@ -39,6 +40,7 @@ class ResumeEvaluationCrew:
         embed_api_base: str = EMBED_BASE_URL,
         llm_api_key: str = LLM_API_KEY,
         llm_model: str = LLM_MODEL,
+        llm_base_url: str = LLM_BASE_URL,
     ) -> None:
         super().__init__()
         pdf_path = Path(cv_file_path)
@@ -50,7 +52,14 @@ class ResumeEvaluationCrew:
                 "api_base": embed_api_base,
             },
         }
-        self.llm = LLM(api_key=llm_api_key, model=llm_model)
+        from crewai import LLM
+
+        self.llm = LLM(
+            model=llm_model,
+            api_key=llm_api_key,
+            base_url=llm_base_url,
+            custom_openai=True,
+        )
         self.resume_pdf = PDFKnowledgeSource(
             file_paths=[
                 pdf_path,

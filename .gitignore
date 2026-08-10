@@ -23,9 +23,10 @@
 
 /ollama*
 typescript
-GEMINI.md
-AGENTS.md
-REFACTORING_PLAN.md
 /prompts
 .gemini/
 data/*.db*
+data/state.json
+data/*.bak
+AGENTS.md
+GEMINI.md

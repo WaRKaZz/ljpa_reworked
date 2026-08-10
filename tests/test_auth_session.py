@@ -2,7 +2,11 @@ import json
 
 import pytest
 
-from ljpa_reworked.auth.session import load_auth_state, verify_auth_state
+from ljpa_reworked.auth.session import (
+    DEFAULT_STATE_PATH,
+    load_auth_state,
+    verify_auth_state,
+)
 
 
 def test_verify_auth_state_missing_file(tmp_path):
@@ -31,3 +35,7 @@ def test_load_auth_state_invalid_raises_value_error(tmp_path):
     missing_file = tmp_path / "missing.json"
     with pytest.raises(ValueError, match="Invalid or missing auth state file"):
         load_auth_state(missing_file)
+
+
+def test_default_state_path_is_under_data():
+    assert DEFAULT_STATE_PATH.as_posix() == "data/state.json"

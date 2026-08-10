@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ljpa_reworked.auth.login_linkedin import (
+    DEFAULT_SAVE_PATH,
     check_login_success,
     clean_env_val,
     fill_login_form,
@@ -66,3 +67,7 @@ async def test_check_login_success_detected(tmp_path):
     result = await check_login_success(mock_page, mock_context, state_path=state_file, poll_interval=0.01, timeout=1.0)
     assert result is True
     mock_context.storage_state.assert_called_once_with(path=str(state_file))
+
+
+def test_default_save_path_is_under_data():
+    assert DEFAULT_SAVE_PATH.as_posix() == "data/state.json"
