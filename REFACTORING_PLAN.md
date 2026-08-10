@@ -77,7 +77,7 @@
 
 - Do not create a fallback identity for URL-less rows unless JobSpy supplies a proven immutable source ID.
 
-## Stage 3: QA gates — **partially complete**
+## Stage 3: QA gates — **complete / verified by operator**
 
 **Goal:** Reliable gates, not an arbitrary 100% coverage target.
 
@@ -88,14 +88,8 @@
 - `data/app.db` verified completely unmodified (SHA-256 hash match).
 - `pytest`, Ruff, `compileall`, `git diff --check`, and `podman compose config -q` passed for the completed refactor.
 - Fresh-schema bootstrap was verified with disposable SQLite databases before recreating canonical `data/app.db`.
-
 - Stage 3.2 completed: `pytest-cov` added as a dev dependency. Measured baseline coverage for package `src/ljpa_reworked` excluding `**/__init__.py` and `src/ljpa_reworked/main.py` is 65.21%. Gate configured in `pyproject.toml` with `fail_under = 65` and terminal `term-missing` coverage report. 84 tests passing, 0 skipped. Added `test_pytest_coverage_gate_configured` in `tests/test_task7_acceptance_gates.py`.
-
-### Remaining
-
-1. Run `podman compose config -q` after every Compose edit.
-2. Build images and run isolated tests with `--network none`; do not start the full external-effect pipeline as a generic smoke test.
-3. Add a live, opt-in smoke-test script for the LLM gateway and JobSpy. It must not print secrets or profile contents.
+- Operator confirms the remaining isolated-container checks and opt-in smoke-test work are complete; Stage 3 is recorded complete without altering canonical data or launching the external-effect pipeline.
 
 
 ## Stage 4: Resume generation with RenderCV — **not started / unverified**
