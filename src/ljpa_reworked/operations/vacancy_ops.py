@@ -1,6 +1,8 @@
+import logging
 from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, or_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 if TYPE_CHECKING:
@@ -8,6 +10,8 @@ if TYPE_CHECKING:
 from ljpa_reworked.models.crewai_pydantic_models import VisaStatus
 from ljpa_reworked.models.database_models import DataSource, Vacancy
 from ljpa_reworked.models.enums import VacancyStatus
+
+logger = logging.getLogger(__name__)
 
 TERMINAL_STATUSES = {
     VacancyStatus.applied,
@@ -223,4 +227,66 @@ def update_vacancy(db: Session, vacancy_id: int, **kwargs) -> Vacancy | None:
         db.commit()
         db.refresh(vacancy)
     return vacancy
+
+
+def upsert_vacancy_by_url(
+    db: Session,
+    vacancy_data: dict,
+) -> tuple[Vacancy | None, bool]:
+    """Upsert a vacancy by URL.
+
+    If the vacancy URL is new, creates a new Vacancy record with status=VacancyStatus.created.
+    If the vacancy URL exists in the database, refreshes only source-owned fields:
+    title, text, credentials, source, visa_status.
+
+    Preserves all workflow data (id, created_at, status, deleted, evaluations, resumes, emails, etc.).
+    Returns (vacancy, is_created). If url is missing or empty, logs skip and returns (None, False).
+    """
+    raw_url = vacancy_data.get("url")
+    if not raw_url or not str(raw_url).strip():
+        logger.warning("Skipping vacancy upsert: missing or blank url.")
+        return None, False
+
+    url = str(raw_url).strip()
+    existing = db.query(Vacancy).filter(Vacancy.url == url).first()
+
+    source = vacancy_data.get("source", DataSource.linkedin)
+    visa_status = vacancy_data.get("visa_status", VisaStatus.not_mentioned)
+
+    if existing is None:
+        vacancy = Vacancy(
+            title=str(vacancy_data.get("title") or "Unknown Title"),
+            text=str(vacancy_data.get("text") or ""),
+            credentials=vacancy_data.get("credentials"),
+            url=url,
+            source=source,
+            visa_status=visa_status,
+            status=VacancyStatus.created,
+        )
+        try:
+            db.add(vacancy)
+            db.commit()
+            db.refresh(vacancy)
+            return vacancy, True
+        except IntegrityError:
+            db.rollback()
+            existing = db.query(Vacancy).filter(Vacancy.url == url).first()
+            if existing is None:
+                raise
+
+    # Refresh source-owned fields on existing record
+    if "title" in vacancy_data and vacancy_data["title"] is not None:
+        existing.title = str(vacancy_data["title"])
+    if "text" in vacancy_data and vacancy_data["text"] is not None:
+        existing.text = str(vacancy_data["text"])
+    if "credentials" in vacancy_data:
+        existing.credentials = vacancy_data["credentials"]
+    if "source" in vacancy_data and vacancy_data["source"] is not None:
+        existing.source = vacancy_data["source"]
+    if "visa_status" in vacancy_data and vacancy_data["visa_status"] is not None:
+        existing.visa_status = vacancy_data["visa_status"]
+
+    db.commit()
+    db.refresh(existing)
+    return existing, False
 

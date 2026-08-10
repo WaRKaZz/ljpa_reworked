@@ -44,7 +44,7 @@ class Vacancy(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     credentials: Mapped[str | None] = mapped_column(String(500), nullable=False)
-    url: Mapped[str] = mapped_column(String(200), nullable=True)
+    url: Mapped[str | None] = mapped_column(String(500), nullable=True, unique=True)
     source: Mapped[DataSource]
     visa_status: Mapped[VisaStatus]
     created_at: Mapped[created_at]

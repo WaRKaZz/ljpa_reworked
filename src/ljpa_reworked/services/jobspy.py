@@ -15,7 +15,7 @@ from ljpa_reworked.models.crewai_pydantic_models import (
     VisaStatus,
 )
 from ljpa_reworked.models.database_models import DataSource, Vacancy
-from ljpa_reworked.operations.vacancy_ops import save_vacancy
+from ljpa_reworked.operations.vacancy_ops import upsert_vacancy_by_url
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +171,42 @@ class JobSpyIntegrationService:
         return normalize_and_deduplicate_queries(query_set.queries)
 
 
+def _store_jobs_df(jobs_df: Any, source_enum: DataSource, session: Session) -> List[Vacancy]:
+    seen_urls: set[str] = set()
+    saved_vacancies: List[Vacancy] = []
+
+    for _, row in jobs_df.iterrows():
+        raw_url = row.get("job_url")
+        if raw_url is None:
+            raw_url = ""
+        trimmed_url = str(raw_url).strip()
+        if not trimmed_url:
+            logger.info("Skipping JobSpy row with empty job_url.")
+            continue
+
+        if trimmed_url in seen_urls:
+            logger.info("Skipping duplicate job_url '%s' within same scrape batch.", trimmed_url)
+            continue
+
+        seen_urls.add(trimmed_url)
+
+        vacancy_data = {
+            "title": str(row.get("title") or "Unknown Title"),
+            "text": str(row.get("description") or ""),
+            "credentials": str(row.get("emails")) if row.get("emails") is not None else None,
+            "url": trimmed_url,
+            "source": source_enum,
+            "visa_status": VisaStatus.not_mentioned,
+        }
+
+        vacancy, _ = upsert_vacancy_by_url(session, vacancy_data)
+        if vacancy is not None:
+            saved_vacancies.append(vacancy)
+
+    logger.info("Successfully processed %d vacancy records.", len(saved_vacancies))
+    return saved_vacancies
+
+
 def fetch_and_store_jobs(
     site_name: str = "linkedin",
     search_term: str = "Python Developer",
@@ -187,25 +223,17 @@ def fetch_and_store_jobs(
         results_wanted=results_wanted,
         hours_old=72,
     )
-    saved_vacancies: List[Vacancy] = []
     if jobs_df.empty:
         logger.warning("JobSpy returned no results.")
-        return saved_vacancies
+        return []
 
     source_enum = DataSource.linkedin if site_name.lower() == "linkedin" else DataSource.other
 
-    for _, row in jobs_df.iterrows():
-        vacancy = save_vacancy(
-            title=str(row.get("title") or "Unknown Title"),
-            text=str(row.get("description") or ""),
-            credentials=str(row.get("emails") or ""),
-            url=str(row.get("job_url") or ""),
-            source=source_enum,
-            visa_status=VisaStatus.not_mentioned,
-            db=db,
-        )
-        saved_vacancies.append(vacancy)
+    if db is not None:
+        return _store_jobs_df(jobs_df, source_enum, db)
 
-    logger.info("Successfully fetched and saved %d vacancy records.", len(saved_vacancies))
-    return saved_vacancies
+    from ljpa_reworked.database import SessionLocal
+
+    with SessionLocal() as session:
+        return _store_jobs_df(jobs_df, source_enum, session)
 
