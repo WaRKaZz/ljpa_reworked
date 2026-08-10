@@ -20,8 +20,8 @@ from ljpa_reworked.operations.vacancy_ops import upsert_vacancy_by_url
 logger = logging.getLogger(__name__)
 
 
-class JobSpyDiscoveryRunSummary(BaseModel):
-    """Summary of a JobSpy discovery run."""
+class JobSpyRunSummary(BaseModel):
+    """Summary of a JobSpy search run."""
 
     queries_attempted: int = 0
     rows_received: int = 0
@@ -163,7 +163,7 @@ def normalize_and_deduplicate_queries(queries: list[JobSearchQuery]) -> list[Job
 
 
 class JobSpyIntegrationService:
-    """Service orchestrating search query generation, caching, and JobSpy discovery."""
+    """Service orchestrating sequential JobSpy search, caching, and database upserts."""
 
     def __init__(
         self,
@@ -184,17 +184,17 @@ class JobSpyIntegrationService:
         )
         return normalize_and_deduplicate_queries(query_set.queries)
 
-    def run(self, db: Session | None = None) -> JobSpyDiscoveryRunSummary:
-        """Run JobSpy discovery pipeline over all derived search queries.
+    def run(self, db: Session | None = None) -> JobSpyRunSummary:
+        """Run JobSpy search pipeline over all derived search queries.
 
         Obtains queries via get_queries(), iterates over queries, calls scrape_jobs for each,
-        upserts vacancies by URL, aggregates counters, and returns JobSpyDiscoveryRunSummary.
-        Strictly discovery-only: no review, resume generation, email, Telegram, or application submission.
+        upserts vacancies by URL, aggregates counters, and returns JobSpyRunSummary.
+        This is Step 2 of the sequential pipeline; later stages own review, resumes, and application.
         """
         import pandas as pd
 
         queries = self.get_queries()
-        summary = JobSpyDiscoveryRunSummary()
+        summary = JobSpyRunSummary()
 
         def _execute_discovery(session: Session) -> None:
             for q in queries:
@@ -277,7 +277,7 @@ class JobSpyIntegrationService:
                 _execute_discovery(session)
 
         logger.info(
-            "JobSpy Discovery completed: attempted=%d, rows=%d, created=%d, refreshed=%d, skipped=%d, failures=%d",
+            "JobSpy search completed: attempted=%d, rows=%d, created=%d, refreshed=%d, skipped=%d, failures=%d",
             summary.queries_attempted,
             summary.rows_received,
             summary.created_count,

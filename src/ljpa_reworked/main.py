@@ -2,8 +2,6 @@
 import logging
 from typing import cast
 
-from sqlalchemy.orm import Session
-
 from ljpa_reworked.crew_workflow import (
     crewai_evaluate_vacancy,
     crewai_generate_email,
@@ -18,11 +16,7 @@ from ljpa_reworked.operations import (
     transition_vacancy_status,
 )
 from ljpa_reworked.services.harness_runner import run_linkedin_harness
-from ljpa_reworked.services.jobspy import (
-    JobSpyDiscoveryRunSummary,
-    JobSpyIntegrationService,
-    fetch_and_store_jobs,
-)
+from ljpa_reworked.services.jobspy import JobSpyIntegrationService
 from ljpa_reworked.workflow import (  # noqa
     extract_email,
     get_linkedin_posts,
@@ -37,23 +31,6 @@ from ljpa_reworked.workflow import (  # noqa
 logger = logging.getLogger(__name__)
 
 
-def run_jobspy_discovery(db: Session | None = None) -> JobSpyDiscoveryRunSummary:
-    """Execute discovery-only JobSpy pipeline without downstream side effects."""
-    logger.info("Executing discovery-only JobSpy pipeline...")
-    service = JobSpyIntegrationService()
-    summary = service.run(db=db)
-    logger.info(
-        "JobSpy Discovery completed: attempted=%d, rows=%d, created=%d, refreshed=%d, skipped=%d, failures=%d",
-        summary.queries_attempted,
-        summary.rows_received,
-        summary.created_count,
-        summary.refreshed_count,
-        summary.skipped_without_url_count,
-        len(summary.failures_by_query),
-    )
-    return summary
-
-
 def main():
     logger.info("=== STARTING SEQUENTIAL AGENTIC PIPELINE ===")
 
@@ -61,13 +38,12 @@ def main():
     logger.info("[Step 1/4] Running LinkedIn Post Vacancy Collector...")
     run_linkedin_harness()
 
-    # Step 2: Run JobSpy Vacancy Discovery synchronously.
-    logger.info("[Step 2/4] Running JobSpy Vacancy Discovery...")
+    # Step 2: Search JobSpy and store vacancies before review.
+    logger.info("[Step 2/4] Searching JobSpy vacancies...")
     try:
-        fetch_and_store_jobs(search_term="Automation Engineer", results_wanted=5)
-        fetch_and_store_jobs(search_term="PLC Programmer", results_wanted=5)
-    except Exception as e:
-        logger.error(f"JobSpy Vacancy Discovery warning: {e}")
+        JobSpyIntegrationService().run()
+    except Exception as exc:
+        logger.error("JobSpy search warning: %s", exc)
 
     # Step 3: Process and Evaluate Vacancies Sequentially
     logger.info("[Step 3/4] Evaluating candidate vacancies sequentially...")
@@ -132,18 +108,5 @@ def main():
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="LJPA Reworked Entry Point")
-    parser.add_argument(
-        "--discovery",
-        action="store_true",
-        help="Run discovery-only JobSpy pipeline without downstream side effects",
-    )
-    args = parser.parse_args()
-
-    if args.discovery:
-        run_jobspy_discovery()
-    else:
-        main()
+    main()
 

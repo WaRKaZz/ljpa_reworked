@@ -1,6 +1,6 @@
 # Global Project Refactoring Plan
 
-> **Runtime decision:** Podman Compose. `linkedin-bot` is the application container; its Python calls the isolated `antigravity-cli` runtime API for agent tasks. Development TODOs are implemented separately with direct host `agy` on `id-laptop`. `main.py` intentionally runs the complete pipeline. Use `python -m ljpa_reworked.main --discovery` only for the isolated JobSpy discovery mode.
+> **Runtime decision:** Podman Compose. `linkedin-bot` is the application container; its Python calls the isolated `antigravity-cli` runtime API for agent tasks. Development TODOs are implemented separately with direct host `agy` on `id-laptop`. `main.py` intentionally runs the complete pipeline. The pipeline has no standalone JobSpy mode: it runs sequentially after LinkedIn-post collection and before review.
 
 ## Current baseline — verified 2026-08-10
 
@@ -10,7 +10,7 @@
 - LinkedIn login/session bootstrap is implemented and operational; `data/state.json` remains its canonical ignored state path.
 - LLM gateway: OpenAI-compatible `http://id-vps:20128/v1`, configured by `LLM_BASE_URL`.
 - Quality baseline: `uv run pytest -q`, `uv run --extra dev ruff check src tests`, `uv run python -m compileall -q src`, and `podman compose config -q`.
-- Pipeline components: LinkedIn Post Vacancy Collector collects LinkedIn post vacancies; JobSpy Vacancy Discovery discovers JobSpy vacancies; Application Submission Automation is planned and not yet verified.
+- Pipeline components: LinkedIn Post Vacancy Collector collects LinkedIn post vacancies; JobSpy Vacancy Search saves JobSpy vacancies; Vacancy Review and Resume Generation follows; Application Harness is planned and not yet verified.
 
 ## Stage 1: LinkedIn Post Vacancy Collector — **complete / verified by operator**
 
@@ -33,9 +33,9 @@
 
 - Keep its prompt, schema terminology, and tests aligned when the collector changes. This is maintenance, not an open implementation stage.
 
-## Stage 2: JobSpy discovery and ETL — **complete for unit scope; live smoke test pending**
+## Stage 2: JobSpy search and ETL — **complete for unit scope; sequential integration pending**
 
-**Goal:** Discover JobSpy vacancies only; never review, generate materials, send messages, or apply.
+**Goal:** Search JobSpy and save or refresh vacancies as Step 2, after LinkedIn harness collection and before review.
 
 ### Completed
 
@@ -44,12 +44,12 @@
 - A mismatched LLM profile hash fails without overwriting a valid cache.
 - URL is the canonical JobSpy identity; blank URLs are skipped and existing source fields refresh without changing lifecycle state.
 - `VacancyStatus` replaced `Vacancy.processed`; migration backfilled existing data and `Vacancy.url` has a uniqueness constraint.
-- `python -m ljpa_reworked.main --discovery` is isolated and returns summary metrics.
+- `JobSpyIntegrationService.run()` returns summary metrics for the Step-2 search.
 
 ### Remaining
 
-1. Execute one controlled network-enabled `--discovery` run only after verifying credentials/provider settings; inspect its summary and DB writes. See `docs/plans/2026-08-10_stage-02_jobspy-discovery-smoke.md`.
-2. Remove legacy hard-coded JobSpy calls from the full `main.py` pipeline after the full pipeline is explicitly switched to `JobSpyIntegrationService`.
+1. Replace legacy hard-coded JobSpy calls in `main.py` with `JobSpyIntegrationService.run()` so JobSpy is the second sequential step.
+2. Verify the sequential hand-off with fakes: harness collection, JobSpy search, then review; do not make a live network run part of this stage.
 3. Do not create a fallback identity for URL-less rows unless JobSpy supplies a proven immutable source ID.
 
 ## Stage 3: QA gates — **partially complete**
@@ -58,7 +58,7 @@
 
 ### Completed
 
-- Unit and acceptance tests exist for statuses, migrations, query validation/cache, URL upsert, discovery isolation, Compose structure, session paths and LLM gateway construction.
+- Unit and acceptance tests exist for statuses, migrations, query validation/cache, URL upsert, sequential JobSpy integration, Compose structure, session paths and LLM gateway construction.
 - Ruff and Python compilation pass.
 - Migration was verified on a disposable copy before applying to canonical `data/app.db`.
 
@@ -93,7 +93,7 @@
 
 1. Add history/retry/failure-reason fields only when scheduling or operator triage needs them.
 2. Add outbox/delivery-attempt records before enabling automatic email, Telegram or application submission retries.
-3. Audit one-to-one relationships and indexes separately; do not bundle schema redesign into discovery work.
+3. Audit one-to-one relationships and indexes separately; do not bundle schema redesign into JobSpy search work.
 
 ## Stage 6: Application Submission Automation — **not started / unverified**
 
@@ -134,7 +134,7 @@
 
 ### Remaining
 
-1. Add minimal root-level operator commands/documentation for `podman compose build`, `up`, logs and discovery-only execution.
+1. Add minimal root-level operator commands/documentation for `podman compose build`, `up`, logs and the sequential pipeline.
 2. Verify image build under Podman; resolve Dockerfile portability defects only if observed.
 3. Keep `sqlite-ui` off production networks or bind it only to a safe interface before using it outside local debugging.
 
@@ -144,7 +144,7 @@ Before changing a stage, the agent must read this file, inspect `git status`, ru
 
 - one database: `data/app.db`;
 - one session path: `data/state.json`;
-- LinkedIn Post Vacancy Collector, JobSpy Vacancy Discovery, and Application Submission Automation remain separate components;
-- `main.py` is the complete pipeline; `--discovery` is isolated;
+- LinkedIn Post Vacancy Collector, JobSpy Vacancy Search, Vacancy Review and Resume Generation, and Application Harness remain ordered components;
+- `main.py` is the only pipeline entry point; JobSpy is always Step 2;
 - Podman Compose is the runtime; CDP is internal-only;
 - no secrets, cookies, DB files, generated resumes or caches are committed.

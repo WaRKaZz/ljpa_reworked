@@ -5,12 +5,11 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from ljpa_reworked.main import run_jobspy_discovery
 from ljpa_reworked.models.crewai_pydantic_models import JobSearchQuery
 from ljpa_reworked.models.database_models import Base, Vacancy
 from ljpa_reworked.services.jobspy import (
-    JobSpyDiscoveryRunSummary,
     JobSpyIntegrationService,
+    JobSpyRunSummary,
 )
 
 
@@ -24,7 +23,7 @@ def db_session():
     session.close()
 
 
-def test_jobspy_discovery_run_counters(db_session):
+def test_jobspy_search_run_counters(db_session):
     queries = [
         JobSearchQuery(
             site_name="linkedin",
@@ -87,7 +86,7 @@ def test_jobspy_discovery_run_counters(db_session):
         with patch("ljpa_reworked.services.jobspy.scrape_jobs", side_effect=mock_scrape_jobs):
             summary = service.run(db=db_session)
 
-    assert isinstance(summary, JobSpyDiscoveryRunSummary)
+    assert isinstance(summary, JobSpyRunSummary)
     assert summary.queries_attempted == 2
     assert summary.rows_received == 5
     assert summary.created_count == 3
@@ -99,7 +98,7 @@ def test_jobspy_discovery_run_counters(db_session):
     assert len(vacancies) == 3
 
 
-def test_jobspy_discovery_handles_query_failure(db_session):
+def test_jobspy_search_handles_query_failure(db_session):
     queries = [
         JobSearchQuery(
             site_name="linkedin",
@@ -144,37 +143,16 @@ def test_jobspy_discovery_handles_query_failure(db_session):
     assert "JobSpy connection failed" in summary.failures_by_query[0]["error"]
 
 
-def test_discovery_entrypoint_is_strictly_discovery_only(db_session):
-    queries = [
-        JobSearchQuery(
-            site_name="linkedin",
-            search_term="Python Engineer",
-            location="Remote",
-            results_wanted=5,
-        )
-    ]
-    df = pd.DataFrame([
-        {
-            "title": "Python Dev",
-            "description": "desc",
-            "emails": None,
-            "job_url": "https://linkedin.com/jobs/100",
-        }
-    ])
+def test_main_runs_jobspy_after_linkedin_harness_before_evaluation():
+    from ljpa_reworked import main as main_module
 
-    with patch("ljpa_reworked.services.jobspy.JobSpyIntegrationService.get_queries", return_value=queries):
-        with patch("ljpa_reworked.services.jobspy.scrape_jobs", return_value=df):
-            with patch("ljpa_reworked.crew_workflow.crewai_evaluate_vacancy") as mock_eval, \
-                 patch("ljpa_reworked.crew_workflow.crewai_generate_resume") as mock_resume, \
-                 patch("ljpa_reworked.crew_workflow.crewai_generate_email") as mock_email, \
-                 patch("ljpa_reworked.workflow.send_telegram_post") as mock_telegram, \
-                 patch("ljpa_reworked.workflow.send_email") as mock_send_email:
+    events = []
+    with patch.object(main_module, "run_linkedin_harness", side_effect=lambda: events.append("harness")), \
+         patch.object(main_module, "JobSpyIntegrationService") as service_class, \
+         patch.object(main_module, "get_linkedin_posts", return_value=[]), \
+         patch.object(main_module, "get_eligble_vacancies", return_value=[]):
+        service_class.return_value.run.side_effect = lambda: events.append("jobspy")
 
-                summary = run_jobspy_discovery(db=db_session)
+        main_module.main()
 
-                assert summary.created_count == 1
-                assert mock_eval.call_count == 0
-                assert mock_resume.call_count == 0
-                assert mock_email.call_count == 0
-                assert mock_telegram.call_count == 0
-                assert mock_send_email.call_count == 0
+    assert events == ["harness", "jobspy"]

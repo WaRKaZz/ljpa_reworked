@@ -37,14 +37,15 @@ Development TODOs under `docs/plans/` run directly on `id-laptop` with `agy --pr
 
 ## Execution modes
 
-- `python -m ljpa_reworked.main`: intentional full pipeline: collection, evaluation, materials and delivery/application paths.
-- `python -m ljpa_reworked.main --discovery`: JobSpy discovery only. It does not review vacancies, create resumes, send messages or apply.
+- `python -m ljpa_reworked.main`: one intentional sequential pipeline: LinkedIn-post harness collection, JobSpy search, vacancy review, resume generation, then application harness.
+- There is no standalone `--discovery` mode. JobSpy search is always Step 2 of this sequence.
 
 ## Pipeline components
 
 1. **LinkedIn Post Vacancy Collector:** Antigravity/Playwright component that collects LinkedIn post vacancies.
-2. **JobSpy Vacancy Discovery:** database-only JobSpy discovery component.
-3. **Application Submission Automation:** planned component for submitting an explicitly eligible vacancy; it is not yet verified.
+2. **JobSpy Vacancy Search:** searches JobSpy and saves or refreshes vacancies by URL before review.
+3. **Vacancy Review and Resume Generation:** reviews saved vacancies and creates a tailored resume for each eligible vacancy.
+4. **Application Harness:** submits an eligible, prepared vacancy through the harness; it is not yet verified.
 
 ## LLM configuration
 
