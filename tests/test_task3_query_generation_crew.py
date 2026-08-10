@@ -149,3 +149,14 @@ def test_query_generation_crew_structure():
     task_obj = crew_inst.generate_job_search_queries_task()
     assert task_obj.output_pydantic == JobSearchQuerySet
     assert "JobSearchQuerySet" in task_obj.description or "JobSearchQuerySet" in task_obj.expected_output
+
+
+def test_job_search_query_set_rejects_normalized_duplicates():
+    with pytest.raises(ValidationError, match="duplicate"):
+        JobSearchQuerySet(
+            profile_sha256="c" * 64,
+            queries=[
+                JobSearchQuery(search_term="Python Engineer", location="Remote", site_name="linkedin"),
+                JobSearchQuery(search_term=" python engineer ", location="remote", site_name="linkedin"),
+            ],
+        )

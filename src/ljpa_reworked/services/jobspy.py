@@ -116,7 +116,9 @@ def generate_and_cache_queries(
             query_set = JobSearchQuerySet.model_validate(result)
 
         if query_set.profile_sha256 != profile_sha256:
-            query_set = query_set.model_copy(update={"profile_sha256": profile_sha256})
+            raise ValueError(
+                "CrewAI profile_sha256 does not match the current profile content"
+            )
 
         atomic_write_cache(cache_path, query_set)
         return query_set

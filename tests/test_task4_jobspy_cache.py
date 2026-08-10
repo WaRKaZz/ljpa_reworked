@@ -187,8 +187,7 @@ def test_jobspy_integration_service_queries(temp_resource_dir):
     _, current_sha = compute_profile_sha256(profile_path)
 
     query1 = JobSearchQuery(search_term="Software Engineer", location="Remote", site_name="linkedin")
-    query2 = JobSearchQuery(search_term="software engineer", location="remote", site_name="linkedin")
-    query_set = JobSearchQuerySet(profile_sha256=current_sha, queries=[query1, query2])
+    query_set = JobSearchQuerySet(profile_sha256=current_sha, queries=[query1])
 
     mock_crew_runner = MagicMock(return_value=query_set)
 
@@ -201,3 +200,23 @@ def test_jobspy_integration_service_queries(temp_resource_dir):
     queries = service.get_queries()
     assert len(queries) == 1
     assert queries[0].search_term == "Software Engineer"
+
+
+def test_generation_rejects_mismatched_profile_hash_and_preserves_cache(tmp_path):
+    from ljpa_reworked.services.jobspy import get_or_generate_job_search_queries
+
+    profile_path = tmp_path / "profile.md"
+    cache_path = tmp_path / "profile_search_query.json"
+    profile_path.write_text("Candidate profile", encoding="utf-8")
+    cache_path.write_text("known-good-cache", encoding="utf-8")
+
+    def crew_runner(**_):
+        return {
+            "profile_sha256": "0" * 64,
+            "queries": [{"search_term": "Python Engineer", "location": "Remote", "site_name": "linkedin", "results_wanted": 10}],
+        }
+
+    with pytest.raises(RuntimeError, match="profile_sha256 does not match"):
+        get_or_generate_job_search_queries(profile_path, cache_path, crew_runner)
+
+    assert cache_path.read_text(encoding="utf-8") == "known-good-cache"

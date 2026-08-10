@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from ljpa_reworked.models.enums import VacancyStatus as VacancyStatus  # noqa: F401
 
@@ -109,4 +109,14 @@ class JobSearchQuery(BaseModel):
 class JobSearchQuerySet(BaseModel):
     profile_sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
     queries: Annotated[list[JobSearchQuery], Field(min_length=1, max_length=12)]
+
+    @model_validator(mode="after")
+    def reject_normalized_duplicates(self):
+        keys = {
+            (query.site_name, query.search_term.casefold(), query.location.casefold())
+            for query in self.queries
+        }
+        if len(keys) != len(self.queries):
+            raise ValueError("duplicate normalized job search queries are not allowed")
+        return self
 
