@@ -202,10 +202,43 @@ def test_languages_and_optional_links_audit_facts():
     assert not hasattr(cert, "issuer")
 
 
-def test_sent_evidence_sources_audit_facts():
-    """Verify multi-table sent evidence check criteria for Stage 4E cleanup rules."""
+def test_sent_evidence_sources_audit_facts(db_session: Session):
+    """Verify sent evidence facts and Stage 4E metadata requirements:
+    1. Email.sent is not set by main send path (defaults to False).
+    2. TelegramStatus.sent records vacancy notification, not resume sent.
+    3. Only VacancyStatus.applied indicates completed application submission.
+    4. Vacancy has no submission timestamp, so Stage 4E requires explicit timestamp addition.
+    """
     from ljpa_reworked.models.database_models import TelegramStatus
 
-    assert hasattr(Email, "sent")
-    assert hasattr(TelegramStatus, "sent")
+    vacancy = Vacancy(
+        title="Python Engineer",
+        text="Looking for a Python engineer...",
+        submit_email="jobs@example.com",
+        source=DataSource.linkedin,
+        visa_status=VisaStatus.not_required,
+    )
+    db_session.add(vacancy)
+    db_session.commit()
+
+    # Email.sent exists but defaults to False and is never set to True by send_email() in main workflow
+    email = Email(subject="Test", recipient="test@example.com", vacancy_id=vacancy.id)
+    db_session.add(email)
+    db_session.commit()
+    db_session.refresh(email)
+    assert email.sent is False
+
+    # TelegramStatus.sent exists for recording Telegram vacancy notification posts
+    tg = TelegramStatus(vacancy_id=vacancy.id, sent=True)
+    db_session.add(tg)
+    db_session.commit()
+    db_session.refresh(tg)
+    assert tg.sent is True
+
+    # VacancyStatus.applied is the sole status representing completed application submission
     assert VacancyStatus.applied in VacancyStatus
+    assert VacancyStatus.applied.value == "applied"
+
+    # Vacancy lacks updated_at or applied_at timestamp for Stage 4E age tracking
+    assert not hasattr(Vacancy, "updated_at")
+    assert not hasattr(Vacancy, "applied_at")

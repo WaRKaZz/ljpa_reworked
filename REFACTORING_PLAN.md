@@ -96,12 +96,12 @@
 
 **Goal:** Replace legacy resume generation with RenderCV-produced ATS PDF output.
 
-### 4A: ATS resume model audit — **complete**
+### 4A: ATS resume model audit — **in progress**
 
 1. Inventory of candidate input categories, vacancy, evaluator, `Resume`, and `ResumeCrewAI` fields against RenderCV ATS requirements (including optional links and languages representation) documented in `docs/stage-04a-resume-model-audit.md` without personal data or secrets.
 2. Minimum required 4B schema additions identified: optional `location` & `linkedin_url` in personal info, `url` & `highlights` in projects, `issuer` & `date` in certifications, optional `rendered_at` on `Resume`, and verified languages representation (sufficient under `skills` JSON, optional dedicated `languages` list in 4B).
-3. Audited Stage 4E cleanup metadata: verified that `VacancyStatus` has no `sent` value (uses `applied`), `Vacancy` has no `updated_at` column, `Email.created_at` records row creation time, and `TelegramStatus.sent` / `Email.sent` provide sent evidence. Corrected unsupported cleanup claims and identified required timestamp/evidence additions for 4B/4E.
-4. Updated focused unit test suite `tests/test_stage4a_resume_model_audit.py` protecting baseline model validation, DB operations, languages/links audit facts, and verified multi-table sent evidence properties.
+3. Audited Stage 4E cleanup metadata: corrected factual error regarding sent evidence—`Email.sent` is never set by the actual main send path, and `TelegramStatus.sent` records a vacancy notification rather than a sent resume. Verified that only `VacancyStatus.applied` is currently evidence of completed application submission; because its timestamp is absent (`Vacancy` lacks `updated_at` or submission timestamp), Stage 4E requires an explicit application/submission timestamp.
+4. Updated focused unit test suite `tests/test_stage4a_resume_model_audit.py` protecting baseline model validation, DB operations, languages/links audit facts, and verified sent evidence properties.
 
 ### 4B: Resume model and schema — **not started**
 
@@ -123,7 +123,7 @@
 
 1. Delete generated resumes for vacancies sent more than two months ago.
 2. Delete generated resumes that were never sent.
-3. Define and test the exact sent-state evidence before enabling cleanup; never delete source candidate data or submission history.
+3. Define and test the exact sent-state evidence before enabling cleanup: only `VacancyStatus.applied` currently indicates completed application submission, but its timestamp is absent. Require an explicit application/submission timestamp for 60-day cleanup enforcement; never delete source candidate data or submission history.
 
 
 ## Stage 5: Database and models — **partially complete**
