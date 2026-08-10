@@ -4,9 +4,9 @@
 
 ## Current baseline — verified 2026-08-10
 
-- Canonical SQLite database: `data/app.db`; 39 vacancies; Alembic revision `f6c1f6797747`.
+- Canonical SQLite database: `data/app.db`; it is recreated by SQLAlchemy `init_db()` when a fresh baseline is required. Alembic is removed.
 - `resources/app.db` was an empty obsolete artifact and was removed.
-- The canonical DB passed `PRAGMA integrity_check` after migration.
+- The canonical DB passed `PRAGMA integrity_check` after fresh-schema recreation; current verified count is 12 `created` vacancies.
 - LinkedIn login/session bootstrap is implemented and operational; `data/state.json` remains its canonical ignored state path.
 - LLM gateway: OpenAI-compatible `http://id-vps:20128/v1`, configured by `LLM_BASE_URL`.
 - Quality baseline: `uv run pytest -q`, `uv run --extra dev ruff check src tests`, `uv run python -m compileall -q src`, and `podman compose config -q`.
@@ -26,8 +26,9 @@
 
 ### Completed
 
-- The LinkedIn Post Vacancy Collector is implemented, working, and tested by the operator.
-- It reads candidate material, uses the canonical ignored `data/state.json` session state, collects LinkedIn post vacancies, and persists normalized `LinkedinPost`/`Vacancy` records.
+- Harness 1 reads candidate material, uses the canonical ignored `data/state.json` session state, and collects final `Vacancy` records directly.
+- The obsolete `LinkedinPost` raw-post pipeline and post-review crew are removed.
+- `prompts/harness_scraper.md` requires full original-post review, structured vacancy summaries, verified submission contacts, per-run URL write deduplication, workspace DB staging, integrity checks, and atomic canonical-DB replacement.
 
 ### Follow-up maintenance
 
@@ -35,7 +36,15 @@
 
 ## Stage 1A: Direct LinkedIn vacancies and fresh database baseline — **complete / verified by operator**
 
-**Goal:** Harness 1 validates LinkedIn posts itself and writes final vacancies directly to `data/app.db`; no raw-post table or post-review crew remains.
+**Goal:** Harness 1 validates fully opened LinkedIn posts and publishes final vacancies through an audited workspace DB copy; no raw-post table or post-review crew remains.
+
+### Completed
+
+- Direct `Vacancy` collection is implemented; raw LinkedIn post storage and review-crew conversion are removed.
+- New source rows are `created`; the exact matching `submit_url` may refresh source-owned fields as `updated`.
+- The collector never treats a search card, post permalink, profile, feed, or search URL as a submission contact.
+- The collector stores a concise structured vacancy summary rather than raw LinkedIn post text.
+- Runtime agent artifacts use the persistent `/workspace` volume and document retained files in `/workspace/README.md`.
 
 ## Stage 1B: Vacancy submission contact model and fresh database — **complete / verified by operator**
 
@@ -60,8 +69,8 @@
 - `JobSpyIntegrationService` generates profile-grounded CrewAI queries with a SHA-256 cache.
 - Query contract validates source, bounds, hash and normalized duplicate queries.
 - A mismatched LLM profile hash fails without overwriting a valid cache.
-- URL is the canonical JobSpy identity; blank URLs are skipped and existing source fields refresh without changing lifecycle state.
-- `VacancyStatus` replaced `Vacancy.processed`; migration backfilled existing data and `Vacancy.url` has a uniqueness constraint.
+- `submit_url` is the canonical JobSpy identity when present; email-only vacancies are allowed, and blank contact pairs are skipped.
+- `VacancyStatus` replaced `Vacancy.processed`; lifecycle state is explicit and `submit_url` is unique when present.
 - `JobSpyIntegrationService.run()` returns summary metrics for the Step-2 search.
 
 ### Remaining
@@ -76,9 +85,9 @@
 
 ### Completed
 
-- Unit and acceptance tests exist for statuses, migrations, query validation/cache, URL upsert, sequential JobSpy integration, Compose structure, session paths and LLM gateway construction.
-- Ruff and Python compilation pass.
-- Migration was verified on a disposable copy before applying to canonical `data/app.db`.
+- Unit and acceptance tests cover statuses, fresh metadata bootstrap, contact validation, `submit_url` upsert, sequential JobSpy integration, Compose structure, session paths, and LLM gateway construction.
+- `pytest`, Ruff, `compileall`, `git diff --check`, and `podman compose config -q` passed for the completed refactor.
+- Fresh-schema bootstrap was verified with disposable SQLite databases before recreating canonical `data/app.db`.
 
 ### Remaining
 
@@ -98,14 +107,15 @@
 
 ## Stage 5: Database and models — **partially complete**
 
-**Goal:** One SQLite database at `data/app.db`, with explicit lifecycle state and repeatable migrations.
+**Goal:** One SQLite database at `data/app.db`, with explicit lifecycle state and repeatable fresh-schema bootstrap.
 
 ### Completed
 
 - `data/app.db` is the only canonical database.
-- Status migration and URL uniqueness migration are applied at `f6c1f6797747`.
+- `Vacancy` has nullable `submit_email` and `submit_url`, plus a DB-level non-blank contact `CHECK`; legacy `credentials` and `url` fields are removed.
+- `submit_url` is unique when present; email-only vacancies are supported.
 - Old empty `resources/app.db` is removed.
-- Alembic configuration points to `data/app.db`.
+- Alembic configuration, revisions, and dependency are removed; SQLAlchemy `init_db()` creates a fresh schema.
 
 ### Remaining
 
@@ -145,10 +155,11 @@
 
 ### Completed
 
-- Compose declares `cloak-browser`, `linkedin-bot`, `antigravity-cli`, and optional `sqlite-ui` debug profile.
-- `linkedin-bot` default command runs the complete `main.py` pipeline.
+- Compose declares `cloak-browser`, production-only commented `linkedin-bot`, `antigravity-cli`, and `sqlite-ui`.
+- `linkedin-bot` default command remains the complete `main.py` pipeline but is not started during laptop development.
 - Database and session state are runtime volumes, not copied into the application image.
-- `sqlite-ui` is read-only and enabled only via the `debug` profile.
+- `sqlite-ui` mounts `data/` writable so its single-row and bulk delete UI work.
+- `antigravity-cli` has a persistent named `/workspace` volume for documented agent artifacts and reusable workspace skills.
 
 ### Remaining
 
