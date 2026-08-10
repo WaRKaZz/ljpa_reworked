@@ -1,0 +1,14 @@
+generate_job_search_queries_task:
+  description: |
+    Analyze the candidate profile below and produce a focused JobSpy search plan.
+
+    Candidate profile:
+    ---
+    {profile_text}
+    ---
+
+    Select roles, technical keywords, locations, job boards, and result counts only when supported by the profile. Prefer specific role-and-skill queries over generic terms. Cover distinct, realistic search angles; do not create near-duplicate queries.
+
+    Return only data that validates against JobSearchQuerySet. Set profile_sha256 exactly to {profile_sha256}. Each query must use one supported site_name and contain a non-empty search_term and location. Do not include explanations, markdown, salary claims, credentials not present in the profile, application instructions, URLs, or lifecycle/status fields.
+  expected_output: "A JobSearchQuerySet JSON object only."
+  agent: query_strategist

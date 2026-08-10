@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, StringConstraints
 
@@ -93,3 +93,20 @@ class ProcessedPost(BaseModel):
         default=False,
         description="verifies if provided post was job vacancy or not",
     )
+
+
+class JobSearchQuery(BaseModel):
+    search_term: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)
+    ]
+    location: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)
+    ]
+    site_name: Literal["linkedin", "indeed", "glassdoor", "google", "zip_recruiter"]
+    results_wanted: Annotated[int, Field(ge=1, le=50)] = 25
+
+
+class JobSearchQuerySet(BaseModel):
+    profile_sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+    queries: Annotated[list[JobSearchQuery], Field(min_length=1, max_length=12)]
+
