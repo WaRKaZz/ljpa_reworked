@@ -180,15 +180,86 @@ def test_format_numeric_layout_feedback_branches():
 
     err_short = "Page 1 (non-final) character count (2800) is outside required range [3300, 3475]"
     res_short = _format_numeric_layout_feedback(err_short)
-    assert "SHORT by 500 characters" in res_short
+    assert "expand the resume text by approximately 587 characters" in res_short
 
     err_long = "Page 1 (non-final) character count (3600) is outside required range [3300, 3475]"
     res_long = _format_numeric_layout_feedback(err_long)
-    assert "EXCEEDS the max 3475 by 125 characters" in res_long
+    assert "trim the resume text by approximately 213 characters" in res_long
 
     err_final = "Page 2 (final) character count (1200) is less than minimum 1400 characters"
     res_final = _format_numeric_layout_feedback(err_final)
-    assert "SHORT by 200 characters" in res_final
+    assert "add approximately 300 characters" in res_final
 
     err_other = "Some generic error"
     assert _format_numeric_layout_feedback(err_other) == err_other
+
+
+def test_save_resume_cleans_up_on_create_resume_error(tmp_path):
+    from ljpa_reworked.models.database_models import Vacancy
+    from ljpa_reworked.workflow import save_resume
+
+    db = MagicMock()
+    mock_vacancy = MagicMock(spec=Vacancy)
+    mock_vacancy.id = 99
+
+    dummy_resume = _make_dummy_resume()
+    temp_pdf = tmp_path / "pre_rendered_db_fail.pdf"
+    temp_pdf.write_bytes(b"%PDF-1.4 dummy content")
+
+    with patch(
+        "ljpa_reworked.workflow.create_resume", side_effect=RuntimeError("DB fail")
+    ):
+        with pytest.raises(RuntimeError) as exc_info:
+            save_resume(dummy_resume, mock_vacancy, db, temp_pdf_path=str(temp_pdf))
+
+        assert "DB fail" in str(exc_info.value)
+        assert not temp_pdf.exists()
+
+
+def test_save_resume_and_retry_oserror_cleanup_branches():
+    from ljpa_reworked.models.database_models import Vacancy
+    from ljpa_reworked.workflow import save_resume
+
+    db = MagicMock()
+    mock_vacancy = MagicMock(spec=Vacancy)
+    mock_vacancy.id = 99
+    dummy_resume = _make_dummy_resume()
+
+    with patch("shutil.copy", side_effect=RuntimeError("copy error")):
+        with patch("os.path.exists", return_value=True):
+            with patch("os.remove", side_effect=OSError("remove error")):
+                with pytest.raises(RuntimeError) as exc_info:
+                    save_resume(dummy_resume, mock_vacancy, db, temp_pdf_path="/tmp/fake.pdf")
+                assert "copy error" in str(exc_info.value)
+
+    with (
+        patch("ljpa_reworked.crew_workflow.crewai_generate_resume", return_value=dummy_resume),
+        patch("ljpa_reworked.crew_workflow.render_resume_crewai_to_pdf", side_effect=RuntimeError("render fail")),
+        patch("os.path.exists", return_value=True),
+        patch("os.remove", side_effect=OSError("remove fail")),
+    ):
+        with pytest.raises(RuntimeError) as exc_info:
+            crewai_generate_resume_with_retry(mock_vacancy, MagicMock())
+        assert "render fail" in str(exc_info.value)
+
+
+def test_render_resume_crewai_to_pdf_layout_validation_oserror_handling(tmp_path):
+    from ljpa_reworked.services.rendercv_helper import render_resume_crewai_to_pdf
+
+    dummy_resume = _make_dummy_resume()
+    out_pdf = tmp_path / "layout_fail.pdf"
+
+    with patch(
+        "ljpa_reworked.services.rendercv_helper.convert_resume_crewai_to_rendercv_input",
+        return_value={},
+    ):
+        with patch("subprocess.run", return_value=MagicMock(returncode=0)):
+            with patch("os.path.exists", return_value=True):
+                with patch(
+                    "ljpa_reworked.services.rendercv_helper.validate_pdf_page_layout",
+                    return_value=(False, "Page 1 layout error"),
+                ):
+                    with patch("os.remove", side_effect=OSError("remove error")):
+                        with pytest.raises(RuntimeError) as exc_info:
+                            render_resume_crewai_to_pdf(dummy_resume, str(out_pdf))
+                        assert "Page 1 layout error" in str(exc_info.value)

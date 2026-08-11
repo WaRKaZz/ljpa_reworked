@@ -154,22 +154,33 @@ def crewai_generate_resume(
         "certifications(title,issuer,date,url).\n"
         "SCHEMA LIMITS: summary <= 500 visible characters. skills is an array of objects; each object has title as a string and elements as a JSON array: [\"TIA Portal\", \"WinCC\"]. Never use a comma-separated string for elements.\n"
         "Write sections in this order: Summary, Skills, Experience, Education, Certifications, Projects. "
-        "Create several skill categories. Every experience has exactly 4 detailed bullets. "
-        "Every project has exactly 3 or 4 detailed highlights.\n"
-        "PAGE REQUIREMENT: RenderCV does not split an entry. Each non-final page must contain 3300-3475 visible characters; "
-        "the last page must contain at least 1400. Count all text you write. To fill a short page, lengthen the summary, "
-        "skill categories, and bullets before the next entry moves to a new page.\n"
+        "Create 3 skill categories with 4-5 elements per category. Every experience has 3 concise, highly relevant bullets. "
+        "Every project has 2-3 detailed highlights.\n"
+        "PAGE REQUIREMENT: RenderCV does not split an entry. Target overall length ~3350-3400 characters. "
+        "If a resume spans multiple pages, each non-final page must contain 3300-3475 visible characters; "
+        "the final page must contain at least 1400. If 1 page, it must contain 1400-3475 characters.\n"
         "Use candidate, vacancy, and general industrial-automation knowledge freely. Add ATS keywords, credible technical "
         "responsibilities, implementation details, and outcomes."
     )
+    feedback_block = ""
+    if layout_feedback:
+        feedback_block = (
+            f"!!! CRITICAL LAYOUT RETRY CORRECTION REQUIRED !!!\n"
+            f"{layout_feedback}\n"
+            f"MUST satisfy the numeric character addition/trimming requirement specified above.\n"
+            f"==================================================\n\n"
+        )
+
     user_prompt = (
+        f"{feedback_block}"
         f"Vacancy title: {vacancy.title}\n"
         f"Vacancy: {vacancy.text}\n"
         f"Priorities: {evaluation.prioritized_facts}\n"
         f"Required sections: {present_sections}\n"
-        f"Previous layout feedback: {layout_feedback or 'None; satisfy the page requirement on the first output.'}\n"
         f"Candidate profile:\n{profile_text}"
     )
+    if layout_feedback:
+        user_prompt += f"\n\nFINAL REMINDER: {layout_feedback}"
 
     payload = {
         "model": LLM_MODEL,
@@ -266,21 +277,22 @@ def _format_numeric_layout_feedback(raw_error: str) -> str:
     if match:
         page_num = match.group(1)
         count = int(match.group(2))
+        target_mid = 3387
         if count < 3300:
-            diff = 3300 - count
+            add_target = target_mid - count
             return (
                 f"{raw_error}\n"
-                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters, which is SHORT by {diff} characters. "
-                f"You MUST expand the output by at least {diff + 150} characters overall. "
-                f"Make summary near 500 characters, expand every experience bullet with detailed technical sentences, "
-                f"add 6-8 skill elements per category, and expand project highlights."
+                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters (SHORT of 3300 min). "
+                f"You MUST expand the resume text by approximately {add_target} characters to land near {target_mid} characters. "
+                f"Add 1 technical sentence to 2-3 experience bullets or expand skill elements."
             )
         elif count > 3475:
-            diff = count - 3475
+            trim_target = count - target_mid
             return (
                 f"{raw_error}\n"
-                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters, which EXCEEDS the max 3475 by {diff} characters. "
-                f"You MUST trim text by at least {diff + 50} characters."
+                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters (EXCEEDS 3475 max). "
+                f"You MUST trim the resume text by approximately {trim_target} characters to land near {target_mid} characters. "
+                f"Slightly shorten 2-3 experience bullets."
             )
 
     match_final = re.search(
@@ -290,11 +302,11 @@ def _format_numeric_layout_feedback(raw_error: str) -> str:
     if match_final:
         page_num = match_final.group(1)
         count = int(match_final.group(2))
-        diff = 1400 - count
+        add_target = 1500 - count
         return (
             f"{raw_error}\n"
-            f"NUMERIC CORRECTION REQUIRED: Final Page {page_num} has {count} characters, SHORT by {diff} characters. "
-            f"You MUST add at least {diff + 150} characters across sections."
+            f"NUMERIC CORRECTION REQUIRED: Final Page {page_num} has {count} characters (SHORT of 1400 min). "
+            f"You MUST add approximately {add_target} characters across experience/project sections."
         )
 
     return raw_error
@@ -313,7 +325,6 @@ def crewai_generate_resume_with_retry(
     max_attempts = max_retries + 1
     layout_feedback = ""
     last_error: Exception | None = None
-    created_pdf_paths: list[str] = []
 
     while attempts < max_attempts:
         attempts += 1
@@ -321,7 +332,6 @@ def crewai_generate_resume_with_retry(
             prefix=f"rendercv_attempt{attempts}_", suffix=".pdf", delete=False
         ) as tmp:
             temp_pdf_path = tmp.name
-        created_pdf_paths.append(temp_pdf_path)
 
         try:
             resume = crewai_generate_resume(
@@ -330,12 +340,6 @@ def crewai_generate_resume_with_retry(
                 layout_feedback=layout_feedback,
             )
             render_resume_crewai_to_pdf(resume, temp_pdf_path)
-            for path_to_clean in created_pdf_paths:
-                if path_to_clean != temp_pdf_path and os.path.exists(path_to_clean):
-                    try:
-                        os.remove(path_to_clean)
-                    except OSError:
-                        pass
             return resume, temp_pdf_path
         except Exception as err:
             last_error = err
@@ -348,10 +352,4 @@ def crewai_generate_resume_with_retry(
             if attempts < max_attempts:
                 layout_feedback = _format_numeric_layout_feedback(str(err))
             else:
-                for path_to_clean in created_pdf_paths:
-                    if os.path.exists(path_to_clean):
-                        try:
-                            os.remove(path_to_clean)
-                        except OSError:
-                            pass
                 raise last_error from err
