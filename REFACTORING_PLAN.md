@@ -125,11 +125,14 @@
 3. **4D.3: Atomic page sectors and calibrated page budgets — complete / accepted by operator.** RenderCV input sets `allow_page_break_in_entries: false`, so whole entries move to the next page instead of splitting. The input order is Summary, Skills, Experience, Education, Certifications, Projects. Every non-final page is deterministically validated at 3300–3475 extracted characters and the final page at >=1400 for any page count. The resume gateway adapter carries field/schema rules, normalizes common gateway shape slips, and passes layout feedback into a retry generation. RenderCV also disables connection icons and the `Last updated` footer. Verified with the LLP Neo Stroy no-split fixture, three-page budget cases, and persisted vacancy-ID-1 PDF. Focused suite: 29 passed; Ruff, compileall, and both staged/unstaged `git diff --check` passed.
 
 
-### 4E: Resume cleanup — **not started**
+### 4E: Resume cleanup — **complete / verified by operator**
 
-1. Delete generated resumes for vacancies sent more than two months ago.
-2. Delete generated resumes that were never sent.
-3. Define and test the exact sent-state evidence before enabling cleanup: only `VacancyStatus.applied` currently indicates completed application submission, but its timestamp is absent. Require an explicit application/submission timestamp for 60-day cleanup enforcement; never delete source candidate data or submission history.
+1. Created `cleanup_resume_pdfs(db, resumes_dir, now=...)` service in `src/ljpa_reworked/services/resume_cleanup.py`.
+2. PDF files of resumes are deleted only if the vacancy lacks confirmed submission (`VacancyStatus.applied` with `applied_at`) or if `applied_at` is older than 60 days. Recent confirmed applied resumes (within 60 days) are retained.
+3. Enforced strict path safety: rejects absolute paths, path traversal (`..`), non-`.pdf` paths, and directory paths. Missing files are safely skipped without error.
+4. Database records (`Resume`, `Vacancy`, history) and candidate source data are never deleted or modified.
+5. Added unit test suite `tests/test_stage4e_resume_cleanup.py` with in-memory SQLite and `tmp_path` covering all retention, deletion, traversal, missing file, and non-PDF cases (14 passed in 4E/4B suite; Ruff, compileall, git diff checks passed).
+
 
 
 ## Stage 5: Database and models — **partially complete**
