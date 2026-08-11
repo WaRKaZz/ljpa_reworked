@@ -27,7 +27,7 @@ class ResumeGenerationCrew:
             config=self.agents_config["resume_agent"],
             llm=self.llm,
             tools=[],
-            max_execution_time=300,
+            max_execution_time=600,
         )
 
     @task
@@ -35,7 +35,7 @@ class ResumeGenerationCrew:
         return Task(
             config=self.tasks_config["resume_generation_task"],
             output_pydantic=ResumeCrewAI,
-            max_execution_time=300,
+            max_execution_time=600,
         )
 
     @crew
