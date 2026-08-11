@@ -111,26 +111,33 @@ def test_crewai_generate_resume_propagates_plan_inputs(tmp_path):
         ],
     )
 
-    mock_crew = MagicMock()
-    mock_crew.usage_metrics.successful_requests = 1
-    mock_crew_output = MagicMock()
-    mock_task_output = MagicMock()
-    mock_task_output.pydantic = mock_resume
-    mock_crew_output.tasks_output = [mock_task_output]
-    mock_crew.kickoff.return_value = mock_crew_output
+    import json
+
+    mock_response = MagicMock()
+    mock_response.read.return_value = json.dumps({
+        "choices": [{"message": {"content": mock_resume.model_dump_json()}}]
+    }).encode("utf-8")
+    mock_response.__enter__.return_value = mock_response
+
+    captured_requests = []
+
+    def mock_urlopen(req, timeout=None):
+        captured_requests.append((req, timeout))
+        return mock_response
 
     with patch("ljpa_reworked.crew_workflow.PROFILE_FILE_PATH", str(test_profile_path)), \
-         patch("ljpa_reworked.crew_workflow.ResumeGenerationCrew") as mock_crew_cls:
-        mock_crew_cls.return_value.crew.return_value = mock_crew
+         patch("urllib.request.urlopen", side_effect=mock_urlopen):
 
         res = crewai_generate_resume(mock_vacancy, mock_eval)
 
-        assert res == mock_resume
-        mock_crew.kickoff.assert_called_once()
-        inputs = mock_crew.kickoff.call_args[1]["inputs"]
-        assert inputs["required_profile_sections"] == ["personal_info", "summary", "experience", "education", "skills"]
-        assert inputs["prioritized_facts"] == ["Python 5+ yrs", "RenderCV integration"]
-        assert inputs["missing_mandatory_facts"] == []
+        assert res.personal_info.name == mock_resume.personal_info.name
+        assert len(captured_requests) == 1
+        req, timeout = captured_requests[0]
+        assert timeout == 90.0
+        payload = json.loads(req.data.decode("utf-8"))
+        user_msg = payload["messages"][1]["content"]
+        assert "Python 5+ yrs" in user_msg
+        assert "RenderCV integration" in user_msg
 
 
 def test_missing_facts_rejection():

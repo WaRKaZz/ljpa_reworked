@@ -25,6 +25,14 @@ def test_stage4c_real_smoke_evaluator_generator_render():
     Renders generated ResumeCrewAI to disposable PDF under /tmp, verifies non-zero size, and cleans up.
     Does not print profile, raw output, secrets, or PDF text.
     """
+    synthetic_profile = (
+        "## General Information\nName: Test Candidate\nEmail: candidate@example.com\nPhone: +1 555-0100\nLocation: NY\n"
+        "## Summary\nExperienced Python Backend Engineer with microservices background.\n"
+        "## Experience\n- Role: Senior Developer at Tech Corp (2020-Present)\n  Highlights: Built FastAPI microservices, optimized queries, Docker deployment.\n"
+        "## Education\n- BS CS, Tech University (2016-2020)\n"
+        "## Skills\n- Python, FastAPI, PostgreSQL, Docker, CI/CD"
+    )
+
     synthetic_inputs = {
         "title": "Senior Python Backend Engineer",
         "text": (
@@ -34,6 +42,7 @@ def test_stage4c_real_smoke_evaluator_generator_render():
         "submit_email": "jobs@example.com",
         "submit_url": "https://example.com/careers/python-engineer",
         "linkedin_url": "https://linkedin.com/in/testcandidate",
+        "candidate_profile": synthetic_profile,
     }
 
     start_eval = time.monotonic()
@@ -48,19 +57,20 @@ def test_stage4c_real_smoke_evaluator_generator_render():
     assert bool(eval_pydantic.summary)
     assert eval_time < 90.0, f"Evaluator took too long: {eval_time:.2f}s"
 
-    gen_inputs = {
-        **synthetic_inputs,
-        "rating": eval_pydantic.rating,
-        "summary": eval_pydantic.summary,
-    }
+    from unittest.mock import MagicMock, patch
+    from ljpa_reworked.crew_workflow import crewai_generate_resume
+
+    mock_vacancy = MagicMock()
+    mock_vacancy.title = synthetic_inputs["title"]
+    mock_vacancy.text = synthetic_inputs["text"]
+    mock_vacancy.submit_email = synthetic_inputs["submit_email"]
+    mock_vacancy.submit_url = synthetic_inputs["submit_url"]
 
     start_gen = time.monotonic()
-    gen_crew_instance = ResumeGenerationCrew()
-    gen_result = gen_crew_instance.crew().kickoff(inputs=gen_inputs)
+    with patch("ljpa_reworked.crew_workflow.read_profile_text", return_value=synthetic_profile):
+        resume_pydantic = crewai_generate_resume(mock_vacancy, eval_pydantic)
     gen_time = time.monotonic() - start_gen
 
-    assert len(gen_result.tasks_output) > 0
-    resume_pydantic = gen_result.tasks_output[0].pydantic
     assert isinstance(resume_pydantic, ResumeCrewAI)
     assert bool(resume_pydantic.personal_info.name)
     assert len(resume_pydantic.experience) > 0
