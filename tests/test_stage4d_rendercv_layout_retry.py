@@ -115,6 +115,54 @@ def test_retry_orchestration_first_fails_layout_second_succeeds():
         assert layout_err_msg in call2_kwargs.get("layout_feedback", "")
 
 
+def test_retry_orchestration_passes_prior_resume_json_on_second_call():
+    import json
+    mock_vacancy = MagicMock()
+    mock_eval = MagicMock(spec=BasicEvaluationCrewAI)
+    resume1 = _make_dummy_resume()
+    resume1.summary = "First candidate summary text"
+    resume2 = _make_dummy_resume()
+    resume2.summary = "Second candidate summary text"
+
+    layout_err_msg = (
+        "RenderCV output failed page layout validation: "
+        "Page 1 (non-final) character count (2827) is outside required range [3300, 3475]"
+    )
+
+    def mock_render(resume, path):
+        if mock_render.call_count == 1:
+            raise RuntimeError(layout_err_msg)
+        return path
+
+    mock_render.call_count = 0
+
+    def mock_render_wrapper(resume, path):
+        mock_render.call_count += 1
+        return mock_render(resume, path)
+
+    with (
+        patch(
+            "ljpa_reworked.crew_workflow.crewai_generate_resume",
+            side_effect=[resume1, resume2],
+        ) as mock_gen,
+        patch(
+            "ljpa_reworked.crew_workflow.render_resume_crewai_to_pdf",
+            side_effect=mock_render_wrapper,
+        ),
+    ):
+        resume, pdf_path = crewai_generate_resume_with_retry(mock_vacancy, mock_eval)
+
+        assert resume == resume2
+        assert mock_gen.call_count == 2
+        call1_kwargs = mock_gen.call_args_list[0].kwargs
+        call2_kwargs = mock_gen.call_args_list[1].kwargs
+
+        assert call1_kwargs.get("prior_resume_json", "") == ""
+        expected_json = json.dumps(resume1.model_dump(mode="json"), ensure_ascii=False)
+        assert call2_kwargs.get("prior_resume_json") == expected_json
+
+
+
 def test_retry_orchestration_both_fail_cleans_files_and_raises(tmp_path):
     mock_vacancy = MagicMock()
     mock_eval = MagicMock(spec=BasicEvaluationCrewAI)

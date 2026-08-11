@@ -98,6 +98,75 @@ def test_crewai_generate_resume_gateway_adapter_payload_and_success(tmp_path):
         assert "Page 1 had 3235 characters" in payload["messages"][1]["content"]
 
 
+def test_crewai_generate_resume_includes_prior_resume_json_in_user_prompt(tmp_path):
+    """Verify crewai_generate_resume formats prior_resume_json in a labelled block in user prompt."""
+    synthetic_profile = (
+        "## Personal Info\n- Name: Test User\n- Email: test@example.com\n- Phone: +1 555-0100\n- Location: NY\n"
+        "## Summary\nBackend Engineer\n"
+        "## Experience\n- Role: Dev at Corp (2020-Present)\n  Highlights: High throughput APIs, DB tuning, CI/CD.\n"
+        "## Education\n- BS CS, University (2016-2020)\n"
+        "## Skills\n- Python, FastAPI, SQL"
+    )
+    test_profile_path = tmp_path / "profile.md"
+    test_profile_path.write_text(synthetic_profile, encoding="utf-8")
+
+    mock_vacancy = MagicMock()
+    mock_vacancy.text = "Python Backend Vacancy"
+    mock_vacancy.title = "Backend Engineer"
+
+    mock_eval = BasicEvaluationCrewAI(summary="Qualified candidate", rating=90)
+
+    dummy_resume = ResumeCrewAI(
+        personal_info=PersonalInfoCrewAI(
+            name="Test User",
+            email="test@example.com",
+            phone="+1 555-0100",
+            address="123 Main St",
+            location="NY",
+        ),
+        summary="Previous summary text",
+        education=[EducationCrewAI(course="BS CS", institution="University", location="NY", start_date="2016", end_date="2020")],
+        experience=[ExperienceCrewAI(title="Dev", company="Corp", location="NY", start_date="2020", end_date="Present", description=["Bullet 1", "Bullet 2", "Bullet 3"])],
+        skills=[SkillCrewAI(title="Languages", elements=["Python"])],
+    )
+
+    prior_json_str = json.dumps(dummy_resume.model_dump(mode="json"), ensure_ascii=False)
+
+    mock_response = MagicMock()
+    mock_response.read.return_value = json.dumps({
+        "choices": [{"message": {"content": json.dumps(dummy_resume.model_dump())}}]
+    }).encode("utf-8")
+    mock_response.__enter__.return_value = mock_response
+
+    captured_requests = []
+
+    def mock_urlopen(req, timeout=None):
+        captured_requests.append((req, timeout))
+        return mock_response
+
+    with patch("ljpa_reworked.crew_workflow.PROFILE_FILE_PATH", str(test_profile_path)), \
+         patch("urllib.request.urlopen", side_effect=mock_urlopen):
+
+        res = crewai_generate_resume(
+            mock_vacancy,
+            mock_eval,
+            layout_feedback="Numeric layout feedback here",
+            prior_resume_json=prior_json_str,
+        )
+
+        assert isinstance(res, ResumeCrewAI)
+        assert len(captured_requests) == 1
+        payload = json.loads(captured_requests[0][0].data.decode("utf-8"))
+        user_prompt = payload["messages"][1]["content"]
+
+        assert "PREVIOUS RESUME JSON" in user_prompt
+        assert prior_json_str in user_prompt
+        assert "Preserve all its verified facts" in user_prompt or "preserve its verified facts" in user_prompt.lower()
+        assert "Modify only enough allowed existing text" in user_prompt or "modify only enough" in user_prompt.lower()
+        assert "Return a complete replacement raw JSON object" in user_prompt or "return a complete replacement" in user_prompt.lower()
+
+
+
 def test_crewai_generate_resume_raises_immediately_on_timeout(tmp_path):
     """Verify crewai_generate_resume fails fast on timeout without retry loops."""
     synthetic_profile = (

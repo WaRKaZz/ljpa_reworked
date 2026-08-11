@@ -139,6 +139,7 @@ def crewai_generate_resume(
     evaluation: BasicEvaluationCrewAI,
     *,
     layout_feedback: str = "",
+    prior_resume_json: str = "",
 ) -> ResumeCrewAI:
     """Generate a JSON resume through the gateway, optionally correcting a prior layout miss."""
     profile_text = read_profile_text(PROFILE_FILE_PATH)
@@ -170,9 +171,22 @@ def crewai_generate_resume(
             f"MUST satisfy the numeric character addition/trimming requirement specified above.\n"
             f"==================================================\n\n"
         )
+    prior_resume_block = ""
+    if prior_resume_json:
+        prior_resume_block = (
+            f"PREVIOUS RESUME JSON:\n"
+            f"```json\n{prior_resume_json}\n```\n"
+            f"INSTRUCTIONS FOR PREVIOUS RESUME:\n"
+            f"This is the previous generated resume JSON object that failed layout constraints.\n"
+            f"Preserve all its verified facts, candidate profile details, schema, and section order.\n"
+            f"Do not invent fake history or restructure unchanged sections.\n"
+            f"Modify only enough allowed existing text in this JSON to meet the numeric character layout correction above.\n"
+            f"Return a complete replacement raw JSON object.\n\n"
+        )
 
     user_prompt = (
         f"{feedback_block}"
+        f"{prior_resume_block}"
         f"Vacancy title: {vacancy.title}\n"
         f"Vacancy: {vacancy.text}\n"
         f"Priorities: {evaluation.prioritized_facts}\n"
@@ -339,7 +353,9 @@ def crewai_generate_resume_with_retry(
     attempts = 0
     max_attempts = max_retries + 1
     layout_feedback = ""
+    prior_resume_json = ""
     last_error: Exception | None = None
+    last_parsed_resume: ResumeCrewAI | None = None
 
     while attempts < max_attempts:
         attempts += 1
@@ -353,7 +369,9 @@ def crewai_generate_resume_with_retry(
                 vacancy=vacancy,
                 evaluation=evaluation,
                 layout_feedback=layout_feedback,
+                prior_resume_json=prior_resume_json,
             )
+            last_parsed_resume = resume
             render_resume_crewai_to_pdf(resume, temp_pdf_path)
             return resume, temp_pdf_path
         except Exception as err:
@@ -366,5 +384,9 @@ def crewai_generate_resume_with_retry(
 
             if attempts < max_attempts:
                 layout_feedback = _format_numeric_layout_feedback(str(err))
+                if last_parsed_resume is not None:
+                    prior_resume_json = json.dumps(
+                        last_parsed_resume.model_dump(mode="json"), ensure_ascii=False
+                    )
             else:
                 raise last_error from err
