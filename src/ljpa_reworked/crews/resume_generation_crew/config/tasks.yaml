@@ -5,7 +5,11 @@ resume_generation_task:
     Vacancy: {text}
     LinkedIn: {linkedin_url}
 
-    Extract personal_info, summary, education, experience, skills, projects, and certifications from candidate profile.
+    Candidate profile:
+    {candidate_profile}
+
+    Extract and cover every applicable verified profile section: personal_info, summary, experience, education, skills, projects, and certifications directly from the candidate profile supplied above.
+    Tailor wording and ordering to the vacancy, but MUST NOT invent jobs, employers, dates, qualifications, skills, certifications, achievements, or contact data not present in the candidate profile.
     Keep text concise (2-sentence summary, 1-2 highlights per experience/project).
     Do not access external URLs. Set linkedin_url literally in personal_info if provided.
   expected_output: >

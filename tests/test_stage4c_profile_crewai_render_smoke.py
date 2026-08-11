@@ -57,23 +57,19 @@ def test_generation_crew_yaml_prompts_have_no_scraping_instructions():
         assert term not in tasks_content, f"Resume generation tasks.yaml contains prohibited term '{term}'"
 
 
-def test_crewai_classes_use_text_file_knowledge_source_and_no_scrape_tool():
-    """Hermetic test: Verify crews use TextFileKnowledgeSource pointing to profile.md, and no ScrapeWebsiteTool."""
-    from crewai.knowledge.source.text_file_knowledge_source import (
-        TextFileKnowledgeSource,
-    )
-
+def test_crewai_classes_have_no_scrape_tool_or_rag_knowledge():
+    """Hermetic test: Verify crews have no tools and no profile RAG knowledge source."""
     with patch("ljpa_reworked.crews.resume_evaluation_crew.resume_evaluation_crew.create_llm", return_value=MagicMock()):
         eval_crew_instance = ResumeEvaluationCrew()
         agent_eval = eval_crew_instance.resume_evaluation_agent()
         assert len(agent_eval.tools) == 0, f"Evaluator agent must have no tools, got: {agent_eval.tools}"
-        assert isinstance(eval_crew_instance.profile_md, TextFileKnowledgeSource)
+        assert not hasattr(eval_crew_instance, "profile_md")
 
     with patch("ljpa_reworked.crews.resume_generation_crew.resume_generation_crew.create_llm", return_value=MagicMock()):
         gen_crew_instance = ResumeGenerationCrew()
         agent_gen = gen_crew_instance.resume_agent()
         assert len(agent_gen.tools) == 0, f"Resume agent must have no tools, got: {agent_gen.tools}"
-        assert isinstance(gen_crew_instance.profile_md, TextFileKnowledgeSource)
+        assert not hasattr(gen_crew_instance, "profile_md")
 
 
 def test_convert_resume_crewai_to_rendercv_input():

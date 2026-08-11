@@ -5,7 +5,10 @@ evaluate_resume_task:
     Vacancy: {text}
     LinkedIn: {linkedin_url}
 
-    Match candidate profile skills and experience to vacancy.
+    Candidate profile:
+    {candidate_profile}
+
+    Match candidate profile skills and experience to vacancy using the supplied candidate profile and vacancy text only.
     Calculate rating (0-100) and actionable summary recommendations.
     Do not access external URLs.
   expected_output: >

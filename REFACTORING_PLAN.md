@@ -121,7 +121,7 @@
 ### 4D: RenderCV output and one operator-reviewed PDF — **in progress**
 
 1. **4D.1: Production persistence path — complete / verified by operator.** Replaced legacy `ResumeGenerator` call in `save_resume()` with `render_resume_crewai_to_pdf()`. Saves only a collision-safe relative filename under `RESOURCES_DIR/resumes/` and persists it with `Resume.rendered_at`. Atomically cleans up the generated PDF if rendering or DB creation fails and re-raises exceptions. Verified with hermetic unit tests using in-memory SQLite (113 passed, 78.95% coverage).
-2. **4D.2: One operator-reviewed PDF — in progress / correction pending.** The first PDF was rejected because profile context arrived through RAG and was incomplete. First replace profile RAG with direct full-file task input in both resume crews and restore the pre-render DB from the verified backup, deleting only the rejected PDF. Then, in a separate authorized run, generate one replacement PDF for the same vacancy and retain it for Ivan's visual acceptance. Do not submit, email, message, collect LinkedIn, run JobSpy, or mark complete before explicit acceptance.
+2. **4D.2: One operator-reviewed PDF — in progress / profile context corrected.** Replaced profile RAG/Knowledge with direct full-file `candidate_profile` task inputs in both resume crews. Restored canonical `data/app.db` from verified backup `data/app.db.stage-04d2-20260811T034454Z.bak` (passed SHA-256 `3e64a77eaa60a8b7c4cb4bb40b27a5969828b5ed212e92a4837e814cc8e1b3a1` and integrity check; verified 12 vacancies, 0 resumes) and removed sole rejected PDF `resources/resumes/resume_1_8ff50b49.pdf`. Awaiting separate authorized replacement PDF generation for Ivan's visual acceptance.
 
 ### 4E: Resume cleanup — **not started**
 

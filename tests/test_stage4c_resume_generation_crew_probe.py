@@ -19,6 +19,15 @@ def test_resume_generation_crew_finite_probe():
         "linkedin_url": "https://linkedin.com/in/testcandidate",
         "rating": 85,
         "summary": "Strong candidate with extensive Python and backend architecture experience.",
+        "candidate_profile": (
+            "# Candidate Profile\n\n## Personal Info\n- Name: Test Candidate\n- Email: candidate@example.com\n"
+            "- Phone: +1 555-0100\n- Location: New York, USA\n\n## Summary\n"
+            "Experienced Python Backend Engineer with 6 years experience in microservices.\n\n"
+            "## Experience\n- Role: Senior Python Developer at Tech Corp (2020-Present)\n"
+            "  Highlights: Built FastAPI microservices, optimized PostgreSQL queries.\n\n"
+            "## Education\n- BS Computer Science, Tech University (2016-2020)\n\n"
+            "## Skills\n- Python, FastAPI, PostgreSQL, Docker, CI/CD"
+        ),
     }
 
     start_time = time.monotonic()
