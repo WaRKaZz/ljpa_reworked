@@ -56,9 +56,12 @@ def test_crewai_generate_resume_gateway_adapter_payload_and_success(tmp_path):
         certifications=[],
     )
 
+    gateway_resume = valid_resume.model_dump()
+    gateway_resume["summary"] = "S" * 501
+    gateway_resume["skills"][0]["elements"] = "Python, FastAPI"
     mock_response = MagicMock()
     mock_response.read.return_value = json.dumps({
-        "choices": [{"message": {"content": valid_resume.model_dump_json()}}]
+        "choices": [{"message": {"content": json.dumps(gateway_resume)}}]
     }).encode("utf-8")
     mock_response.__enter__.return_value = mock_response
 
@@ -71,19 +74,28 @@ def test_crewai_generate_resume_gateway_adapter_payload_and_success(tmp_path):
     with patch("ljpa_reworked.crew_workflow.PROFILE_FILE_PATH", str(test_profile_path)), \
          patch("urllib.request.urlopen", side_effect=mock_urlopen):
 
-        res = crewai_generate_resume(mock_vacancy, mock_eval)
+        res = crewai_generate_resume(
+            mock_vacancy,
+            mock_eval,
+            layout_feedback="Page 1 had 3235 characters; add at least 65 before page 2.",
+        )
 
         assert isinstance(res, ResumeCrewAI)
         assert res.personal_info.name == "Test User"
+        assert len(res.summary) == 500
+        assert res.skills[0].elements == ["Python", "FastAPI"]
         assert len(captured_requests) == 1
 
         req, timeout = captured_requests[0]
-        assert timeout == 90.0
+        assert timeout == 120.0
         payload = json.loads(req.data.decode("utf-8"))
         assert payload["max_tokens"] == 4096
         assert payload["stream"] is False
         assert len(payload["messages"]) >= 2
         assert "messages" in payload
+        assert "summary <= 500 visible characters" in payload["messages"][0]["content"]
+        assert 'elements as a JSON array: ["TIA Portal", "WinCC"]' in payload["messages"][0]["content"]
+        assert "Page 1 had 3235 characters" in payload["messages"][1]["content"]
 
 
 def test_crewai_generate_resume_raises_immediately_on_timeout(tmp_path):

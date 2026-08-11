@@ -6,9 +6,6 @@ import pytest
 from ljpa_reworked.crews.resume_evaluation_crew.resume_evaluation_crew import (
     ResumeEvaluationCrew,
 )
-from ljpa_reworked.crews.resume_generation_crew.resume_generation_crew import (
-    ResumeGenerationCrew,
-)
 from ljpa_reworked.models.crewai_pydantic_models import (
     BasicEvaluationCrewAI,
     ResumeCrewAI,
@@ -26,11 +23,26 @@ def test_stage4c_real_smoke_evaluator_generator_render():
     Does not print profile, raw output, secrets, or PDF text.
     """
     synthetic_profile = (
-        "## General Information\nName: Test Candidate\nEmail: candidate@example.com\nPhone: +1 555-0100\nLocation: NY\n"
-        "## Summary\nExperienced Python Backend Engineer with microservices background.\n"
-        "## Experience\n- Role: Senior Developer at Tech Corp (2020-Present)\n  Highlights: Built FastAPI microservices, optimized queries, Docker deployment.\n"
-        "## Education\n- BS CS, Tech University (2016-2020)\n"
-        "## Skills\n- Python, FastAPI, PostgreSQL, Docker, CI/CD"
+        "## General Information\nName: Test Candidate\nEmail: candidate@example.com\nPhone: +1 555-0100\nLocation: New York, NY\n"
+        "Target Title: Senior Python Backend & Systems Engineer\n\n"
+        "## Summary\n"
+        "Senior Backend Engineer with 8+ years of experience designing, building, and deploying high-throughput microservice architectures, "
+        "REST APIs, asynchronous task processing pipelines, and relational database schemas using Python, FastAPI, PostgreSQL, Docker, and Kubernetes.\n\n"
+        "## Experience\n"
+        "- Role: Senior Backend Engineer at Enterprise Tech Corp (2021-Present, New York, NY)\n"
+        "  Highlights: Designed and implemented high-volume microservices using Python and FastAPI handling 10M+ daily events. "
+        "Engineered async Celery and Redis queuing pipelines that reduced API response latency by 45%. "
+        "Optimized complex PostgreSQL query execution plans and database indexes.\n"
+        "- Role: Software Engineer at Cloud Systems Inc (2017-2021, Boston, MA)\n"
+        "  Highlights: Built RESTful web APIs and OAuth2 authentication services using Python and Flask. "
+        "Automated multi-stage Docker container builds and CI/CD pipelines under GitHub Actions.\n\n"
+        "## Education\n"
+        "- Degree: B.S. Computer Science, Massachusetts Institute of Technology (2013-2017)\n\n"
+        "## Skills\n"
+        "- Languages & Frameworks: Python, FastAPI, Flask, Asyncio, SQL, TypeScript\n"
+        "- Databases & Infrastructure: PostgreSQL, Redis, Docker, Podman, Kubernetes, CI/CD, Linux\n\n"
+        "## Certifications\n"
+        "- Vendor: AWS — AWS Certified Solutions Architect - Associate (2022)\n"
     )
 
     synthetic_inputs = {
@@ -58,6 +70,7 @@ def test_stage4c_real_smoke_evaluator_generator_render():
     assert eval_time < 90.0, f"Evaluator took too long: {eval_time:.2f}s"
 
     from unittest.mock import MagicMock, patch
+
     from ljpa_reworked.crew_workflow import crewai_generate_resume
 
     mock_vacancy = MagicMock()
@@ -67,14 +80,16 @@ def test_stage4c_real_smoke_evaluator_generator_render():
     mock_vacancy.submit_url = synthetic_inputs["submit_url"]
 
     start_gen = time.monotonic()
-    with patch("ljpa_reworked.crew_workflow.read_profile_text", return_value=synthetic_profile):
+    with patch(
+        "ljpa_reworked.crew_workflow.read_profile_text", return_value=synthetic_profile
+    ):
         resume_pydantic = crewai_generate_resume(mock_vacancy, eval_pydantic)
     gen_time = time.monotonic() - start_gen
 
     assert isinstance(resume_pydantic, ResumeCrewAI)
     assert bool(resume_pydantic.personal_info.name)
     assert len(resume_pydantic.experience) > 0
-    assert gen_time < 90.0, f"Generator took too long: {gen_time:.2f}s"
+    assert gen_time < 180.0, f"Generator took too long: {gen_time:.2f}s"
 
     out_pdf = f"/tmp/stage4c_smoke_resume_{int(time.time())}.pdf"
     if os.path.exists(out_pdf):
@@ -88,4 +103,6 @@ def test_stage4c_real_smoke_evaluator_generator_render():
     finally:
         if os.path.exists(out_pdf):
             os.remove(out_pdf)
-            assert not os.path.exists(out_pdf), "PDF file failed to delete after smoke verification"
+            assert not os.path.exists(out_pdf), (
+                "PDF file failed to delete after smoke verification"
+            )

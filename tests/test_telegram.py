@@ -36,7 +36,10 @@ def test_telegram_send_message_failure():
         with patch("ljpa_reworked.services.telegram.TELEGRAM_CHAT_ID", "12345"):
             tg = Telegram()
 
-    with patch("requests.post", side_effect=requests.exceptions.RequestException("Network error")):
+    with patch(
+        "requests.post",
+        side_effect=requests.exceptions.RequestException("Network error"),
+    ):
         res = tg.send_message("Test message")
 
     assert res is False

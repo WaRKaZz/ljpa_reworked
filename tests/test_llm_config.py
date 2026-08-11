@@ -48,7 +48,9 @@ def test_create_llm_does_not_duplicate_openai_prefix(monkeypatch):
         ),
     ],
 )
-def test_resume_related_crews_use_shared_llm_factory(monkeypatch, module_name, class_name):
+def test_resume_related_crews_use_shared_llm_factory(
+    monkeypatch, module_name, class_name
+):
     import importlib
 
     module = importlib.import_module(module_name)

@@ -357,10 +357,7 @@ def upsert_vacancy_by_url(
             existing.title = str(vacancy_data["title"])
         if "text" in vacancy_data and vacancy_data["text"] is not None:
             existing.text = str(vacancy_data["text"])
-        if (
-            email is not None
-            or "submit_email" in vacancy_data
-        ):
+        if email is not None or "submit_email" in vacancy_data:
             existing.submit_email = email
 
         if "source" in vacancy_data and vacancy_data["source"] is not None:

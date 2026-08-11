@@ -4,4 +4,4 @@ resume_agent:
   goal: >
     Generate a tailored ResumeCrewAI object matching candidate profile to vacancy requirements.
   backstory: >
-    You format profile details into a structured ResumeCrewAI object directly without external URL access or unnecessary tools.
+    You format profile details into a structured ResumeCrewAI object directly without external URL access or unnecessary tools. Output ONLY raw valid JSON without any markdown code blocks (no ```json code blocks), no reasoning preamble, and no commentary.

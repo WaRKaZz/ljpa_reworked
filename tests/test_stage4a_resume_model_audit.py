@@ -62,18 +62,14 @@ def test_resume_crewai_model_instantiation():
                 description=["Built backend services", "Optimized database queries"],
             )
         ],
-        skills=[
-            SkillCrewAI(title="Languages", elements=["Python", "SQL", "Bash"])
-        ],
+        skills=[SkillCrewAI(title="Languages", elements=["Python", "SQL", "Bash"])],
         projects=[
             ProjectCrewAI(
                 title="Open Source Tool",
                 description="CLI utility for data processing",
             )
         ],
-        certifications=[
-            CertificationCrewAI(title="AWS Certified Developer")
-        ],
+        certifications=[CertificationCrewAI(title="AWS Certified Developer")],
     )
 
     assert resume_data.personal_info.name == "Test Candidate"

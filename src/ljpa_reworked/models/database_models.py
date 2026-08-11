@@ -55,11 +55,19 @@ class Vacancy(Base):
         String(1000), nullable=True, unique=True
     )
     source: Mapped[DataSource] = mapped_column(
-        Enum(DataSource, values_callable=lambda x: [e.value for e in x], native_enum=False),
+        Enum(
+            DataSource,
+            values_callable=lambda x: [e.value for e in x],
+            native_enum=False,
+        ),
         nullable=False,
     )
     visa_status: Mapped[VisaStatus] = mapped_column(
-        Enum(VisaStatus, values_callable=lambda x: [e.value for e in x], native_enum=False),
+        Enum(
+            VisaStatus,
+            values_callable=lambda x: [e.value for e in x],
+            native_enum=False,
+        ),
         nullable=False,
     )
     created_at: Mapped[created_at]

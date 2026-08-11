@@ -58,7 +58,6 @@ CV_FILE_PATH = os.path.join(RESOURCES_DIR, CV_FILE_NAME) if CV_FILE_NAME else No
 PROFILE_FILE_PATH = os.path.join(RESOURCES_DIR, "profile.md")
 
 
-
 def create_llm(timeout: float | int | None = None, max_tokens: int | None = None):
     """Build the project LLM client for the configured OpenAI-compatible gateway."""
     from crewai import LLM

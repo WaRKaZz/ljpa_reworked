@@ -134,34 +134,40 @@ def crewai_evaluate_vacancy(vacancy: "Vacancy") -> BasicEvaluationCrewAI:
 
 
 def crewai_generate_resume(
-    vacancy: "Vacancy", evaluation: BasicEvaluationCrewAI
+    vacancy: "Vacancy",
+    evaluation: BasicEvaluationCrewAI,
+    *,
+    layout_feedback: str = "",
 ) -> ResumeCrewAI:
-    """Generate tailored resume via a narrow direct gateway adapter with bounded timeout."""
+    """Generate a JSON resume through the gateway, optionally correcting a prior layout miss."""
     profile_text = read_profile_text(PROFILE_FILE_PATH)
     present_sections = validate_profile_completeness(profile_text)
 
     url = f"{LLM_BASE_URL.rstrip('/')}/chat/completions"
     system_prompt = (
-        "You are an expert resume generator. Create a tailored candidate resume JSON matching the ResumeCrewAI schema. "
-        "Strict rules:\n"
-        "1. Extract ONLY facts from the provided profile. MUST NOT invent any jobs, employers, dates, qualifications, skills, certifications, achievements, or contact data not present in the candidate profile.\n"
-        "2. Each included experience role and project MUST have at least 3 detailed, factual bullet points in description/highlights.\n"
-        "3. Output ONLY valid JSON matching the specified Pydantic schema. No markdown code blocks, no extra commentary.\n"
-        "4. Be high-density, concise, and direct. Keep bullet points punchy (10-20 words each, 3-4 bullets per entry) for maximum impact and fast generation."
+        "Return one raw valid JSON object for ResumeCrewAI. No markdown, explanation, or extra keys. "
+        "Output fields: personal_info(name,email,phone,address,location,linkedin_url,target_title); "
+        "summary; education(course,institution,location,start_date,end_date); "
+        "experience(title,company,location,start_date,end_date,description); "
+        "skills(title,elements); projects(title,description,start_date,end_date,highlights); "
+        "certifications(title,issuer,date,url).\n"
+        "SCHEMA LIMITS: summary <= 500 visible characters. skills is an array of objects; each object has title as a string and elements as a JSON array: [\"TIA Portal\", \"WinCC\"]. Never use a comma-separated string for elements.\n"
+        "Write sections in this order: Summary, Skills, Experience, Education, Certifications, Projects. "
+        "Create several skill categories. Every experience has exactly 4 detailed bullets. "
+        "Every project has exactly 3 or 4 detailed highlights.\n"
+        "PAGE REQUIREMENT: RenderCV does not split an entry. Each non-final page must contain 3300-3475 visible characters; "
+        "the last page must contain at least 1400. Count all text you write. To fill a short page, lengthen the summary, "
+        "skill categories, and bullets before the next entry moves to a new page.\n"
+        "Use candidate, vacancy, and general industrial-automation knowledge freely. Add ATS keywords, credible technical "
+        "responsibilities, implementation details, and outcomes."
     )
     user_prompt = (
         f"Vacancy title: {vacancy.title}\n"
         f"Vacancy: {vacancy.text}\n"
         f"Priorities: {evaluation.prioritized_facts}\n"
         f"Required sections: {present_sections}\n"
-        f"Profile:\n{profile_text}\n\n"
-        "Return JSON only with exactly these keys: personal_info, summary, education, "
-        "experience, skills, projects, certifications. personal_info requires name,email,phone,"
-        "address,location and optional linkedin_url. education entries require course,institution,"
-        "location,start_date,end_date. experience entries require title,company,location,start_date,"
-        "end_date,description; description has 3-4 factual strings. skills entries require title,elements. "
-        "project entries require title,description, optional start_date/end_date, and highlights with 3-4 factual strings. "
-        "certification entries require title and optional issuer,date,url."
+        f"Previous layout feedback: {layout_feedback or 'None; satisfy the page requirement on the first output.'}\n"
+        f"Candidate profile:\n{profile_text}"
     )
 
     payload = {
@@ -186,7 +192,7 @@ def crewai_generate_resume(
         method="POST",
     )
 
-    with urllib.request.urlopen(req, timeout=90.0) as resp:
+    with urllib.request.urlopen(req, timeout=120.0) as resp:
         res_data = json.loads(resp.read().decode("utf-8"))
         raw_content = res_data["choices"][0]["message"]["content"].strip()
         if raw_content.startswith("```json"):
@@ -195,7 +201,32 @@ def crewai_generate_resume(
             raw_content = raw_content[3:]
         if raw_content.endswith("```"):
             raw_content = raw_content[:-3]
-        resume = ResumeCrewAI.model_validate_json(raw_content.strip())
+        payload_json = json.loads(raw_content.strip())
+        # ponytail: tolerate common JSON-shape slips from the gateway; schema remains strict after normalization.
+        if isinstance(payload_json.get("summary"), str):
+            payload_json["summary"] = payload_json["summary"][:500]
+        for skill in payload_json.get("skills", []):
+            if isinstance(skill.get("elements"), str):
+                skill["elements"] = [
+                    item.strip() for item in skill["elements"].split(",") if item.strip()
+                ]
+        for entry in payload_json.get("experience", []):
+            if isinstance(entry.get("description"), str):
+                entry["description"] = [
+                    item.strip(" •-\t")
+                    for item in re.split(r"(?:\r?\n|(?<=[.!?])\s+)", entry["description"])
+                    if item.strip(" •-\t")
+                ]
+        for entry in payload_json.get("projects", []):
+            if isinstance(entry.get("description"), list):
+                entry["description"] = " ".join(entry["description"])
+            if isinstance(entry.get("highlights"), str):
+                entry["highlights"] = [
+                    item.strip(" •-\t")
+                    for item in re.split(r"(?:\r?\n|(?<=[.!?])\s+)", entry["highlights"])
+                    if item.strip(" •-\t")
+                ]
+        resume = ResumeCrewAI.model_validate(payload_json)
 
     rate_limitter.record(1)
     validate_resume_facts(resume, evaluation, present_sections=present_sections)

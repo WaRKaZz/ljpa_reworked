@@ -31,44 +31,90 @@ def test_profile_file_path_exists_and_configured():
 
 def test_evaluation_crew_yaml_prompts_have_no_scraping_instructions():
     """Hermetic test: Ensure evaluator YAML prompts do not instruct agents to scrape URLs."""
-    eval_dir = Path(__file__).resolve().parents[1] / "src" / "ljpa_reworked" / "crews" / "resume_evaluation_crew" / "config"
+    eval_dir = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "ljpa_reworked"
+        / "crews"
+        / "resume_evaluation_crew"
+        / "config"
+    )
     with open(eval_dir / "agents.yaml", encoding="utf-8") as f:
         agents_content = f.read().lower()
     with open(eval_dir / "tasks.yaml", encoding="utf-8") as f:
         tasks_content = f.read().lower()
 
-    prohibited = ["scrape", "scrape_tool", "scrapewebsite", "browse", "fetch url", "open url"]
+    prohibited = [
+        "scrape",
+        "scrape_tool",
+        "scrapewebsite",
+        "browse",
+        "fetch url",
+        "open url",
+    ]
     for term in prohibited:
-        assert term not in agents_content, f"Evaluator agents.yaml contains prohibited term '{term}'"
-        assert term not in tasks_content, f"Evaluator tasks.yaml contains prohibited term '{term}'"
+        assert term not in agents_content, (
+            f"Evaluator agents.yaml contains prohibited term '{term}'"
+        )
+        assert term not in tasks_content, (
+            f"Evaluator tasks.yaml contains prohibited term '{term}'"
+        )
 
 
 def test_generation_crew_yaml_prompts_have_no_scraping_instructions():
     """Hermetic test: Ensure resume generation YAML prompts do not instruct agents to scrape URLs."""
-    gen_dir = Path(__file__).resolve().parents[1] / "src" / "ljpa_reworked" / "crews" / "resume_generation_crew" / "config"
+    gen_dir = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "ljpa_reworked"
+        / "crews"
+        / "resume_generation_crew"
+        / "config"
+    )
     with open(gen_dir / "agents.yaml", encoding="utf-8") as f:
         agents_content = f.read().lower()
     with open(gen_dir / "tasks.yaml", encoding="utf-8") as f:
         tasks_content = f.read().lower()
 
-    prohibited = ["scrape", "scrape_tool", "scrapewebsite", "browse", "fetch url", "open url"]
+    prohibited = [
+        "scrape",
+        "scrape_tool",
+        "scrapewebsite",
+        "browse",
+        "fetch url",
+        "open url",
+    ]
     for term in prohibited:
-        assert term not in agents_content, f"Resume generation agents.yaml contains prohibited term '{term}'"
-        assert term not in tasks_content, f"Resume generation tasks.yaml contains prohibited term '{term}'"
+        assert term not in agents_content, (
+            f"Resume generation agents.yaml contains prohibited term '{term}'"
+        )
+        assert term not in tasks_content, (
+            f"Resume generation tasks.yaml contains prohibited term '{term}'"
+        )
 
 
 def test_crewai_classes_have_no_scrape_tool_or_rag_knowledge():
     """Hermetic test: Verify crews have no tools and no profile RAG knowledge source."""
-    with patch("ljpa_reworked.crews.resume_evaluation_crew.resume_evaluation_crew.create_llm", return_value=MagicMock()):
+    with patch(
+        "ljpa_reworked.crews.resume_evaluation_crew.resume_evaluation_crew.create_llm",
+        return_value=MagicMock(),
+    ):
         eval_crew_instance = ResumeEvaluationCrew()
         agent_eval = eval_crew_instance.resume_evaluation_agent()
-        assert len(agent_eval.tools) == 0, f"Evaluator agent must have no tools, got: {agent_eval.tools}"
+        assert len(agent_eval.tools) == 0, (
+            f"Evaluator agent must have no tools, got: {agent_eval.tools}"
+        )
         assert not hasattr(eval_crew_instance, "profile_md")
 
-    with patch("ljpa_reworked.crews.resume_generation_crew.resume_generation_crew.create_llm", return_value=MagicMock()):
+    with patch(
+        "ljpa_reworked.crews.resume_generation_crew.resume_generation_crew.create_llm",
+        return_value=MagicMock(),
+    ):
         gen_crew_instance = ResumeGenerationCrew()
         agent_gen = gen_crew_instance.resume_agent()
-        assert len(agent_gen.tools) == 0, f"Resume agent must have no tools, got: {agent_gen.tools}"
+        assert len(agent_gen.tools) == 0, (
+            f"Resume agent must have no tools, got: {agent_gen.tools}"
+        )
         assert not hasattr(gen_crew_instance, "profile_md")
 
 
@@ -100,12 +146,13 @@ def test_convert_resume_crewai_to_rendercv_input():
                 location="Remote",
                 start_date="2022-07",
                 end_date="Present",
-                description=["Developed microservices in Python", "Optimized PostgreSQL queries"],
+                description=[
+                    "Developed microservices in Python",
+                    "Optimized PostgreSQL queries",
+                ],
             )
         ],
-        skills=[
-            SkillCrewAI(title="Programming", elements=["Python", "Go", "SQL"])
-        ],
+        skills=[SkillCrewAI(title="Programming", elements=["Python", "Go", "SQL"])],
         projects=[
             ProjectCrewAI(
                 title="OpenSource Library",
@@ -133,7 +180,9 @@ def test_convert_resume_crewai_to_rendercv_input():
     assert cv["name"] == "Test Candidate"
     assert cv["email"] == "candidate@example.com"
     assert cv["location"] == "Berlin, Germany"
-    assert cv["social_networks"] == [{"network": "LinkedIn", "username": "testcandidate"}]
+    assert cv["social_networks"] == [
+        {"network": "LinkedIn", "username": "testcandidate"}
+    ]
 
     sections = cv["sections"]
     assert "Summary" in sections
@@ -144,12 +193,13 @@ def test_convert_resume_crewai_to_rendercv_input():
     assert "Certifications" in sections
 
     exp = sections["Experience"][0]
-    assert exp["company"] == "Tech Solutions"
-    assert exp["position"] == "Senior Backend Engineer"
+    assert exp["name"] == "Tech Solutions — Senior Backend Engineer"
+    assert exp["summary"] == "Remote"
     assert exp["end_date"] == "present"  # RenderCV requires lowercase 'present'
-    assert exp["highlights"] == ["Developed microservices in Python", "Optimized PostgreSQL queries"]
-
-
+    assert exp["highlights"] == [
+        "Developed microservices in Python",
+        "Optimized PostgreSQL queries",
+    ]
 
 
 def test_render_resume_crewai_to_pdf():
@@ -164,29 +214,53 @@ def test_render_resume_crewai_to_pdf():
             address="123 Main St",
             location="Berlin, Germany",
             linkedin_url="https://linkedin.com/in/testrendercandidate",
+            target_title="Senior Backend & Systems Integration Engineer",
         ),
-        summary="Experienced engineer with strong track record in Python.",
+        summary=(
+            "Experienced Senior Backend Engineer with over 8 years of hands-on technical expertise designing, "
+            "implementing, and scaling microservices, asynchronous message queues, data pipelines, and RESTful APIs "
+            "using Python, FastAPI, PostgreSQL, and Docker. Proven track record in optimizing system performance, "
+            "reducing latency, and maintaining high availability across cloud deployment infrastructure."
+        ),
         education=[
             EducationCrewAI(
                 course="B.Sc. Computer Science",
                 institution="Technical University",
                 location="Berlin, Germany",
-                start_date="2018-09",
-                end_date="2022-06",
+                start_date="2014-09",
+                end_date="2018-06",
             )
         ],
         experience=[
             ExperienceCrewAI(
-                title="Backend Developer",
+                title="Senior Backend Developer",
                 company="Sample Enterprise",
                 location="Berlin, Germany",
                 start_date="2022-07",
                 end_date="Present",
-                description=["Built scalable APIs using Python and FastAPI"],
-            )
+                description=[
+                    "Built scalable, high-throughput microservice APIs using Python, FastAPI, and PostgreSQL handling over 5 million daily requests.",
+                    "Engineered asynchronous task processing architecture using Celery and Redis, reducing background task execution time by 40%.",
+                    "Led database schema optimization, index tuning, and query refactoring for high-volume relational databases.",
+                    "Implemented comprehensive automated test suites and CI/CD deployment pipelines under Docker and Podman.",
+                ],
+            ),
+            ExperienceCrewAI(
+                title="Software Engineer",
+                company="Tech Solutions Ltd",
+                location="Berlin, Germany",
+                start_date="2018-07",
+                end_date="2022-06",
+                description=[
+                    "Developed core backend payment gateway integrations and authentication microservices using Python and Flask.",
+                    "Configured monitoring and telemetry dashboards with Prometheus and Grafana for real-time error detection.",
+                ],
+            ),
         ],
         skills=[
-            SkillCrewAI(title="Engineering", elements=["Python", "PostgreSQL", "Docker"])
+            SkillCrewAI(title="Languages & Frameworks", elements=["Python", "FastAPI", "Flask", "SQL", "TypeScript"]),
+            SkillCrewAI(title="Databases & Caching", elements=["PostgreSQL", "Redis", "SQLAlchemy", "MongoDB"]),
+            SkillCrewAI(title="DevOps & Infrastructure", elements=["Docker", "Podman", "CI/CD", "Linux", "Git"]),
         ],
         projects=[],
         certifications=[],

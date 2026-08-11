@@ -31,6 +31,7 @@ class PersonalInfoCrewAI(BaseModel):
     address: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
     location: StrippedStr
     linkedin_url: StrippedStr | None = None
+    target_title: StrippedStr | None = None
 
 
 class EducationCrewAI(BaseModel):

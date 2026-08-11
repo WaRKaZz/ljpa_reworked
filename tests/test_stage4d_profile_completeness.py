@@ -126,7 +126,13 @@ Experienced engineer.
 - Python, SQL, Git
 """
     sections = validate_profile_completeness(profile_without_optionals)
-    assert set(sections) == {"personal_info", "summary", "experience", "education", "skills"}
+    assert set(sections) == {
+        "personal_info",
+        "summary",
+        "experience",
+        "education",
+        "skills",
+    }
 
     profile_with_projects = """
 ## General Information
@@ -146,7 +152,14 @@ Experienced engineer.
 - My Open Source Project
 """
     sections_with_proj = validate_profile_completeness(profile_with_projects)
-    assert set(sections_with_proj) == {"personal_info", "summary", "experience", "education", "skills", "projects"}
+    assert set(sections_with_proj) == {
+        "personal_info",
+        "summary",
+        "experience",
+        "education",
+        "skills",
+        "projects",
+    }
 
 
 def test_crewai_evaluate_and_generate_enforce_completeness_guardrail(tmp_path):
@@ -161,14 +174,19 @@ def test_crewai_evaluate_and_generate_enforce_completeness_guardrail(tmp_path):
     mock_vacancy.submit_email = "jobs@example.com"
     mock_vacancy.submit_url = None
 
-    with patch("ljpa_reworked.crew_workflow.PROFILE_FILE_PATH", str(test_profile_path)), \
-         patch("ljpa_reworked.crew_workflow.ResumeEvaluationCrew") as mock_eval_crew:
-
-        with pytest.raises(ValueError, match="Missing required core sections: education"):
+    with (
+        patch("ljpa_reworked.crew_workflow.PROFILE_FILE_PATH", str(test_profile_path)),
+        patch("ljpa_reworked.crew_workflow.ResumeEvaluationCrew") as mock_eval_crew,
+    ):
+        with pytest.raises(
+            ValueError, match="Missing required core sections: education"
+        ):
             crewai_evaluate_vacancy(mock_vacancy)
 
         mock_eval = BasicEvaluationCrewAI(summary="OK", rating=80)
-        with pytest.raises(ValueError, match="Missing required core sections: education"):
+        with pytest.raises(
+            ValueError, match="Missing required core sections: education"
+        ):
             crewai_generate_resume(mock_vacancy, mock_eval)
 
         mock_eval_crew.assert_not_called()
@@ -215,5 +233,9 @@ def test_validate_resume_facts_against_deterministic_present_sections():
         projects=[],  # Projects required by deterministic list, but missing in resume
     )
 
-    with pytest.raises(ValueError, match="Required profile section 'projects' is missing or empty"):
-        validate_resume_facts(resume_missing_projects, eval_model, present_sections=present_sections)
+    with pytest.raises(
+        ValueError, match="Required profile section 'projects' is missing or empty"
+    ):
+        validate_resume_facts(
+            resume_missing_projects, eval_model, present_sections=present_sections
+        )

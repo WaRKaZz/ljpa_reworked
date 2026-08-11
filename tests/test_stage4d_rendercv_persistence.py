@@ -81,7 +81,9 @@ def sample_vacancy(db_session: Session):
     return vacancy
 
 
-def test_save_resume_successful_persistence(db_session: Session, sample_resume, sample_vacancy, tmp_path):
+def test_save_resume_successful_persistence(
+    db_session: Session, sample_resume, sample_vacancy, tmp_path
+):
     """Verify save_resume renders via RenderCV helper, creates non-empty file, and stores relative filename + rendered_at."""
 
     def mock_render(resume_data, out_path):
@@ -90,9 +92,13 @@ def test_save_resume_successful_persistence(db_session: Session, sample_resume, 
             f.write(b"%PDF-1.4 mock pdf content")
         return out_path
 
-    with patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)), patch(
-        "ljpa_reworked.workflow.render_resume_crewai_to_pdf", side_effect=mock_render
-    ) as mock_helper:
+    with (
+        patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)),
+        patch(
+            "ljpa_reworked.workflow.render_resume_crewai_to_pdf",
+            side_effect=mock_render,
+        ) as mock_helper,
+    ):
         orm_resume = save_resume(sample_resume, sample_vacancy, db_session)
 
         mock_helper.assert_called_once()
@@ -123,9 +129,12 @@ def test_save_resume_rendering_failure_leaves_no_db_row_or_file(
     db_session: Session, sample_resume, sample_vacancy, tmp_path
 ):
     """Verify that if render_resume_crewai_to_pdf raises an error, no DB row or leftover file is created."""
-    with patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)), patch(
-        "ljpa_reworked.workflow.render_resume_crewai_to_pdf",
-        side_effect=RuntimeError("RenderCV failed"),
+    with (
+        patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)),
+        patch(
+            "ljpa_reworked.workflow.render_resume_crewai_to_pdf",
+            side_effect=RuntimeError("RenderCV failed"),
+        ),
     ):
         with pytest.raises(RuntimeError, match="RenderCV failed"):
             save_resume(sample_resume, sample_vacancy, db_session)
@@ -151,8 +160,12 @@ def test_save_resume_empty_file_leaves_no_db_row_or_file(
             f.write(b"")  # empty
         return out_path
 
-    with patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)), patch(
-        "ljpa_reworked.workflow.render_resume_crewai_to_pdf", side_effect=mock_render_empty
+    with (
+        patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)),
+        patch(
+            "ljpa_reworked.workflow.render_resume_crewai_to_pdf",
+            side_effect=mock_render_empty,
+        ),
     ):
         with pytest.raises(RuntimeError):
             save_resume(sample_resume, sample_vacancy, db_session)
@@ -178,10 +191,16 @@ def test_save_resume_db_failure_cleans_up_pdf_and_reraises(
             f.write(b"%PDF-1.4 valid content")
         return out_path
 
-    with patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)), patch(
-        "ljpa_reworked.workflow.render_resume_crewai_to_pdf", side_effect=mock_render
-    ), patch(
-        "ljpa_reworked.workflow.create_resume", side_effect=RuntimeError("DB Commit Failed")
+    with (
+        patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)),
+        patch(
+            "ljpa_reworked.workflow.render_resume_crewai_to_pdf",
+            side_effect=mock_render,
+        ),
+        patch(
+            "ljpa_reworked.workflow.create_resume",
+            side_effect=RuntimeError("DB Commit Failed"),
+        ),
     ):
         with pytest.raises(RuntimeError, match="DB Commit Failed"):
             save_resume(sample_resume, sample_vacancy, db_session)

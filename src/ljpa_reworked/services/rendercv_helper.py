@@ -1,6 +1,8 @@
 import re
 from typing import Any
 
+import pypdfium2
+
 from ljpa_reworked.models.crewai_pydantic_models import ResumeCrewAI
 
 
@@ -52,6 +54,8 @@ def convert_resume_crewai_to_rendercv_input(resume: ResumeCrewAI) -> dict[str, A
     cv: dict[str, Any] = {
         "name": info.name,
     }
+    if info.target_title:
+        cv["headline"] = info.target_title
     if info.email:
         cv["email"] = info.email
     phone = _normalize_phone(info.phone)
@@ -157,53 +161,66 @@ def convert_resume_crewai_to_rendercv_input(resume: ResumeCrewAI) -> dict[str, A
     cv["sections"] = {
         name: sections[name] for name in section_order if name in sections
     }
-    return {"cv": cv}
+    return {
+        "cv": cv,
+        "design": {
+            "theme": "classic",
+            "entries": {
+                "vertical_space_between_entries": "0.15cm",
+                "allow_page_break_in_entries": False,
+            },
+            "header": {
+                "use_icons_for_connections": False,
+            },
+            "page": {
+                "show_last_updated_date": False,
+            },
+        },
+    }
 
 
 def validate_pdf_page_layout(pdf_path: str) -> tuple[bool, str]:
-    """Validate PDF page count and layout fill requirements.
+    """Validate PDF page character budget requirements for any page count.
 
-    Max 2 pages; page 2 allowed only if it contains secondary material and is at least 50% filled.
+    Requirements:
+    - Every non-final page must contain 3300-3475 extracted characters.
+    - The final page must contain at least 1400 extracted characters.
     """
     import os
+
     if not os.path.exists(pdf_path):
         return False, f"PDF file does not exist at {pdf_path}"
 
     try:
-        import pypdfium2
         doc = pypdfium2.PdfDocument(pdf_path)
     except Exception as e:
         return False, f"Failed to parse PDF: {e}"
 
     num_pages = len(doc)
+    if num_pages < 1:
+        return False, "PDF contains no pages"
+
+    char_counts = []
+    for i in range(num_pages):
+        text = doc[i].get_textpage().get_text_range()
+        count = len(text)
+        char_counts.append(count)
+        if i < num_pages - 1:
+            if count < 3300 or count > 3475:
+                return (
+                    False,
+                    f"Page {i + 1} (non-final) character count ({count}) is outside required range [3300, 3475]",
+                )
+        else:
+            if count < 1400:
+                return (
+                    False,
+                    f"Page {i + 1} (final) character count ({count}) is less than minimum 1400 characters",
+                )
+
     if num_pages == 1:
-        return True, "1-page PDF meets layout requirements"
-    elif num_pages > 2:
-        return False, f"PDF exceeds maximum 2 pages: total {num_pages} pages"
-
-    page2 = doc[1]
-    w, h = page2.get_size()
-    text = page2.get_textpage().get_text_range()
-
-    secondary_keywords = ["certifications", "projects", "education", "tools", "skills", "languages", "courses", "certificates"]
-    has_secondary = any(kw in text.lower() for kw in secondary_keywords)
-    if not has_secondary:
-        return False, "Page 2 lacks secondary section content"
-
-    import numpy as np
-    image = page2.render(scale=1).to_pil()
-    img_arr = np.array(image.convert("L"))
-    mask = img_arr < 240
-    y_indices, _ = np.where(mask)
-    if len(y_indices) == 0:
-        return False, "Page 2 is empty"
-
-    max_y = y_indices.max()
-    fill_pct = max_y / h
-    if fill_pct < 0.50:
-        return False, f"Page 2 fill level ({fill_pct*100:.1f}%) is less than 50%"
-
-    return True, f"2-page PDF valid with secondary material and {fill_pct*100:.1f}% fill on page 2"
+        return True, f"1-page PDF valid with {char_counts[0]} characters"
+    return True, f"{num_pages}-page PDF valid with character counts {char_counts}"
 
 
 def render_resume_crewai_to_pdf(resume: ResumeCrewAI, output_pdf_path: str) -> str:
@@ -214,6 +231,7 @@ def render_resume_crewai_to_pdf(resume: ResumeCrewAI, output_pdf_path: str) -> s
 
     import yaml
 
+    output_pdf_path = os.path.abspath(output_pdf_path)
     input_dict = convert_resume_crewai_to_rendercv_input(resume)
     # ponytail: RenderCV always creates an output folder; isolate it in a temp dir.
     with tempfile.TemporaryDirectory(prefix="rendercv-") as temp_dir:

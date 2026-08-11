@@ -64,7 +64,9 @@ def save_resume(resume: ResumeCrewAI, vacancy: Vacancy, db: Session) -> Resume:
     try:
         render_resume_crewai_to_pdf(resume, resume_path)
         if not os.path.exists(resume_path) or os.path.getsize(resume_path) == 0:
-            raise RuntimeError(f"RenderCV failed to generate a non-empty PDF at {resume_path}")
+            raise RuntimeError(
+                f"RenderCV failed to generate a non-empty PDF at {resume_path}"
+            )
     except Exception:
         if os.path.exists(resume_path):
             try:

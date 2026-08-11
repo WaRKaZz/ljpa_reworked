@@ -116,7 +116,10 @@ def test_pydantic_resume_new_ats_fields():
         certifications=[cert],
     )
     assert resume_data.personal_info.location == "Berlin, Germany"
-    assert resume_data.projects[0].highlights == ["Implemented AST parsing", "Achieved 99% coverage"]
+    assert resume_data.projects[0].highlights == [
+        "Implemented AST parsing",
+        "Achieved 99% coverage",
+    ]
     assert resume_data.certifications[0].issuer == "Amazon Web Services"
 
 
@@ -228,7 +231,9 @@ def test_ordinary_transition_does_not_set_applied_at(db_session: Session):
     assert vacancy.applied_at is None
 
 
-def test_confirmed_email_submission_sets_applied_at_only_on_success(db_session: Session, tmp_path):
+def test_confirmed_email_submission_sets_applied_at_only_on_success(
+    db_session: Session, tmp_path
+):
     """Confirmed email submission sets applied_at after successful send & transition, leaves unset on failure."""
     vacancy = Vacancy(
         title="Backend Engineer",
@@ -254,9 +259,13 @@ def test_confirmed_email_submission_sets_applied_at_only_on_success(db_session: 
     dummy_resume = resumes_dir / "dummy_resume.pdf"
     dummy_resume.write_text("pdf content")
 
-    with patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)), \
-         patch("ljpa_reworked.workflow.SMTPClient") as mock_smtp:
-        mock_smtp.return_value.__enter__.return_value.send_email.side_effect = RuntimeError("SMTP connection failed")
+    with (
+        patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)),
+        patch("ljpa_reworked.workflow.SMTPClient") as mock_smtp,
+    ):
+        mock_smtp.return_value.__enter__.return_value.send_email.side_effect = (
+            RuntimeError("SMTP connection failed")
+        )
         with pytest.raises(RuntimeError):
             send_email(email_data)
 
@@ -265,9 +274,11 @@ def test_confirmed_email_submission_sets_applied_at_only_on_success(db_session: 
     assert vacancy.status == VacancyStatus.created
 
     # Case 2: Send email succeeds -> confirmed transition stamps applied_at
-    with patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)), \
-         patch("ljpa_reworked.workflow.shutil.copy"), \
-         patch("ljpa_reworked.workflow.SMTPClient") as mock_smtp:
+    with (
+        patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)),
+        patch("ljpa_reworked.workflow.shutil.copy"),
+        patch("ljpa_reworked.workflow.SMTPClient") as mock_smtp,
+    ):
         mock_smtp.return_value.__enter__.return_value.send_email.return_value = None
         send_email(email_data)
         confirm_email_application_submitted(db_session, vacancy.id)
@@ -278,7 +289,9 @@ def test_confirmed_email_submission_sets_applied_at_only_on_success(db_session: 
     assert isinstance(vacancy.applied_at, datetime)
 
 
-def test_confirm_email_application_submitted_atomicity_on_commit_failure(db_session: Session):
+def test_confirm_email_application_submitted_atomicity_on_commit_failure(
+    db_session: Session,
+):
     """Failure at the combined commit boundary must rollback both status change and applied_at timestamp."""
     vacancy = Vacancy(
         title="Full Stack Engineer",
@@ -301,12 +314,16 @@ def test_confirm_email_application_submitted_atomicity_on_commit_failure(db_sess
         real_commit()
 
     with patch.object(db_session, "commit", side_effect=failing_commit):
-        with pytest.raises(RuntimeError, match="Database commit failed during combined submission"):
+        with pytest.raises(
+            RuntimeError, match="Database commit failed during combined submission"
+        ):
             confirm_email_application_submitted(db_session, vacancy.id)
 
     db_session.rollback()
     db_session.expire_all()
-    reloaded_vacancy = db_session.query(Vacancy).filter(Vacancy.id == vacancy.id).first()
+    reloaded_vacancy = (
+        db_session.query(Vacancy).filter(Vacancy.id == vacancy.id).first()
+    )
     assert reloaded_vacancy.status == VacancyStatus.created, (
         f"Expected status to remain '{VacancyStatus.created.value}', but got '{reloaded_vacancy.status.value}'. "
         "Partial applied status was committed/persisted!"
