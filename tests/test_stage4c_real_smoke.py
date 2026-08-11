@@ -10,9 +10,6 @@ from ljpa_reworked.models.crewai_pydantic_models import (
     BasicEvaluationCrewAI,
     ResumeCrewAI,
 )
-from ljpa_reworked.services.rendercv_helper import (
-    render_resume_crewai_to_pdf,
-)
 
 
 @pytest.mark.timeout(180)
@@ -71,7 +68,7 @@ def test_stage4c_real_smoke_evaluator_generator_render():
 
     from unittest.mock import MagicMock, patch
 
-    from ljpa_reworked.crew_workflow import crewai_generate_resume
+    from ljpa_reworked.crew_workflow import crewai_generate_resume_with_retry
 
     mock_vacancy = MagicMock()
     mock_vacancy.title = synthetic_inputs["title"]
@@ -83,7 +80,9 @@ def test_stage4c_real_smoke_evaluator_generator_render():
     with patch(
         "ljpa_reworked.crew_workflow.read_profile_text", return_value=synthetic_profile
     ):
-        resume_pydantic = crewai_generate_resume(mock_vacancy, eval_pydantic)
+        resume_pydantic, out_pdf = crewai_generate_resume_with_retry(
+            mock_vacancy, eval_pydantic
+        )
     gen_time = time.monotonic() - start_gen
 
     assert isinstance(resume_pydantic, ResumeCrewAI)
@@ -91,13 +90,7 @@ def test_stage4c_real_smoke_evaluator_generator_render():
     assert len(resume_pydantic.experience) > 0
     assert gen_time < 180.0, f"Generator took too long: {gen_time:.2f}s"
 
-    out_pdf = f"/tmp/stage4c_smoke_resume_{int(time.time())}.pdf"
-    if os.path.exists(out_pdf):
-        os.remove(out_pdf)
-
     try:
-        pdf_path = render_resume_crewai_to_pdf(resume_pydantic, out_pdf)
-        assert pdf_path == out_pdf
         assert os.path.exists(out_pdf), "PDF file does not exist after rendering"
         assert os.path.getsize(out_pdf) > 0, "PDF file is empty (0 bytes)"
     finally:

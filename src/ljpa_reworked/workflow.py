@@ -52,7 +52,12 @@ def extract_email(credentials: str) -> str | None:
     return match.group(0)
 
 
-def save_resume(resume: ResumeCrewAI, vacancy: Vacancy, db: Session) -> Resume:
+def save_resume(
+    resume: ResumeCrewAI,
+    vacancy: Vacancy,
+    db: Session,
+    temp_pdf_path: str | None = None,
+) -> Resume:
     """Saves a generated resume to the database and filesystem."""
     resume_dir = os.path.join(RESOURCES_DIR, "resumes")
     os.makedirs(resume_dir, exist_ok=True)
@@ -62,7 +67,10 @@ def save_resume(resume: ResumeCrewAI, vacancy: Vacancy, db: Session) -> Resume:
     resume_path = os.path.join(resume_dir, resume_name)
 
     try:
-        render_resume_crewai_to_pdf(resume, resume_path)
+        if temp_pdf_path and os.path.exists(temp_pdf_path):
+            shutil.copy(temp_pdf_path, resume_path)
+        else:
+            render_resume_crewai_to_pdf(resume, resume_path)
         if not os.path.exists(resume_path) or os.path.getsize(resume_path) == 0:
             raise RuntimeError(
                 f"RenderCV failed to generate a non-empty PDF at {resume_path}"
@@ -74,6 +82,12 @@ def save_resume(resume: ResumeCrewAI, vacancy: Vacancy, db: Session) -> Resume:
             except OSError:
                 pass
         raise
+    finally:
+        if temp_pdf_path and os.path.exists(temp_pdf_path):
+            try:
+                os.remove(temp_pdf_path)
+            except OSError:
+                pass
 
     rendered_at = datetime.now(timezone.utc)
 

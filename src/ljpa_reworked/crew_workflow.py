@@ -21,6 +21,7 @@ from ljpa_reworked.models.crewai_pydantic_models import (
     ResumeCrewAI,
 )
 from ljpa_reworked.services.dynamic_rate_limiter import DynamicRateLimiter
+from ljpa_reworked.services.rendercv_helper import render_resume_crewai_to_pdf
 
 if TYPE_CHECKING:
     from ljpa_reworked.models.database_models import Vacancy
@@ -254,3 +255,103 @@ def crewai_generate_email(vacancy: "Vacancy") -> EmailCrewAI:
     crew_output = crew.kickoff(inputs=inputs)
     rate_limitter.record(crew.usage_metrics.successful_requests)
     return crew_output.tasks_output[0].pydantic
+
+
+def _format_numeric_layout_feedback(raw_error: str) -> str:
+    """Extract numeric deficit/excess from validation error and formulate explicit correction instructions."""
+    match = re.search(
+        r"Page (\d+) \(non-final\) character count \((\d+)\) is outside required range \[3300, 3475\]",
+        raw_error,
+    )
+    if match:
+        page_num = match.group(1)
+        count = int(match.group(2))
+        if count < 3300:
+            diff = 3300 - count
+            return (
+                f"{raw_error}\n"
+                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters, which is SHORT by {diff} characters. "
+                f"You MUST expand the output by at least {diff + 150} characters overall. "
+                f"Make summary near 500 characters, expand every experience bullet with detailed technical sentences, "
+                f"add 6-8 skill elements per category, and expand project highlights."
+            )
+        elif count > 3475:
+            diff = count - 3475
+            return (
+                f"{raw_error}\n"
+                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters, which EXCEEDS the max 3475 by {diff} characters. "
+                f"You MUST trim text by at least {diff + 50} characters."
+            )
+
+    match_final = re.search(
+        r"Page (\d+) \(final\) character count \((\d+)\) is less than minimum 1400 characters",
+        raw_error,
+    )
+    if match_final:
+        page_num = match_final.group(1)
+        count = int(match_final.group(2))
+        diff = 1400 - count
+        return (
+            f"{raw_error}\n"
+            f"NUMERIC CORRECTION REQUIRED: Final Page {page_num} has {count} characters, SHORT by {diff} characters. "
+            f"You MUST add at least {diff + 150} characters across sections."
+        )
+
+    return raw_error
+
+
+def crewai_generate_resume_with_retry(
+    vacancy: "Vacancy",
+    evaluation: BasicEvaluationCrewAI,
+    *,
+    max_retries: int = 1,
+) -> tuple[ResumeCrewAI, str]:
+    """Generate a resume and render to PDF, making at most max_retries retry with factual layout feedback if page budget fails."""
+    import tempfile
+
+    attempts = 0
+    max_attempts = max_retries + 1
+    layout_feedback = ""
+    last_error: Exception | None = None
+    created_pdf_paths: list[str] = []
+
+    while attempts < max_attempts:
+        attempts += 1
+        with tempfile.NamedTemporaryFile(
+            prefix=f"rendercv_attempt{attempts}_", suffix=".pdf", delete=False
+        ) as tmp:
+            temp_pdf_path = tmp.name
+        created_pdf_paths.append(temp_pdf_path)
+
+        try:
+            resume = crewai_generate_resume(
+                vacancy=vacancy,
+                evaluation=evaluation,
+                layout_feedback=layout_feedback,
+            )
+            render_resume_crewai_to_pdf(resume, temp_pdf_path)
+            for path_to_clean in created_pdf_paths:
+                if path_to_clean != temp_pdf_path and os.path.exists(path_to_clean):
+                    try:
+                        os.remove(path_to_clean)
+                    except OSError:
+                        pass
+            return resume, temp_pdf_path
+        except Exception as err:
+            last_error = err
+            if os.path.exists(temp_pdf_path):
+                try:
+                    os.remove(temp_pdf_path)
+                except OSError:
+                    pass
+
+            if attempts < max_attempts:
+                layout_feedback = _format_numeric_layout_feedback(str(err))
+            else:
+                for path_to_clean in created_pdf_paths:
+                    if os.path.exists(path_to_clean):
+                        try:
+                            os.remove(path_to_clean)
+                        except OSError:
+                            pass
+                raise last_error from err

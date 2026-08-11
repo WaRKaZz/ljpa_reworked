@@ -4,7 +4,7 @@ import logging
 from ljpa_reworked.crew_workflow import (
     crewai_evaluate_vacancy,
     crewai_generate_email,
-    crewai_generate_resume,
+    crewai_generate_resume_with_retry,
 )
 from ljpa_reworked.database import SessionLocal
 from ljpa_reworked.models.enums import VacancyStatus
@@ -62,8 +62,12 @@ def main():
                 )
                 continue
 
-            resume = crewai_generate_resume(vacancy=vacancy, evaluation=evaluation)
-            orm_resume = save_resume(resume, vacancy, db)
+            resume, temp_pdf_path = crewai_generate_resume_with_retry(
+                vacancy=vacancy, evaluation=evaluation
+            )
+            orm_resume = save_resume(
+                resume, vacancy, db, temp_pdf_path=temp_pdf_path
+            )
 
             recipient_email = vacancy.submit_email or (
                 extract_email(vacancy.submit_url or "") if vacancy.submit_url else None
