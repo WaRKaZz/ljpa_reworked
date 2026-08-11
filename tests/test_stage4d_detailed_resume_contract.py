@@ -8,8 +8,11 @@ from ljpa_reworked.crew_workflow import (
 )
 from ljpa_reworked.models.crewai_pydantic_models import (
     BasicEvaluationCrewAI,
+    CertificationCrewAI,
+    EducationCrewAI,
     ExperienceCrewAI,
     PersonalInfoCrewAI,
+    ProjectCrewAI,
     ResumeCrewAI,
     SkillCrewAI,
 )
@@ -38,7 +41,7 @@ def test_basic_evaluation_crewai_fields():
 
 def test_crewai_generate_resume_propagates_plan_inputs(tmp_path):
     """Verify crewai_generate_resume passes structured plan fields to crew kickoff inputs."""
-    synthetic_profile = "# Synthetic Candidate Profile\n- Skill: Python"
+    synthetic_profile = '## General Information\nName: Test\n## Summary\nEngineer\n## Experience\n- Role\n## Education\n- Degree\n## Skills\n- Python'
     test_profile_path = tmp_path / "profile.md"
     test_profile_path.write_text(synthetic_profile, encoding="utf-8")
 
@@ -65,7 +68,15 @@ def test_crewai_generate_resume_propagates_plan_inputs(tmp_path):
             location="Berlin, Germany",
         ),
         summary="Experienced engineer with Python background.",
-        education=[],
+        education=[
+            EducationCrewAI(
+                course="Computer Science B.Sc.",
+                institution="Tech University",
+                location="Berlin",
+                start_date="2016",
+                end_date="2020",
+            )
+        ],
         experience=[
             ExperienceCrewAI(
                 title="Senior Developer",
@@ -84,8 +95,20 @@ def test_crewai_generate_resume_propagates_plan_inputs(tmp_path):
             SkillCrewAI(title="Languages", elements=["Python", "SQL"]),
             SkillCrewAI(title="Frameworks", elements=["FastAPI", "Django"]),
         ],
-        projects=[],
-        certifications=[],
+        projects=[
+            ProjectCrewAI(
+                title="Synthetic Engine",
+                description="High performance REST service",
+                highlights=["Bullet 1", "Bullet 2", "Bullet 3"],
+            )
+        ],
+        certifications=[
+            CertificationCrewAI(
+                title="Python Certified Professional",
+                issuer="Python Institute",
+                date="2021",
+            )
+        ],
     )
 
     mock_crew = MagicMock()
@@ -105,7 +128,7 @@ def test_crewai_generate_resume_propagates_plan_inputs(tmp_path):
         assert res == mock_resume
         mock_crew.kickoff.assert_called_once()
         inputs = mock_crew.kickoff.call_args[1]["inputs"]
-        assert inputs["required_profile_sections"] == ["experience", "education", "skills", "projects", "certifications"]
+        assert inputs["required_profile_sections"] == ["personal_info", "summary", "experience", "education", "skills"]
         assert inputs["prioritized_facts"] == ["Python 5+ yrs", "RenderCV integration"]
         assert inputs["missing_mandatory_facts"] == []
 
@@ -175,6 +198,131 @@ def test_missing_facts_rejection():
 
     with pytest.raises(ValueError, match="fewer than 3 bullet points"):
         validate_resume_facts(resume_few_bullets, eval_ok)
+
+
+def test_required_section_coverage_omitted_section_rejection():
+    """Verify validate_resume_facts fails when evaluation specifies required profile sections missing in resume."""
+    eval_req_education = BasicEvaluationCrewAI(
+        summary="OK candidate",
+        rating=90,
+        required_profile_sections=["experience", "education"],
+    )
+
+    resume_no_education = ResumeCrewAI(
+        personal_info=PersonalInfoCrewAI(
+            name="Test User",
+            email="test@example.com",
+            phone="+1 555 0199",
+            address="123 Main St",
+            location="Berlin, Germany",
+        ),
+        summary="A developer summary.",
+        education=[],
+        experience=[
+            ExperienceCrewAI(
+                title="Dev",
+                company="Corp",
+                location="Berlin",
+                start_date="2020",
+                end_date="2022",
+                description=["Bullet 1", "Bullet 2", "Bullet 3"],
+            )
+        ],
+        skills=[SkillCrewAI(title="Languages", elements=["Python"])],
+    )
+
+    with pytest.raises(ValueError, match="Required profile section 'education' is missing or empty"):
+        validate_resume_facts(resume_no_education, eval_req_education)
+
+
+def test_required_section_coverage_unknown_section_rejection():
+    """Verify validate_resume_facts fails clearly when evaluation specifies an unknown required profile section."""
+    eval_unknown_sec = BasicEvaluationCrewAI(
+        summary="OK candidate",
+        rating=90,
+        required_profile_sections=["volunteer_work"],
+    )
+
+    resume_valid = ResumeCrewAI(
+        personal_info=PersonalInfoCrewAI(
+            name="Test User",
+            email="test@example.com",
+            phone="+1 555 0199",
+            address="123 Main St",
+            location="Berlin, Germany",
+        ),
+        summary="A developer summary.",
+        education=[],
+        experience=[],
+        skills=[SkillCrewAI(title="Languages", elements=["Python"])],
+    )
+
+    with pytest.raises(ValueError, match="Unknown required profile section: 'volunteer_work'"):
+        validate_resume_facts(resume_valid, eval_unknown_sec)
+
+
+def test_required_section_coverage_alias_normalization_and_passing():
+    """Verify validate_resume_facts normalizes known section aliases and passes when all required sections are present."""
+    from ljpa_reworked.models.crewai_pydantic_models import (
+        CertificationCrewAI,
+        EducationCrewAI,
+        ProjectCrewAI,
+    )
+
+    eval_aliases = BasicEvaluationCrewAI(
+        summary="OK candidate",
+        rating=90,
+        required_profile_sections=["work experience", "academic background", "technical skills", "projects", "certificates"],
+    )
+
+    resume_complete = ResumeCrewAI(
+        personal_info=PersonalInfoCrewAI(
+            name="Test User",
+            email="test@example.com",
+            phone="+1 555 0199",
+            address="123 Main St",
+            location="Berlin, Germany",
+        ),
+        summary="A developer summary.",
+        education=[
+            EducationCrewAI(
+                course="B.Sc. CS",
+                institution="University",
+                location="Berlin",
+                start_date="2015",
+                end_date="2019",
+            )
+        ],
+        experience=[
+            ExperienceCrewAI(
+                title="Dev",
+                company="Corp",
+                location="Berlin",
+                start_date="2020",
+                end_date="2022",
+                description=["Bullet 1", "Bullet 2", "Bullet 3"],
+            )
+        ],
+        skills=[SkillCrewAI(title="Languages", elements=["Python"])],
+        projects=[
+            ProjectCrewAI(
+                title="Project Alpha",
+                description="A test project",
+                highlights=["H1", "H2", "H3"],
+            )
+        ],
+        certifications=[
+            CertificationCrewAI(
+                title="AWS Certified Developer",
+                issuer="Amazon Web Services",
+                date="2021",
+            )
+        ],
+    )
+
+    # Must pass without raising ValueError
+    validate_resume_facts(resume_complete, eval_aliases)
+
 
 
 def test_evaluator_and_generator_task_yaml_contracts():

@@ -15,15 +15,18 @@ from ljpa_reworked.crews.resume_generation_crew.resume_generation_crew import (
 )
 from ljpa_reworked.models.crewai_pydantic_models import (
     BasicEvaluationCrewAI,
+    EducationCrewAI,
+    ExperienceCrewAI,
     PersonalInfoCrewAI,
     ResumeCrewAI,
+    SkillCrewAI,
 )
 
 
 def test_read_profile_text_success_and_failure(tmp_path):
     """Verify read_profile_text reads valid UTF-8 file and raises clear error when missing."""
     test_file = tmp_path / "test_profile.md"
-    content = "# Synthetic Candidate Profile\n- Skill: Python"
+    content = '## General Information\nName: Test\n## Summary\nEngineer\n## Experience\n- Role\n## Education\n- Degree\n## Skills\n- Python'
     test_file.write_text(content, encoding="utf-8")
 
     assert read_profile_text(str(test_file)) == content
@@ -55,7 +58,7 @@ def test_resume_generation_crew_no_knowledge_or_embedder():
 
 def test_crewai_evaluate_vacancy_passes_candidate_profile(tmp_path):
     """Verify crewai_evaluate_vacancy passes full profile text in inputs['candidate_profile']."""
-    synthetic_profile = "# Synthetic Profile\nSenior Backend Engineer with Python"
+    synthetic_profile = '## General Information\nName: Test\n## Summary\nEngineer\n## Experience\n- Role\n## Education\n- Degree\n## Skills\n- Python'
     test_profile_path = tmp_path / "profile.md"
     test_profile_path.write_text(synthetic_profile, encoding="utf-8")
 
@@ -90,7 +93,7 @@ def test_crewai_evaluate_vacancy_passes_candidate_profile(tmp_path):
 
 def test_crewai_generate_resume_passes_candidate_profile(tmp_path):
     """Verify crewai_generate_resume passes full profile text in inputs['candidate_profile']."""
-    synthetic_profile = "# Synthetic Profile\nExperienced Python Dev"
+    synthetic_profile = '## General Information\nName: Test\n## Summary\nEngineer\n## Experience\n- Role\n## Education\n- Degree\n## Skills\n- Python'
     test_profile_path = tmp_path / "profile.md"
     test_profile_path.write_text(synthetic_profile, encoding="utf-8")
 
@@ -111,9 +114,9 @@ def test_crewai_generate_resume_passes_candidate_profile(tmp_path):
             location="Berlin, Germany",
         ),
         summary="A software engineer",
-        education=[],
-        experience=[],
-        skills=[],
+        education=[EducationCrewAI(course="Degree", institution="University", location="Berlin", start_date="2016", end_date="2020")],
+        experience=[ExperienceCrewAI(title="Engineer", company="Company", location="Berlin", start_date="2020", end_date="Present", description=["One", "Two", "Three"])],
+        skills=[SkillCrewAI(title="Languages", elements=["Python"])],
         projects=[],
         certifications=[],
     )
