@@ -4,7 +4,8 @@ import logging
 import os
 import re
 import shutil
-from datetime import datetime, timedelta
+import uuid
+from datetime import datetime, timedelta, timezone
 from os import path
 from typing import TYPE_CHECKING
 
@@ -31,7 +32,7 @@ from ljpa_reworked.operations import (
     get_emails_by_recipient,
     mark_vacancy_as_sent,
 )
-from ljpa_reworked.services.resume_generator import ResumeGenerator
+from ljpa_reworked.services.rendercv_helper import render_resume_crewai_to_pdf
 from ljpa_reworked.services.smtp_client import SMTPClient
 from ljpa_reworked.services.telegram import Telegram
 
@@ -53,19 +54,43 @@ def extract_email(credentials: str) -> str | None:
 
 def save_resume(resume: ResumeCrewAI, vacancy: Vacancy, db: Session) -> Resume:
     """Saves a generated resume to the database and filesystem."""
-    resume_name = f"{datetime.now().timestamp()}.pdf"
-    orm_resume = create_resume(
-        db=db,
-        vacancy_id=vacancy.id,
-        resume_data=resume,
-        path=resume_name,
-    )
-
     resume_dir = os.path.join(RESOURCES_DIR, "resumes")
     os.makedirs(resume_dir, exist_ok=True)
 
+    unique_id = uuid.uuid4().hex[:8]
+    resume_name = f"resume_{vacancy.id}_{unique_id}.pdf"
     resume_path = os.path.join(resume_dir, resume_name)
-    ResumeGenerator(orm_resume.to_dict()).generate(resume_path)
+
+    try:
+        render_resume_crewai_to_pdf(resume, resume_path)
+        if not os.path.exists(resume_path) or os.path.getsize(resume_path) == 0:
+            raise RuntimeError(f"RenderCV failed to generate a non-empty PDF at {resume_path}")
+    except Exception:
+        if os.path.exists(resume_path):
+            try:
+                os.remove(resume_path)
+            except OSError:
+                pass
+        raise
+
+    rendered_at = datetime.now(timezone.utc)
+
+    try:
+        orm_resume = create_resume(
+            db=db,
+            vacancy_id=vacancy.id,
+            resume_data=resume,
+            path=resume_name,
+            rendered_at=rendered_at,
+        )
+    except Exception:
+        if os.path.exists(resume_path):
+            try:
+                os.remove(resume_path)
+            except OSError:
+                pass
+        raise
+
     logger.info(f"Saved resume {resume_name} for vacancy {vacancy.id}.")
     return orm_resume
 
