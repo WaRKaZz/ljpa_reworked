@@ -21,6 +21,7 @@ class VisaStatus(Enum):
     not_provided = "not_provided"
     not_mentioned = "not_mentioned"
     not_required = "not_required"
+    NOT_SPECIFIED = "NOT_SPECIFIED"
 
 
 class PersonalInfoCrewAI(BaseModel):

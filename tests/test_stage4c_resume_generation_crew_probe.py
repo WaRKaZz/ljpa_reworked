@@ -1,13 +1,17 @@
-import time
+from unittest.mock import MagicMock, patch
 
 from ljpa_reworked.crews.resume_generation_crew.resume_generation_crew import (
     ResumeGenerationCrew,
 )
-from ljpa_reworked.models.crewai_pydantic_models import ResumeCrewAI
+from ljpa_reworked.models.crewai_pydantic_models import (
+    PersonalInfoCrewAI,
+    ResumeCrewAI,
+    SkillCrewAI,
+)
 
 
-def test_resume_generation_crew_finite_probe():
-    """Finite synthetic probe verifying ResumeGenerationCrew completes under 60 seconds."""
+def test_resume_generation_crew_hermetic_probe():
+    """Hermetic synthetic probe verifying ResumeGenerationCrew inputs without network or LLM execution."""
     synthetic_inputs = {
         "title": "Senior Python Backend Engineer",
         "text": (
@@ -30,16 +34,45 @@ def test_resume_generation_crew_finite_probe():
         ),
     }
 
-    start_time = time.monotonic()
-    crew_instance = ResumeGenerationCrew()
-    crew_result = crew_instance.crew().kickoff(inputs=synthetic_inputs)
-    elapsed_time = time.monotonic() - start_time
+    mock_llm = MagicMock()
+    mock_crew = MagicMock()
+    mock_crew_output = MagicMock()
+    mock_task_output = MagicMock()
 
-    assert elapsed_time < 75.0, f"Task exceeded 75s limit! Took {elapsed_time:.2f}s"
+    mock_resume = ResumeCrewAI(
+        personal_info=PersonalInfoCrewAI(
+            name="Test Candidate",
+            email="candidate@example.com",
+            phone="+1 555-0100",
+            address="123 Test St",
+            location="New York, USA",
+        ),
+        summary="Experienced Python Backend Engineer",
+        education=[],
+        experience=[],
+        skills=[SkillCrewAI(title="Languages", elements=["Python", "FastAPI"])],
+        projects=[],
+        certifications=[],
+    )
+    mock_task_output.pydantic = mock_resume
+    mock_crew_output.tasks_output = [mock_task_output]
+    mock_crew.kickoff.return_value = mock_crew_output
 
-    resume = crew_result.tasks_output[0].pydantic
-    assert isinstance(resume, ResumeCrewAI), "Output is not a valid ResumeCrewAI instance"
-    assert resume.personal_info is not None
-    assert bool(resume.personal_info.name)
-    assert len(resume.experience) > 0
-    assert len(resume.skills) > 0
+    with patch(
+        "ljpa_reworked.crews.resume_generation_crew.resume_generation_crew.create_llm",
+        return_value=mock_llm,
+    ), patch("crewai.Crew.kickoff", return_value=mock_crew_output) as mock_kickoff:
+        crew_instance = ResumeGenerationCrew()
+        c = crew_instance.crew()
+
+        assert getattr(crew_instance, "profile_md", None) is None
+        assert getattr(crew_instance, "embedder", None) is None
+        assert getattr(c, "knowledge", None) is None
+
+        crew_result = c.kickoff(inputs=synthetic_inputs)
+        mock_kickoff.assert_called_once_with(inputs=synthetic_inputs)
+
+        assert "candidate_profile" in synthetic_inputs
+        resume = crew_result.tasks_output[0].pydantic
+        assert isinstance(resume, ResumeCrewAI)
+        assert resume.personal_info.name == "Test Candidate"

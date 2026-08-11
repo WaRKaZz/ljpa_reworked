@@ -18,9 +18,14 @@ def _normalize_date(date_str: str | None) -> str | None:
     if not date_str:
         return None
     date_clean = date_str.strip()
-    if date_clean.lower() == "present":
+    if date_clean.lower() in ("present", "current", "now", "ongoing"):
         return "present"
-    return date_clean
+    if re.match(r"^\d{4}(-\d{2})?(-\d{2})?$", date_clean):
+        return date_clean
+    year_match = re.search(r"\b(19|20)\d{2}\b", date_clean)
+    if year_match:
+        return year_match.group(0)
+    return None
 
 
 def _normalize_phone(phone_str: str | None) -> str | None:

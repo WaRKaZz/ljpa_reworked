@@ -54,8 +54,14 @@ class Vacancy(Base):
     submit_url: Mapped[str | None] = mapped_column(
         String(1000), nullable=True, unique=True
     )
-    source: Mapped[DataSource]
-    visa_status: Mapped[VisaStatus]
+    source: Mapped[DataSource] = mapped_column(
+        Enum(DataSource, values_callable=lambda x: [e.value for e in x], native_enum=False),
+        nullable=False,
+    )
+    visa_status: Mapped[VisaStatus] = mapped_column(
+        Enum(VisaStatus, values_callable=lambda x: [e.value for e in x], native_enum=False),
+        nullable=False,
+    )
     created_at: Mapped[created_at]
     deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[VacancyStatus] = mapped_column(
