@@ -149,18 +149,19 @@ def crewai_generate_resume(
         "3. Output ONLY valid JSON matching the specified Pydantic schema. No markdown code blocks, no extra commentary.\n"
         "4. Be high-density, concise, and direct. Keep bullet points punchy (10-20 words each, 3-4 bullets per entry) for maximum impact and fast generation."
     )
-    json_schema = ResumeCrewAI.model_json_schema()
     user_prompt = (
-        f"Vacancy Title: {vacancy.title}\n"
-        f"Vacancy Details: {vacancy.text}\n"
-        f"LinkedIn URL: {LINKEDIN_PROFILE_URL}\n"
-        f"Evaluation Summary: {evaluation.summary}\n"
-        f"Evaluation Rating: {evaluation.rating}\n"
-        f"Required Profile Sections: {present_sections}\n"
-        f"Prioritized Facts: {evaluation.prioritized_facts}\n"
-        f"Missing Facts: {evaluation.missing_mandatory_facts}\n\n"
-        f"Candidate Profile Markdown:\n{profile_text}\n\n"
-        f"Output JSON strictly matching this schema:\n{json.dumps(json_schema)}"
+        f"Vacancy title: {vacancy.title}\n"
+        f"Vacancy: {vacancy.text}\n"
+        f"Priorities: {evaluation.prioritized_facts}\n"
+        f"Required sections: {present_sections}\n"
+        f"Profile:\n{profile_text}\n\n"
+        "Return JSON only with exactly these keys: personal_info, summary, education, "
+        "experience, skills, projects, certifications. personal_info requires name,email,phone,"
+        "address,location and optional linkedin_url. education entries require course,institution,"
+        "location,start_date,end_date. experience entries require title,company,location,start_date,"
+        "end_date,description; description has 3-4 factual strings. skills entries require title,elements. "
+        "project entries require title,description, optional start_date/end_date, and highlights with 3-4 factual strings. "
+        "certification entries require title and optional issuer,date,url."
     )
 
     payload = {
