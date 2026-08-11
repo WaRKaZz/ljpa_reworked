@@ -27,7 +27,7 @@ class ResumeEvaluationCrew:
         self.llm_timeout = llm_timeout
         self.max_execution_time = max_execution_time
         self.max_iter = max_iter
-        self.llm = create_llm(timeout=llm_timeout)
+        self.llm = create_llm(timeout=llm_timeout, max_tokens=4096)
 
     @agent
     def resume_evaluation_agent(self) -> Agent:

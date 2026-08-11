@@ -19,7 +19,7 @@ class ResumeGenerationCrew:
 
     def __init__(self) -> None:
         super().__init__()
-        self.llm = create_llm()
+        self.llm = create_llm(max_tokens=4096)
 
     @agent
     def resume_agent(self) -> Agent:

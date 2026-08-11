@@ -59,7 +59,7 @@ PROFILE_FILE_PATH = os.path.join(RESOURCES_DIR, "profile.md")
 
 
 
-def create_llm(timeout: float | int | None = None):
+def create_llm(timeout: float | int | None = None, max_tokens: int | None = None):
     """Build the project LLM client for the configured OpenAI-compatible gateway."""
     from crewai import LLM
 
@@ -72,4 +72,6 @@ def create_llm(timeout: float | int | None = None):
     }
     if timeout is not None:
         kwargs["timeout"] = timeout
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
     return LLM(**kwargs)
