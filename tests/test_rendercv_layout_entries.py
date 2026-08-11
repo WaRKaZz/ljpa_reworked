@@ -29,3 +29,4 @@ def test_education_and_experience_use_normal_entry_layout():
     assert sections["Experience"][0]["name"] == "Company — Engineer"
     assert sections["Experience"][0]["summary"] == "Berlin"
     assert "company" not in sections["Experience"][0]
+    assert list(sections) == ["Summary", "Skills", "Experience", "Education"]

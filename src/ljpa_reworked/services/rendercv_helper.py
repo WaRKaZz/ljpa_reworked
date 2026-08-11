@@ -145,7 +145,18 @@ def convert_resume_crewai_to_rendercv_input(resume: ResumeCrewAI) -> dict[str, A
             cert_entries.append(entry)
         sections["Certifications"] = cert_entries
 
-    cv["sections"] = sections
+    # HR scans Summary and Skills first; keep ATS-standard sections in this order.
+    section_order = (
+        "Summary",
+        "Skills",
+        "Experience",
+        "Education",
+        "Certifications",
+        "Projects",
+    )
+    cv["sections"] = {
+        name: sections[name] for name in section_order if name in sections
+    }
     return {"cv": cv}
 
 
