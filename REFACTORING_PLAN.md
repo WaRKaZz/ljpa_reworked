@@ -118,11 +118,10 @@
 4. Executed permitted real end-to-end smoke test using `resources/profile.md` and a synthetic vacancy through configured gateway: evaluator succeeded, generator produced valid `ResumeCrewAI`, RenderCV compiled a non-empty PDF under `/tmp`, verified non-zero size, and deleted the PDF afterwards.
 5. All hermetic contract tests and real smoke tests passed (109 passed, 71.10% coverage).
 
-### 4D: RenderCV output and one operator-reviewed PDF — **not started**
+### 4D: RenderCV output and one operator-reviewed PDF — **in progress**
 
-1. Extract the proven disposable RenderCV conversion into the smallest production renderer and persist PDF metadata.
-2. Keep generated resumes out of Git and store per-vacancy output metadata in the canonical DB.
-3. With explicit operator authorization, run evaluator and generator for one saved vacancy, render one PDF in the ignored resume directory, and leave it for visual review. Do not submit, email, or message.
+1. **4D.1: Production persistence path — not started.** Replace the legacy PDF generator in `save_resume()` with the proven RenderCV helper. Save only a relative filename under the ignored resume directory and persist it with `Resume.rendered_at`. Verify with synthetic data and disposable SQLite only; do not mutate `data/app.db` or make network calls.
+2. **4D.2: One operator-reviewed PDF — not started.** After 4D.1 is verified and with separate explicit operator authorization, back up `data/app.db`, run evaluator and generator for one saved vacancy, render one PDF in the ignored resume directory, persist its metadata, and leave it for visual review. Do not submit, email, or message.
 
 ### 4E: Resume cleanup — **not started**
 
