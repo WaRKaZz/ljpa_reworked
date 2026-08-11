@@ -19,11 +19,15 @@ def crewai_retry_handler(func):
         for i in range(retries):
             try:
                 return func(*args, **kwargs)
+            except ValueError as e:
+                # Validation error (missing mandatory profile facts / invalid facts) fails without retry
+                raise e
             except Exception as e:
                 logging.error(f"Attempt {i + 1} of {retries} failed with error: {e}")
                 if i < retries - 1:
                     logging.info("Retrying in 60 seconds...")
                 else:
                     logging.error("All retries failed.")
+                    raise e
 
     return wrapper

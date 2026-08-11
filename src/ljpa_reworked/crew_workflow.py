@@ -31,6 +31,26 @@ def read_profile_text(profile_path: str = PROFILE_FILE_PATH) -> str:
         return f.read()
 
 
+def validate_resume_facts(resume: ResumeCrewAI, evaluation: BasicEvaluationCrewAI) -> None:
+    """Validate generated resume against candidate profile evaluation plan."""
+    if evaluation.missing_mandatory_facts:
+        raise ValueError(
+            f"Missing mandatory profile facts: {', '.join(evaluation.missing_mandatory_facts)}"
+        )
+
+    for exp in resume.experience:
+        if len(exp.description) < 3:
+            raise ValueError(
+                f"Experience entry '{exp.title}' at '{exp.company}' has fewer than 3 bullet points."
+            )
+
+    for proj in resume.projects:
+        if len(proj.highlights) < 3:
+            raise ValueError(
+                f"Project entry '{proj.title}' has fewer than 3 bullet points."
+            )
+
+
 @crewai_retry_handler
 def crewai_evaluate_vacancy(vacancy: "Vacancy") -> BasicEvaluationCrewAI:
     profile_text = read_profile_text(PROFILE_FILE_PATH)
@@ -62,11 +82,16 @@ def crewai_generate_resume(
     inputs["linkedin_url"] = LINKEDIN_PROFILE_URL
     inputs["rating"] = evaluation.rating
     inputs["summary"] = evaluation.summary
+    inputs["required_profile_sections"] = evaluation.required_profile_sections
+    inputs["prioritized_facts"] = evaluation.prioritized_facts
+    inputs["missing_mandatory_facts"] = evaluation.missing_mandatory_facts
     inputs["candidate_profile"] = profile_text
     crew_output = crew.kickoff(inputs=inputs)
     rate_limitter.record(crew.usage_metrics.successful_requests)
     resume: ResumeCrewAI = crew_output.tasks_output[0].pydantic
+    validate_resume_facts(resume, evaluation)
     return resume
+
 
 
 @crewai_retry_handler

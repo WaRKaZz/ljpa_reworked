@@ -148,6 +148,52 @@ def convert_resume_crewai_to_rendercv_input(resume: ResumeCrewAI) -> dict[str, A
     return {"cv": cv}
 
 
+def validate_pdf_page_layout(pdf_path: str) -> tuple[bool, str]:
+    """Validate PDF page count and layout fill requirements.
+
+    Max 2 pages; page 2 allowed only if it contains secondary material and is at least 50% filled.
+    """
+    import os
+    if not os.path.exists(pdf_path):
+        return False, f"PDF file does not exist at {pdf_path}"
+
+    try:
+        import pypdfium2
+        doc = pypdfium2.PdfDocument(pdf_path)
+    except Exception as e:
+        return False, f"Failed to parse PDF: {e}"
+
+    num_pages = len(doc)
+    if num_pages == 1:
+        return True, "1-page PDF meets layout requirements"
+    elif num_pages > 2:
+        return False, f"PDF exceeds maximum 2 pages: total {num_pages} pages"
+
+    page2 = doc[1]
+    w, h = page2.get_size()
+    text = page2.get_textpage().get_text_range()
+
+    secondary_keywords = ["certifications", "projects", "education", "tools", "skills", "languages", "courses", "certificates"]
+    has_secondary = any(kw in text.lower() for kw in secondary_keywords)
+    if not has_secondary:
+        return False, "Page 2 lacks secondary section content"
+
+    import numpy as np
+    image = page2.render(scale=1).to_pil()
+    img_arr = np.array(image.convert("L"))
+    mask = img_arr < 240
+    y_indices, _ = np.where(mask)
+    if len(y_indices) == 0:
+        return False, "Page 2 is empty"
+
+    max_y = y_indices.max()
+    fill_pct = max_y / h
+    if fill_pct < 0.50:
+        return False, f"Page 2 fill level ({fill_pct*100:.1f}%) is less than 50%"
+
+    return True, f"2-page PDF valid with secondary material and {fill_pct*100:.1f}% fill on page 2"
+
+
 def render_resume_crewai_to_pdf(resume: ResumeCrewAI, output_pdf_path: str) -> str:
     """Convert a ResumeCrewAI model to RenderCV input YAML and render a PDF using RenderCV."""
     import os
@@ -177,4 +223,14 @@ def render_resume_crewai_to_pdf(resume: ResumeCrewAI, output_pdf_path: str) -> s
             raise RuntimeError(
                 f"RenderCV rendering failed with exit code {res.returncode}: {res.stderr}\n{res.stdout}"
             )
+
+    is_valid, msg = validate_pdf_page_layout(output_pdf_path)
+    if not is_valid:
+        if os.path.exists(output_pdf_path):
+            try:
+                os.remove(output_pdf_path)
+            except OSError:
+                pass
+        raise RuntimeError(f"RenderCV output failed page layout validation: {msg}")
+
     return output_pdf_path

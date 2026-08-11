@@ -128,6 +128,9 @@ class EmailCrewAI(BaseModel):
 class BasicEvaluationCrewAI(BaseModel):
     summary: StrippedStr
     rating: Annotated[int, Field(ge=0, le=100)]
+    required_profile_sections: list[StrippedStr] = Field(default_factory=list)
+    prioritized_facts: list[StrippedStr] = Field(default_factory=list)
+    missing_mandatory_facts: list[StrippedStr] = Field(default_factory=list)
 
 
 class ProcessedPost(BaseModel):
