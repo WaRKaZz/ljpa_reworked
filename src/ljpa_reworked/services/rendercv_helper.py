@@ -219,7 +219,7 @@ def render_resume_crewai_to_pdf(resume: ResumeCrewAI, output_pdf_path: str) -> s
     with tempfile.TemporaryDirectory(prefix="rendercv-") as temp_dir:
         temp_yaml_path = os.path.join(temp_dir, "resume.yaml")
         with open(temp_yaml_path, "w", encoding="utf-8") as f:
-            yaml.dump(input_dict, f, allow_unicode=True)
+            yaml.dump(input_dict, f, allow_unicode=True, sort_keys=False)
         cmd = [
             "rendercv",
             "render",
