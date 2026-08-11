@@ -121,7 +121,7 @@
 ### 4D: RenderCV output and one operator-reviewed PDF — **in progress**
 
 1. **4D.1: Production persistence path — complete / verified by operator.** Replaced legacy `ResumeGenerator` call in `save_resume()` with `render_resume_crewai_to_pdf()`. Saves only a collision-safe relative filename under `RESOURCES_DIR/resumes/` and persists it with `Resume.rendered_at`. Atomically cleans up the generated PDF if rendering or DB creation fails and re-raises exceptions. Verified with hermetic unit tests using in-memory SQLite (113 passed, 78.95% coverage).
-2. **4D.2: One operator-reviewed PDF — deterministic profile-completeness correction in progress.** The LLM-selected required sections are not authoritative. Derive resume-section requirements deterministically from `profile.md`, reject missing core profile sections before any LLM call, restore the verified baseline, and only then create a replacement PDF if the profile is complete. Keep the backup and leave Stage 4D.2 incomplete until Ivan visually accepts a complete resume. Do not submit, email, message, collect LinkedIn, run JobSpy, or run the full pipeline.
+2. **4D.2: One operator-reviewed PDF — canonical profile rebuild in progress.** Local source PDFs contain factual experience, education, certifications, languages, skills, and projects absent from the incomplete `profile.md`. Rebuild canonical `resources/profile.md` from those local sources, validate structured core sections deterministically, restore the baseline, then create one replacement PDF only after profile validation succeeds. Keep the backup and leave Stage 4D.2 incomplete until Ivan visually accepts it. Do not submit, email, message, collect LinkedIn, run JobSpy, or run the full pipeline.
 
 ### 4E: Resume cleanup — **not started**
 
