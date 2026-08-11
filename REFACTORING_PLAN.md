@@ -121,7 +121,7 @@
 ### 4D: RenderCV output and one operator-reviewed PDF — **in progress**
 
 1. **4D.1: Production persistence path — complete / verified by operator.** Replaced legacy `ResumeGenerator` call in `save_resume()` with `render_resume_crewai_to_pdf()`. Saves only a collision-safe relative filename under `RESOURCES_DIR/resumes/` and persists it with `Resume.rendered_at`. Atomically cleans up the generated PDF if rendering or DB creation fails and re-raises exceptions. Verified with hermetic unit tests using in-memory SQLite (113 passed, 78.95% coverage).
-2. **4D.2: One operator-reviewed PDF — not started.** After 4D.1 is verified and with separate explicit operator authorization, back up `data/app.db`, run evaluator and generator for one saved vacancy, render one PDF in the ignored resume directory, persist its metadata, and leave it for visual review. Do not submit, email, or message.
+2. **4D.2: One operator-reviewed PDF — in progress / awaiting operator acceptance.** Back up and verify `data/app.db`, select one eligible saved vacancy without exposing its contents, run exactly one authorized evaluator/generator cycle through the configured gateway, render and persist one PDF, then retain the artifact and backup for Ivan's visual review. Do not submit, email, message, collect LinkedIn, run JobSpy, or mark complete before explicit acceptance.
 
 ### 4E: Resume cleanup — **not started**
 
