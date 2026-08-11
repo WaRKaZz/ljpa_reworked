@@ -73,10 +73,11 @@ def convert_resume_crewai_to_rendercv_input(resume: ResumeCrewAI) -> dict[str, A
     if resume.education:
         edu_entries = []
         for edu in resume.education:
+            # ponytail: RenderCV EducationEntry reserves columns for institution,
+            # area, location, and dates; NormalEntry matches the compact project layout.
             entry: dict[str, Any] = {
-                "institution": edu.institution,
-                "area": edu.course,
-                "location": edu.location,
+                "name": f"{edu.institution} — {edu.course}",
+                "summary": edu.location,
             }
             if edu.start_date:
                 entry["start_date"] = _normalize_date(edu.start_date)
@@ -88,10 +89,10 @@ def convert_resume_crewai_to_rendercv_input(resume: ResumeCrewAI) -> dict[str, A
     if resume.experience:
         exp_entries = []
         for exp in resume.experience:
+            # ponytail: NormalEntry avoids the wide ExperienceEntry header table.
             entry: dict[str, Any] = {
-                "company": exp.company,
-                "position": exp.title,
-                "location": exp.location,
+                "name": f"{exp.company} — {exp.title}",
+                "summary": exp.location,
             }
             if exp.start_date:
                 entry["start_date"] = _normalize_date(exp.start_date)
