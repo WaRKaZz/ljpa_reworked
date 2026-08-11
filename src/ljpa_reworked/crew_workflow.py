@@ -270,6 +270,17 @@ def crewai_generate_email(vacancy: "Vacancy") -> EmailCrewAI:
 
 def _format_numeric_layout_feedback(raw_error: str) -> str:
     """Extract numeric deficit/excess from validation error and formulate explicit correction instructions."""
+    common_instructions = (
+        "\nRenderCV entry policy: RenderCV has allow_page_break_in_entries set to false, so whole section entries move together to the next page when overflow occurs instead of splitting.\n"
+        "ALLOWED FIELDS IN PRIORITY ORDER:\n"
+        "1. Summary section (expand/trim up to max 500 characters limit).\n"
+        "2. Skill elements (add or trim technical skill elements in existing categories).\n"
+        "3. Existing experience descriptions and project highlights (expand or trim bullet points with technical detail).\n"
+        "FORBIDDEN CHANGES: Do NOT invent fake roles, companies, projects, certifications, or dates. Do not add fabricated history.\n"
+        "PRESERVED CONSTRAINTS: Preserve all verified candidate profile facts, maintain section order (Summary, Skills, Experience, Education, Certifications, Projects), and adhere strictly to the ResumeCrewAI Pydantic schema.\n"
+        "FINAL JSON REMINDER: Return strictly one raw valid JSON object matching ResumeCrewAI schema without markdown syntax or comments."
+    )
+
     match = re.search(
         r"Page (\d+) \(non-final\) character count \((\d+)\) is outside required range \[3300, 3475\]",
         raw_error,
@@ -282,17 +293,19 @@ def _format_numeric_layout_feedback(raw_error: str) -> str:
             add_target = target_mid - count
             return (
                 f"{raw_error}\n"
-                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters (SHORT of 3300 min). "
+                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters (SHORT of 3300 min in range [3300, 3475]). "
                 f"You MUST expand the resume text by approximately {add_target} characters to land near {target_mid} characters. "
                 f"Add 1 technical sentence to 2-3 experience bullets or expand skill elements."
+                f"{common_instructions}"
             )
         elif count > 3475:
             trim_target = count - target_mid
             return (
                 f"{raw_error}\n"
-                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters (EXCEEDS 3475 max). "
+                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters (EXCEEDS 3475 max in range [3300, 3475]). "
                 f"You MUST trim the resume text by approximately {trim_target} characters to land near {target_mid} characters. "
                 f"Slightly shorten 2-3 experience bullets."
+                f"{common_instructions}"
             )
 
     match_final = re.search(
@@ -302,11 +315,13 @@ def _format_numeric_layout_feedback(raw_error: str) -> str:
     if match_final:
         page_num = match_final.group(1)
         count = int(match_final.group(2))
-        add_target = 1500 - count
+        target_mid = 1500
+        add_target = target_mid - count
         return (
             f"{raw_error}\n"
-            f"NUMERIC CORRECTION REQUIRED: Final Page {page_num} has {count} characters (SHORT of 1400 min). "
-            f"You MUST add approximately {add_target} characters across experience/project sections."
+            f"NUMERIC CORRECTION REQUIRED: Final Page {page_num} has {count} characters (SHORT of 1400 min requirement). "
+            f"You MUST add approximately {add_target} characters across experience/project sections to land near {target_mid} characters."
+            f"{common_instructions}"
         )
 
     return raw_error

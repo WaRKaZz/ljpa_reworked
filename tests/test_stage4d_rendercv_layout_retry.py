@@ -194,6 +194,52 @@ def test_format_numeric_layout_feedback_branches():
     assert _format_numeric_layout_feedback(err_other) == err_other
 
 
+def test_format_numeric_layout_feedback_detailed_instructions():
+    from ljpa_reworked.crew_workflow import _format_numeric_layout_feedback
+
+    # 1. Short non-final page case (2800 < 3300)
+    err_short = "Page 1 (non-final) character count (2800) is outside required range [3300, 3475]"
+    res_short = _format_numeric_layout_feedback(err_short)
+    assert "Page 1" in res_short
+    assert "2800" in res_short
+    assert "[3300, 3475]" in res_short
+    assert "587" in res_short  # 3387 - 2800 = 587
+    assert "3387" in res_short
+    assert "RenderCV" in res_short and "move" in res_short.lower()
+    assert "Priority" in res_short or "priority" in res_short.lower()
+    assert "Summary" in res_short
+    assert "Skill" in res_short or "skills" in res_short.lower()
+    assert "Forbidden" in res_short or "forbidden" in res_short.lower()
+    assert "no invented" in res_short.lower() or "do not invent" in res_short.lower()
+    assert "Preserve" in res_short or "preserve" in res_short.lower()
+    assert "JSON" in res_short
+
+    # 2. Long non-final page case (3600 > 3475)
+    err_long = "Page 1 (non-final) character count (3600) is outside required range [3300, 3475]"
+    res_long = _format_numeric_layout_feedback(err_long)
+    assert "Page 1" in res_long
+    assert "3600" in res_long
+    assert "[3300, 3475]" in res_long
+    assert "213" in res_long  # 3600 - 3387 = 213
+    assert "3387" in res_long
+    assert "Summary" in res_long
+    assert "Forbidden" in res_long or "forbidden" in res_long.lower()
+    assert "JSON" in res_long
+
+    # 3. Short final page case (1200 < 1400)
+    err_final = "Page 2 (final) character count (1200) is less than minimum 1400 characters"
+    res_final = _format_numeric_layout_feedback(err_final)
+    assert "Page 2" in res_final
+    assert "1200" in res_final
+    assert "1400" in res_final
+    assert "300" in res_final  # 1500 - 1200 = 300
+    assert "1500" in res_final
+    assert "Summary" in res_final
+    assert "Forbidden" in res_final or "forbidden" in res_final.lower()
+    assert "JSON" in res_final
+
+
+
 def test_save_resume_cleans_up_on_create_resume_error(tmp_path):
     from ljpa_reworked.models.database_models import Vacancy
     from ljpa_reworked.workflow import save_resume
