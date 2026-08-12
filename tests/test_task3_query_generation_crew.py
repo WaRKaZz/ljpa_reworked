@@ -291,7 +291,7 @@ def test_query_generation_prompt_keyword_query_rules():
         / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "1–3 short" in task_config or "1-3 short" in task_config
+    assert "5–7 short" in task_config or "5-7 short" in task_config
     assert "no sentence" in task_config or "full sentences" in task_config
     assert "google_search_term" not in task_config
     assert "jobs near <location>" not in task_config
@@ -308,3 +308,14 @@ def test_query_generation_prompt_excludes_google_site_and_worldwide_rule():
     assert "Allowed site_name values only: linkedin, indeed." in task_config
     assert "Google queries"  not in task_config
     assert "google_search_term" not in task_config
+
+
+def test_query_generation_prompt_explicitly_excludes_google_and_ziprecruiter():
+    from pathlib import Path
+
+    task_config = (
+        Path(__file__).parents[1]
+        / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "Do not generate Google or ZipRecruiter queries." in task_config

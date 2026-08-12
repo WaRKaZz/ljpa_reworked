@@ -8,14 +8,14 @@ generate_job_search_queries_task:
     ---
 
     Keyword and search term rules:
-    - `search_term` must contain 1–3 short, searchable role or skill keywords grounded only in profile.md (e.g. "Python Developer", "Backend AI", "Data Engineer").
+    - `search_term` must contain 5–7 short, searchable role or skill keywords grounded only in profile.md (e.g. "Python Developer", "Backend AI", "Data Engineer").
     - Do not use full sentences, full vacancy titles, long technology stacks, boolean operators, or company names in `search_term`.
     Use the candidate's Job Search Preferences for locations, not their current or past residence unless profile preferences explicitly choose them. When preferences say worldwide:
     - Require at least one LinkedIn query with location `worldwide`.
     - Require Indeed queries to use individual country locations, selected by the Crew as realistic international markets for the profile-supported roles and skills.
     - Never use `worldwide` for Indeed queries.
 
-    Generate 10 to 15 distinct, realistic queries. Cover different roles, skills, locations, and supported job boards. Allowed site_name values only: linkedin, indeed. Do not create near-duplicate queries.
+    Generate 10 to 15 distinct, realistic queries. Cover different roles, skills, locations, and supported job boards. Allowed site_name values only: linkedin, indeed. Do not generate Google or ZipRecruiter queries. Do not create near-duplicate queries.
 
     Return only data that validates against JobSearchQuerySet. Set profile_sha256 exactly to {profile_sha256}. Each query must use one supported site_name and contain a non-empty search_term and location. Do not include explanations, markdown, salary claims, credentials not present in the profile, application instructions, URLs, or lifecycle/status fields.
   expected_output: "A JobSearchQuerySet JSON object only."
