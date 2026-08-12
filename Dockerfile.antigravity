@@ -99,7 +99,7 @@ RUN bash -o pipefail -c \
 # MarkItDown service uses MCP 2.0 because Antigravity probes `server/discover` (2026-07-28).
 RUN python -m pip install --no-cache-dir "markitdown==0.1.7" "mcp==2.0.0" fastapi uvicorn pydantic
 
-COPY --chown=agent:agent docker/markitdown_mcp.py /home/agent/.local/lib/markitdown_mcp.py
+COPY --chown=agent:agent src/ljpa_reworked/services/docker/markitdown_mcp.py /home/agent/.local/lib/markitdown_mcp.py
 
 # Нативная установка Superpowers и Ponytail.
 RUN agy plugin install https://github.com/obra/superpowers \
