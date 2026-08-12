@@ -44,6 +44,8 @@ NON-NEGOTIABLE EXECUTION RULES
 
 8. Never write to `/app/data/app.db` during collection, review, audit, deduplication, or cleanup. Use the transactional database procedure below.
 
+9. Do not use background execution for the scraper, sub-processes, or its DB audit. Stay in the foreground until the scraper process exits. Do not use `/workspace` prior reports or scripts as proof of current-run completion. Do not state success until the completion artifact at `/workspace/scraper-result.json` exists.
+
 ==================================================
 DATABASE WORKSPACE AND ATOMIC PUBLISHING
 ==================================================
@@ -55,9 +57,19 @@ The canonical database is `/app/data/app.db`. It is the production input and mus
 3. A deletion is permitted only in `/workspace/app.db.work`, only for a row created in this exact run, and only after that row fails the final audit. Never delete, modify, or purge a pre-existing row in either database.
 4. Keep a manifest at `/workspace/run-manifest.json` containing the workspace DB path, canonical DB path, run start time, inserted IDs, updated IDs, deleted current-run IDs, and final validation results. Do not include vacancy text, profiles, cookies, tokens, or secrets in the manifest.
 5. Before publishing, close every SQLite connection to the workspace copy. Run `PRAGMA integrity_check`, `PRAGMA foreign_key_check`, and the complete audit on `/workspace/app.db.work`. Confirm that no candidate accepted in this run violates any gate.
-6. Publish only if every check passes: copy `/workspace/app.db.work` to a temporary sibling file `/app/data/app.db.next`, verify `PRAGMA integrity_check` on `app.db.next`, then atomically replace the canonical DB with `os.replace('/app/data/app.db.next', '/app/data/app.db')`. Do not use `DELETE` or recreate the canonical DB in place.
-7. If any check, copy, or replacement step fails, remove only `/app/data/app.db.next` and retain the original `/app/data/app.db` unchanged. Report the failure and stop.
-8. After successful publish, open the new `/app/data/app.db` read-only and run `PRAGMA integrity_check` plus a count/status summary. Do not make further writes to it during this run.
+6. Write `/workspace/scraper-result.json` only after stopping worker processes, closing SQLite, running `PRAGMA integrity_check` and `PRAGMA foreign_key_check`, and completing the final audit:
+   ```json
+   {
+     "status": "completed",
+     "workspace_db": "/app/data/app.db",
+     "integrity_check": "ok",
+     "foreign_key_check": "ok",
+     "final_valid_vacancy_count": 10
+   }
+   ```
+7. Publish only if every check passes and `/workspace/scraper-result.json` contains `"status": "completed"`: copy `/workspace/app.db.work` to a temporary sibling file `/app/data/app.db.next`, verify `PRAGMA integrity_check` on `app.db.next`, then atomically replace the canonical DB with `os.replace('/app/data/app.db.next', '/app/data/app.db')`. Do not use `DELETE` or recreate the canonical DB in place.
+8. If any check, copy, or replacement step fails, remove only `/app/data/app.db.next` and retain the original `/app/data/app.db` unchanged. Report the failure and stop.
+9. After successful publish, open the new `/app/data/app.db` read-only and run `PRAGMA integrity_check` plus a count/status summary. Do not make further writes to it during this run.
 
 ==================================================
 PHASE 1 — DYNAMIC CANDIDATE PROFILE INGESTION

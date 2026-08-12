@@ -1,20 +1,74 @@
 import json
+import sqlite3
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from ljpa_reworked.services.harness_runner import harness_submit, run_linkedin_harness
 
 
-def test_run_linkedin_harness_sends_http_request():
-    mock_response = MagicMock()
-    mock_response.__enter__.return_value = [b'{"event":"init"}\n']
+def test_run_linkedin_harness_sends_http_request(tmp_path):
+    canonical = tmp_path / "app.db"
+    scraper = tmp_path / "harness-scraper" / "app.db"
+    with sqlite3.connect(canonical) as connection:
+        connection.execute("CREATE TABLE marker (value TEXT)")
 
-    with patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
-        assert run_linkedin_harness(api_url="http://localhost:8080/run-harness") == 0
+    mock_response = MagicMock()
+    mock_response.__enter__.return_value = [b'{"event":"result","result":{"status":"SUCCESS"}}\n']
+
+    def side_effect_urlopen(*args, **kwargs):
+        artifact = scraper.with_name("scraper-result.json")
+        artifact.write_text(json.dumps({
+            "status": "completed",
+            "workspace_db": "/app/data/app.db",
+            "integrity_check": "ok",
+            "foreign_key_check": "ok",
+            "final_valid_vacancy_count": 1,
+        }))
+        return mock_response
+
+    with patch("urllib.request.urlopen", side_effect=side_effect_urlopen) as mock_urlopen:
+        assert run_linkedin_harness(
+            api_url="http://localhost:8080/run-harness",
+            canonical_db_path=canonical,
+            scraper_db_path=scraper,
+        ) == 0
+    assert not scraper.exists()
 
     assert mock_urlopen.called
     req = mock_urlopen.call_args.args[0]
     assert req.full_url == "http://localhost:8080/run-harness"
     assert req.get_method() == "POST"
+
+
+def test_scraper_runner_returns_at_terminal_agy_success(tmp_path):
+    canonical = tmp_path / "app.db"
+    scraper = tmp_path / "harness-scraper" / "app.db"
+    with sqlite3.connect(canonical) as connection:
+        connection.execute("CREATE TABLE marker (value TEXT)")
+
+    consumed = []
+
+    def response_lines():
+        consumed.append("line1")
+        yield b'{"event":"message","content":"working"}\n'
+        consumed.append("line2")
+        yield b'{"event":"result","result":{"status":"SUCCESS"}}\n'
+        consumed.append("line3")
+        yield b'{"event":"message","content":"should not be read"}\n'
+
+    mock_response = MagicMock()
+    mock_response.__enter__.return_value = response_lines()
+
+    with patch("urllib.request.urlopen", return_value=mock_response):
+        run_linkedin_harness(
+            api_url="http://localhost:8080/run-harness",
+            canonical_db_path=canonical,
+            scraper_db_path=scraper,
+        )
+
+    assert consumed == ["line1", "line2"]
+
 
 
 def test_harness_submit_sends_payload_and_returns_0_on_confirmed_status():
@@ -29,7 +83,7 @@ def test_harness_submit_sends_payload_and_returns_0_on_confirmed_status():
             vacancy_url="https://example.com/apply",
             resume_path="/app/resources/resumes/resume_1.pdf",
             prompt_file="/app/prompts/harness_submit.md",
-            timeout="8h",
+            timeout="1h",
             api_url="http://localhost:8080/run-harness",
         )
         assert result == 0
@@ -41,7 +95,7 @@ def test_harness_submit_sends_payload_and_returns_0_on_confirmed_status():
     assert payload["vacancy_url"] == "https://example.com/apply"
     assert payload["resume_path"] == "/app/resources/resumes/resume_1.pdf"
     assert payload["prompt_file"] == "/app/prompts/harness_submit.md"
-    assert payload["timeout"] == "8h"
+    assert payload["timeout"] == "1h"
 
 
 def test_harness_submit_returns_nonzero_on_failure_or_missing_confirmation():
@@ -73,15 +127,16 @@ def test_harness_runner_cli_manual_one_vacancy_path():
         with patch(
             "ljpa_reworked.services.harness_runner.harness_submit", return_value=0
         ) as mock_submit:
-            with patch("sys.exit") as mock_exit:
-                from ljpa_reworked.services.harness_runner import main as cli_main
+            from ljpa_reworked.services.harness_runner import main as cli_main
 
+            with pytest.raises(SystemExit) as exit_info:
                 cli_main()
-                mock_submit.assert_called_once_with(
-                    vacancy_url="https://example.com/job/123",
-                    resume_path="/app/resources/resumes/test.pdf",
-                    prompt_file="/app/prompts/harness_submit.md",
-                    timeout="8h",
-                    api_url="http://localhost:8080/run-harness",
-                )
-                mock_exit.assert_called_once_with(0)
+
+    assert exit_info.value.code == 0
+    mock_submit.assert_called_once_with(
+        vacancy_url="https://example.com/job/123",
+        resume_path="/app/resources/resumes/test.pdf",
+        prompt_file="/app/prompts/harness_submit.md",
+        timeout="1h",
+        api_url="http://localhost:8080/run-harness",
+    )
