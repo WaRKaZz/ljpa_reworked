@@ -219,7 +219,39 @@ def test_query_generation_prompt_preserves_explicit_worldwide_preference():
         / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "Use location `worldwide`" in task_config
+    assert "location `worldwide`" in task_config
+
+
+def test_query_generation_prompt_source_aware_worldwide_contract():
+    from pathlib import Path
+
+    task_config = (
+        Path(__file__).parents[1]
+        / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "Require at least one LinkedIn query with location `worldwide`." in task_config
+    assert (
+        "Require Indeed and Google queries to use individual country locations"
+        in task_config
+    )
+    assert "Never use `worldwide` for Indeed or Google queries." in task_config
+    assert (
+        "not their current or past residence unless profile preferences explicitly choose them"
+        in task_config
+    )
+
+
+def test_query_generation_prompt_has_no_fixed_hardcoded_markets():
+    from pathlib import Path
+
+    task_config = (
+        Path(__file__).parents[1]
+        / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
+    ).read_text(encoding="utf-8")
+
+    for prohibited in ["Saudi Arabia", "UAE", "United Arab Emirates", "USA", "United States"]:
+        assert prohibited not in task_config
 
 
 def test_query_generation_prompt_restricts_site_names_to_working_sources():
