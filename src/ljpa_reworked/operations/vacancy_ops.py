@@ -209,12 +209,12 @@ def transition_vacancy_status(
     return vacancy
 
 
-def confirm_email_application_submitted(
+def confirm_application_submitted(
     db: Session,
     vacancy_id: int,
     applied_at: datetime | None = None,
 ) -> Vacancy:
-    """Transition vacancy to applied status and stamp applied_at timestamp only after confirmed email send."""
+    """Transition vacancy to applied status and stamp applied_at timestamp only after confirmed application submission."""
     vacancy = transition_vacancy_status(
         db=db,
         vacancy_id=vacancy_id,
@@ -225,6 +225,43 @@ def confirm_email_application_submitted(
     db.commit()
     db.refresh(vacancy)
     return vacancy
+
+
+# Alias for backward compatibility
+confirm_email_application_submitted = confirm_application_submitted
+
+
+def get_eligible_url_vacancies(
+    db: Session,
+    limit: int = 20,
+    max_age_days: int = 60,
+) -> list[Vacancy]:
+    """Get up to limit freshest eligible URL vacancies created within max_age_days."""
+    from datetime import timedelta
+    cutoff = datetime.utcnow() - timedelta(days=max_age_days)
+    return (
+        db.query(Vacancy)
+        .filter(
+            and_(
+                Vacancy.deleted.is_(False),
+                Vacancy.submit_url.isnot(None),
+                Vacancy.submit_url != "",
+                or_(
+                    Vacancy.submit_url.startswith("http://"),
+                    Vacancy.submit_url.startswith("https://"),
+                ),
+                Vacancy.created_at >= cutoff,
+                Vacancy.visa_status.in_(
+                    [VisaStatus.provided, VisaStatus.not_mentioned]
+                ),
+                Vacancy.status.notin_(TERMINAL_STATUSES),
+            )
+        )
+        .order_by(Vacancy.created_at.desc(), Vacancy.id.desc())
+        .limit(limit)
+        .all()
+    )
+
 
 
 def get_all_vacancies(db: Session, skip: int = 0, limit: int = 100) -> list[Vacancy]:

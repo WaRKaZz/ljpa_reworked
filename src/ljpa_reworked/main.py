@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import logging
+import os
 
+from ljpa_reworked.config import RESOURCES_DIR
 from ljpa_reworked.crew_workflow import (
     crewai_evaluate_vacancy,
     crewai_generate_email,
@@ -9,13 +11,18 @@ from ljpa_reworked.crew_workflow import (
 from ljpa_reworked.database import SessionLocal
 from ljpa_reworked.models.enums import VacancyStatus
 from ljpa_reworked.operations import (
+    confirm_application_submitted,
     confirm_email_application_submitted,
     create_email,
     create_evaluation,
     get_eligble_vacancies,
+    get_eligible_url_vacancies,
     transition_vacancy_status,
 )
-from ljpa_reworked.services.harness_runner import run_linkedin_harness
+from ljpa_reworked.services.harness_runner import (
+    harness_submit,
+    run_linkedin_harness,
+)
 from ljpa_reworked.services.jobspy import JobSpyIntegrationService
 from ljpa_reworked.workflow import (
     extract_email,
@@ -28,6 +35,11 @@ logger = logging.getLogger(__name__)
 
 
 def process_eligible_vacancies(db, vacancies):
+    eligible_url_vacancies = get_eligible_url_vacancies(
+        db=db, limit=20, max_age_days=60
+    )
+    eligible_url_ids = {v.id for v in eligible_url_vacancies}
+
     for vacancy in vacancies:
         evaluation = crewai_evaluate_vacancy(vacancy=vacancy)
         create_evaluation(
@@ -54,27 +66,47 @@ def process_eligible_vacancies(db, vacancies):
             extract_email(vacancy.submit_url or "") if vacancy.submit_url else None
         )
 
-        if not recipient_email or not verified_recipient(recipient_email, db):
+        if recipient_email and verified_recipient(recipient_email, db):
+            email = crewai_generate_email(vacancy=vacancy)
+            orm_email = create_email(
+                db=db,
+                vacancy_id=vacancy.id,
+                email_data=email,
+                recipient=recipient_email,
+                resume_path=orm_resume.path,
+            )
+            send_email(orm_email)
+            confirm_email_application_submitted(
+                db=db,
+                vacancy_id=vacancy.id,
+            )
+        else:
             transition_vacancy_status(
                 db=db,
                 vacancy_id=vacancy.id,
                 target_status=VacancyStatus.application_prepared,
             )
-            continue
 
-        email = crewai_generate_email(vacancy=vacancy)
-        orm_email = create_email(
-            db=db,
-            vacancy_id=vacancy.id,
-            email_data=email,
-            recipient=recipient_email,
-            resume_path=orm_resume.path,
-        )
-        send_email(orm_email)
-        confirm_email_application_submitted(
-            db=db,
-            vacancy_id=vacancy.id,
-        )
+        if (
+            vacancy.submit_url
+            and vacancy.id in eligible_url_ids
+            and vacancy.status != VacancyStatus.applied
+        ):
+            pdf_path = os.path.join(RESOURCES_DIR, "resumes", orm_resume.path)
+            res = harness_submit(vacancy_url=vacancy.submit_url, resume_path=pdf_path)
+            if res == 0:
+                confirm_application_submitted(
+                    db=db,
+                    vacancy_id=vacancy.id,
+                )
+            elif res == 1:
+                transition_vacancy_status(
+                    db=db,
+                    vacancy_id=vacancy.id,
+                    target_status=VacancyStatus.application_error,
+                )
+
+
 
 
 def main():

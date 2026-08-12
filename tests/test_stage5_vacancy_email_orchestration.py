@@ -128,6 +128,7 @@ def test_process_eligible_vacancies_verified_email_path(db_session: Session):
         patch(
             "ljpa_reworked.main.confirm_email_application_submitted"
         ) as mock_confirm,
+        patch("ljpa_reworked.main.harness_submit", return_value=None),
     ):
         process_eligible_vacancies(db=db_session, vacancies=[v])
 
@@ -192,6 +193,7 @@ def test_process_eligible_vacancies_unverified_or_missing_email(
         patch(
             "ljpa_reworked.main.confirm_email_application_submitted"
         ) as mock_confirm,
+        patch("ljpa_reworked.main.harness_submit", return_value=None),
     ):
         process_eligible_vacancies(db=db_session, vacancies=[v])
 
@@ -202,5 +204,3 @@ def test_process_eligible_vacancies_unverified_or_missing_email(
         mock_create_email.assert_not_called()
         mock_send_email.assert_not_called()
         mock_confirm.assert_not_called()
-
-
