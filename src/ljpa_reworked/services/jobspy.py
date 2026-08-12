@@ -222,6 +222,7 @@ class JobSpyIntegrationService:
                         location=q.location,
                         results_wanted=q.results_wanted,
                         hours_old=72,
+                        country_indeed="worldwide",
                     )
                 except Exception as err:
                     logger.error("JobSpy scrape failed for query %s: %s", q, err)
@@ -383,6 +384,7 @@ def fetch_and_store_jobs(
         location=location,
         results_wanted=results_wanted,
         hours_old=72,
+        country_indeed="worldwide",
     )
     if jobs_df.empty:
         logger.warning("JobSpy returned no results.")

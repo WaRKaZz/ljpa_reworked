@@ -80,7 +80,7 @@ def test_jobspy_search_run_counters(db_session):
     )
 
     def mock_scrape_jobs(
-        site_name, search_term, location, results_wanted, hours_old=72
+        site_name, search_term, location, results_wanted, hours_old=72, country_indeed="worldwide"
     ):
         if search_term == "Python Engineer":
             return df_q1
@@ -134,7 +134,7 @@ def test_jobspy_search_handles_query_failure(db_session):
     )
 
     def mock_scrape_jobs(
-        site_name, search_term, location, results_wanted, hours_old=72
+        site_name, search_term, location, results_wanted, hours_old=72, country_indeed="worldwide"
     ):
         if search_term == "Failed Query":
             raise RuntimeError("JobSpy connection failed")

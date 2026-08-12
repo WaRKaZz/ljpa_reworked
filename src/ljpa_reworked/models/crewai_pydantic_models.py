@@ -154,7 +154,7 @@ class JobSearchQuery(BaseModel):
 
 class JobSearchQuerySet(BaseModel):
     profile_sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
-    queries: Annotated[list[JobSearchQuery], Field(min_length=1, max_length=12)]
+    queries: Annotated[list[JobSearchQuery], Field(min_length=1, max_length=15)]
 
     @model_validator(mode="after")
     def reject_normalized_duplicates(self):
