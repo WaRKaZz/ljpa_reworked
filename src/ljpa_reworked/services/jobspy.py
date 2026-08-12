@@ -178,6 +178,27 @@ def normalize_and_deduplicate_queries(
     return deduped
 
 
+def indeed_country_for_location(location: str) -> str:
+    """Map a JobSpy query location to Indeed's required country domain."""
+    normalized = location.casefold()
+    for marker, country in (
+        ("usa", "usa"),
+        ("united states", "usa"),
+        ("germany", "germany"),
+        ("uae", "united arab emirates"),
+        ("united arab emirates", "united arab emirates"),
+        ("australia", "australia"),
+        ("canada", "canada"),
+        ("saudi arabia", "saudi arabia"),
+        ("united kingdom", "united kingdom"),
+        ("uk", "united kingdom"),
+        ("netherlands", "netherlands"),
+    ):
+        if marker in normalized:
+            return country
+    return "worldwide"
+
+
 def validate_jobspy_query(site_name: str, location: str) -> str | None:
     """Validate query against source capabilities. Returns skip reason string if unsupported, None if supported."""
     site = (site_name or "").lower().strip()
@@ -250,7 +271,7 @@ class JobSpyIntegrationService:
                         "location": q.location,
                         "results_wanted": q.results_wanted,
                         "hours_old": 72,
-                        "country_indeed": "worldwide",
+                        "country_indeed": indeed_country_for_location(q.location),
                     }
                     if q.site_name == "google" and getattr(q, "google_search_term", None):
                         scrape_kwargs["google_search_term"] = q.google_search_term

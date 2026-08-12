@@ -124,6 +124,7 @@ def test_jobspy_service_run_passes_google_search_term_only_for_google(
     assert first_call_kwargs.get("search_term") == "Python Developer"
     assert first_call_kwargs.get("google_search_term") == "Python Engineer jobs near Munich, Germany" or first_call_kwargs.get("google_search_term") == "Python Developer jobs near Munich, Germany"
 
+    assert first_call_kwargs["country_indeed"] == "germany"
     # Second call: linkedin -> google_search_term NOT in kwargs
     second_call_kwargs = mock_scrape_jobs.call_args_list[1].kwargs
     assert second_call_kwargs.get("site_name") == ["linkedin"]
@@ -148,3 +149,11 @@ def test_fetch_and_store_jobs_passes_google_search_term_for_google(
     mock_scrape_jobs.assert_called_once()
     kwargs = mock_scrape_jobs.call_args.kwargs
     assert kwargs.get("google_search_term") == "Python Developer jobs near Munich, Germany"
+
+
+def test_indeed_country_follows_query_location():
+    from ljpa_reworked.services.jobspy import indeed_country_for_location
+
+    assert indeed_country_for_location('Houston, TX, USA') == 'usa'
+    assert indeed_country_for_location('Frankfurt, Germany') == 'germany'
+    assert indeed_country_for_location('Dubai, UAE') == 'united arab emirates'
