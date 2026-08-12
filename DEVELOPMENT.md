@@ -43,15 +43,7 @@ docker compose --profile debug up -d sqlite-ui
 ```
 Open `http://localhost:7901` in your browser to view, query, and edit the SQLite database via `sqlite-web`.
 
-## 4. Interactive Browser Authentication & VNC
-
-To perform initial or periodic LinkedIn session renewal:
-1. Start the browser container: `docker compose up -d cloak-browser`.
-2. Connect to the VNC session in your web browser: `http://localhost:6080`.
-3. Perform the login manually in the open Chromium window.
-4. Execute `src/operations/login_harness.py` to capture and verify `auth/state.json`.
-
-## 5. Testing & Verification
+## 4. Testing & Verification
 
 Run tests locally using `pytest`:
 ```bash
@@ -60,7 +52,7 @@ uv run pytest
 Ensure all harness components and database operations pass before completing features.
 
 
-## 4. Local Execution & Docker Strategy
+## 5. Local Execution & Docker Strategy
 
 - **Development & Testing**: Execute Python modules, scripts, and tests directly on the local host machine during development.
 - **Docker Deployment**: Docker containers are maintained for target deployment. Avoid building or running Docker images for routine testing tasks unless specifically testing the container build itself.

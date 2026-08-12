@@ -45,17 +45,6 @@ Built with **CrewAI**, **Playwright**, and containerized for consistency using *
    uv sync
    ```
 
-## 🔐 LinkedIn Authentication (VNC)
-
-Before agents can scrape LinkedIn, you must authenticate. LJPA uses an interactive VNC session to safely handle 2FA and Captchas and saves the session state for headless agents.
-
-1. Run the interactive login wrapper:
-   ```bash
-   ./scripts/linkedin_relogin.sh
-   ```
-2. Open your browser and navigate to: **http://localhost:7900/vnc.html**
-3. Log into LinkedIn manually in the VNC window. The script will detect the successful login, save the session to `auth/state.json`, and close automatically.
-
 ## ⚙️ Usage
 
 Once authenticated, you can trigger the main application pipeline:
