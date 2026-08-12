@@ -196,3 +196,14 @@ def test_query_generation_prompt_uses_job_search_preferences_not_candidate_histo
     assert "Job Search Preferences" in task_config
     assert "current or past residence" in task_config
     assert "10 to 15" in task_config
+
+
+def test_query_generation_prompt_preserves_explicit_worldwide_preference():
+    from pathlib import Path
+
+    task_config = (
+        Path(__file__).parents[1]
+        / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "Use location `worldwide`" in task_config
