@@ -244,14 +244,18 @@ class JobSpyIntegrationService:
                     continue
 
                 try:
-                    jobs_df = scrape_jobs(
-                        site_name=[q.site_name],
-                        search_term=q.search_term,
-                        location=q.location,
-                        results_wanted=q.results_wanted,
-                        hours_old=72,
-                        country_indeed="worldwide",
-                    )
+                    scrape_kwargs = {
+                        "site_name": [q.site_name],
+                        "search_term": q.search_term,
+                        "location": q.location,
+                        "results_wanted": q.results_wanted,
+                        "hours_old": 72,
+                        "country_indeed": "worldwide",
+                    }
+                    if q.site_name == "google" and getattr(q, "google_search_term", None):
+                        scrape_kwargs["google_search_term"] = q.google_search_term
+
+                    jobs_df = scrape_jobs(**scrape_kwargs)
                 except Exception as err:
                     logger.error("JobSpy scrape failed for query %s: %s", q, err)
                     summary.failures_by_query.append(
@@ -389,6 +393,7 @@ def fetch_and_store_jobs(
     location: str = "Remote",
     results_wanted: int = 10,
     db: Session | None = None,
+    google_search_term: str | None = None,
 ) -> list[Vacancy]:
     """Fetch job postings via python-jobspy ETL pipeline and store them as Vacancy records in SQLite."""
     logger.info(
@@ -403,14 +408,18 @@ def fetch_and_store_jobs(
         return []
 
     try:
-        jobs_df = scrape_jobs(
-            site_name=[site_name],
-            search_term=search_term,
-            location=location,
-            results_wanted=results_wanted,
-            hours_old=72,
-            country_indeed="worldwide",
-        )
+        scrape_kwargs = {
+            "site_name": [site_name],
+            "search_term": search_term,
+            "location": location,
+            "results_wanted": results_wanted,
+            "hours_old": 72,
+            "country_indeed": "worldwide",
+        }
+        if site_name == "google" and google_search_term:
+            scrape_kwargs["google_search_term"] = google_search_term
+
+        jobs_df = scrape_jobs(**scrape_kwargs)
     except Exception as err:
         logger.error(
             "JobSpy scrape failed for %s (%s, %s): %s",

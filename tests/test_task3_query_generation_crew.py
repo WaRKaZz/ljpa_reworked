@@ -264,3 +264,34 @@ def test_query_generation_prompt_restricts_site_names_to_working_sources():
 
     assert "Allowed site_name values only: linkedin, indeed, google." in task_config
     assert "zip_recruiter" not in task_config
+
+
+def test_job_search_query_google_search_term_field():
+    query_google = JobSearchQuery(
+        search_term="Python Engineer",
+        location="Munich, Germany",
+        site_name="google",
+        google_search_term="Python Engineer jobs near Munich, Germany",
+    )
+    assert query_google.google_search_term == "Python Engineer jobs near Munich, Germany"
+
+    query_linkedin = JobSearchQuery(
+        search_term="Python Engineer",
+        location="Remote",
+        site_name="linkedin",
+    )
+    assert query_linkedin.google_search_term is None
+
+
+def test_query_generation_prompt_keyword_query_rules():
+    from pathlib import Path
+
+    task_config = (
+        Path(__file__).parents[1]
+        / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "1–3 short" in task_config or "1-3 short" in task_config
+    assert "no sentence" in task_config or "full sentences" in task_config
+    assert "google_search_term" in task_config
+    assert "jobs near <location>" in task_config

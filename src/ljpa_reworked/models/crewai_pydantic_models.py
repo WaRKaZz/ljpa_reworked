@@ -149,7 +149,9 @@ class JobSearchQuery(BaseModel):
         str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)
     ]
     site_name: Literal["linkedin", "indeed", "glassdoor", "google", "zip_recruiter"]
+    google_search_term: StrippedStr | None = None
     results_wanted: Annotated[int, Field(ge=1, le=50)] = 25
+
 
 
 class JobSearchQuerySet(BaseModel):
