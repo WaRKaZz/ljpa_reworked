@@ -232,10 +232,10 @@ def test_query_generation_prompt_source_aware_worldwide_contract():
 
     assert "Require at least one LinkedIn query with location `worldwide`." in task_config
     assert (
-        "Require Indeed and Google queries to use individual country locations"
+        "Require Indeed queries to use individual country locations"
         in task_config
     )
-    assert "Never use `worldwide` for Indeed or Google queries." in task_config
+    assert "Never use `worldwide` for Indeed queries." in task_config
     assert (
         "not their current or past residence unless profile preferences explicitly choose them"
         in task_config
@@ -262,7 +262,7 @@ def test_query_generation_prompt_restricts_site_names_to_working_sources():
         / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "Allowed site_name values only: linkedin, indeed, google." in task_config
+    assert "Allowed site_name values only: linkedin, indeed." in task_config
     assert "zip_recruiter" not in task_config
 
 
@@ -293,5 +293,18 @@ def test_query_generation_prompt_keyword_query_rules():
 
     assert "1–3 short" in task_config or "1-3 short" in task_config
     assert "no sentence" in task_config or "full sentences" in task_config
-    assert "google_search_term" in task_config
-    assert "jobs near <location>" in task_config
+    assert "google_search_term" not in task_config
+    assert "jobs near <location>" not in task_config
+
+
+def test_query_generation_prompt_excludes_google_site_and_worldwide_rule():
+    from pathlib import Path
+
+    task_config = (
+        Path(__file__).parents[1]
+        / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "Allowed site_name values only: linkedin, indeed." in task_config
+    assert "Google queries"  not in task_config
+    assert "google_search_term" not in task_config
