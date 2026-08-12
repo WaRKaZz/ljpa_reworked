@@ -178,6 +178,15 @@ def normalize_and_deduplicate_queries(
     return deduped
 
 
+def validate_jobspy_query(site_name: str, location: str) -> str | None:
+    """Validate query against source capabilities. Returns skip reason string if unsupported, None if supported."""
+    site = (site_name or "").lower().strip()
+    loc = (location or "").lower().strip()
+    if site == "glassdoor" and loc == "worldwide":
+        return "Glassdoor does not support worldwide location search"
+    return None
+
+
 class JobSpyIntegrationService:
     """Service orchestrating sequential JobSpy search, caching, and database upserts."""
 
@@ -215,6 +224,23 @@ class JobSpyIntegrationService:
         def _execute_discovery(session: Session) -> None:
             for q in queries:
                 summary.queries_attempted += 1
+                q_dict = (
+                    q.model_dump()
+                    if hasattr(q, "model_dump")
+                    else {
+                        "search_term": q.search_term,
+                        "site_name": q.site_name,
+                        "location": q.location,
+                    }
+                )
+                skip_reason = validate_jobspy_query(q.site_name, q.location)
+                if skip_reason:
+                    logger.warning("Skipping query %s: %s", q, skip_reason)
+                    summary.failures_by_query.append(
+                        {"query": q_dict, "error": skip_reason}
+                    )
+                    continue
+
                 try:
                     jobs_df = scrape_jobs(
                         site_name=[q.site_name],
@@ -226,19 +252,11 @@ class JobSpyIntegrationService:
                     )
                 except Exception as err:
                     logger.error("JobSpy scrape failed for query %s: %s", q, err)
-                    q_dict = (
-                        q.model_dump()
-                        if hasattr(q, "model_dump")
-                        else {
-                            "search_term": q.search_term,
-                            "site_name": q.site_name,
-                            "location": q.location,
-                        }
-                    )
                     summary.failures_by_query.append(
                         {"query": q_dict, "error": str(err)}
                     )
                     continue
+
 
                 if jobs_df is None or jobs_df.empty:
                     continue
@@ -378,15 +396,31 @@ def fetch_and_store_jobs(
         location,
         site_name,
     )
-    jobs_df = scrape_jobs(
-        site_name=[site_name],
-        search_term=search_term,
-        location=location,
-        results_wanted=results_wanted,
-        hours_old=72,
-        country_indeed="worldwide",
-    )
-    if jobs_df.empty:
+    skip_reason = validate_jobspy_query(site_name, location)
+    if skip_reason:
+        logger.warning("Skipping JobSpy scrape: %s", skip_reason)
+        return []
+
+    try:
+        jobs_df = scrape_jobs(
+            site_name=[site_name],
+            search_term=search_term,
+            location=location,
+            results_wanted=results_wanted,
+            hours_old=72,
+            country_indeed="worldwide",
+        )
+    except Exception as err:
+        logger.error(
+            "JobSpy scrape failed for %s (%s, %s): %s",
+            site_name,
+            search_term,
+            location,
+            err,
+        )
+        return []
+
+    if jobs_df is None or jobs_df.empty:
         logger.warning("JobSpy returned no results.")
         return []
 

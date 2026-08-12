@@ -175,3 +175,58 @@ def test_main_runs_jobspy_after_linkedin_harness_before_evaluation():
         main_module.main()
 
     assert events == ["harness", "jobspy"]
+
+
+def test_jobspy_glassdoor_worldwide_query_skipped(db_session):
+    queries = [
+        JobSearchQuery(
+            site_name="glassdoor",
+            search_term="Python Engineer",
+            location="worldwide",
+            results_wanted=5,
+        ),
+    ]
+
+    service = JobSpyIntegrationService()
+
+    with patch.object(service, "get_queries", return_value=queries):
+        with patch("ljpa_reworked.services.jobspy.scrape_jobs") as mock_scrape:
+            summary = service.run(db=db_session)
+
+    mock_scrape.assert_not_called()
+    assert summary.queries_attempted == 1
+    assert len(summary.failures_by_query) == 1
+    assert summary.failures_by_query[0]["query"]["site_name"] == "glassdoor"
+    assert summary.failures_by_query[0]["query"]["location"] == "worldwide"
+    assert "glassdoor" in summary.failures_by_query[0]["error"].lower()
+    assert "worldwide" in summary.failures_by_query[0]["error"].lower()
+
+
+def test_jobspy_ziprecruiter_http_403_recorded_in_failures(db_session):
+    queries = [
+        JobSearchQuery(
+            site_name="zip_recruiter",
+            search_term="Backend Engineer",
+            location="worldwide",
+            results_wanted=5,
+        ),
+    ]
+
+    def mock_scrape_jobs(*args, **kwargs):
+        raise RuntimeError("ZipRecruiter 403 Forbidden")
+
+    service = JobSpyIntegrationService()
+
+    with patch.object(service, "get_queries", return_value=queries):
+        with patch(
+            "ljpa_reworked.services.jobspy.scrape_jobs", side_effect=mock_scrape_jobs
+        ):
+            summary = service.run(db=db_session)
+
+    assert summary.queries_attempted == 1
+    assert len(summary.failures_by_query) == 1
+    failure = summary.failures_by_query[0]
+    assert failure["query"]["site_name"] == "zip_recruiter"
+    assert failure["query"]["search_term"] == "Backend Engineer"
+    assert failure["query"]["location"] == "worldwide"
+    assert "ZipRecruiter 403 Forbidden" in failure["error"]
