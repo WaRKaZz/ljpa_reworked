@@ -80,7 +80,12 @@ def test_jobspy_search_run_counters(db_session):
     )
 
     def mock_scrape_jobs(
-        site_name, search_term, location, results_wanted, hours_old=72, country_indeed="worldwide"
+        site_name,
+        search_term,
+        location,
+        results_wanted,
+        hours_old=72,
+        country_indeed="worldwide",
     ):
         if search_term == "Python Engineer":
             return df_q1
@@ -134,7 +139,12 @@ def test_jobspy_search_handles_query_failure(db_session):
     )
 
     def mock_scrape_jobs(
-        site_name, search_term, location, results_wanted, hours_old=72, country_indeed="worldwide"
+        site_name,
+        search_term,
+        location,
+        results_wanted,
+        hours_old=72,
+        country_indeed="worldwide",
     ):
         if search_term == "Failed Query":
             raise RuntimeError("JobSpy connection failed")
@@ -202,7 +212,7 @@ def test_jobspy_glassdoor_worldwide_query_skipped(db_session):
     assert "worldwide" in summary.failures_by_query[0]["error"].lower()
 
 
-def test_jobspy_ziprecruiter_http_403_recorded_in_failures(db_session):
+def test_jobspy_ziprecruiter_disabled_recorded_in_failures(db_session):
     queries = [
         JobSearchQuery(
             site_name="zip_recruiter",
@@ -212,21 +222,20 @@ def test_jobspy_ziprecruiter_http_403_recorded_in_failures(db_session):
         ),
     ]
 
-    def mock_scrape_jobs(*args, **kwargs):
-        raise RuntimeError("ZipRecruiter 403 Forbidden")
-
     service = JobSpyIntegrationService()
 
     with patch.object(service, "get_queries", return_value=queries):
-        with patch(
-            "ljpa_reworked.services.jobspy.scrape_jobs", side_effect=mock_scrape_jobs
-        ):
+        with patch("ljpa_reworked.services.jobspy.scrape_jobs") as mock_scrape:
             summary = service.run(db=db_session)
 
+    mock_scrape.assert_not_called()
     assert summary.queries_attempted == 1
     assert len(summary.failures_by_query) == 1
     failure = summary.failures_by_query[0]
     assert failure["query"]["site_name"] == "zip_recruiter"
     assert failure["query"]["search_term"] == "Backend Engineer"
     assert failure["query"]["location"] == "worldwide"
-    assert "ZipRecruiter 403 Forbidden" in failure["error"]
+    assert (
+        "ziprecruiter" in failure["error"].lower()
+        or "unavailable" in failure["error"].lower()
+    )

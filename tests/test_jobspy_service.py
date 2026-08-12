@@ -2,7 +2,10 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from ljpa_reworked.services.jobspy import fetch_and_store_jobs
+from ljpa_reworked.services.jobspy import (
+    fetch_and_store_jobs,
+    validate_jobspy_query,
+)
 
 
 @patch("ljpa_reworked.services.jobspy.scrape_jobs")
@@ -39,6 +42,28 @@ def test_fetch_and_store_jobs_skips_glassdoor_worldwide(mock_scrape_jobs):
         site_name="glassdoor",
         search_term="Python Developer",
         location="worldwide",
+        db=db_mock,
+    )
+    assert result == []
+    mock_scrape_jobs.assert_not_called()
+
+
+def test_validate_jobspy_query_disables_ziprecruiter():
+    reason = validate_jobspy_query("zip_recruiter", "Remote")
+    assert reason is not None
+    assert "ziprecruiter" in reason.lower() or "unavailable" in reason.lower()
+
+    reason_alt = validate_jobspy_query("ziprecruiter", "Remote")
+    assert reason_alt is not None
+
+
+@patch("ljpa_reworked.services.jobspy.scrape_jobs")
+def test_fetch_and_store_jobs_skips_ziprecruiter(mock_scrape_jobs):
+    db_mock = MagicMock()
+    result = fetch_and_store_jobs(
+        site_name="zip_recruiter",
+        search_term="Python Developer",
+        location="Remote",
         db=db_mock,
     )
     assert result == []

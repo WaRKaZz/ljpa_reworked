@@ -182,6 +182,8 @@ def validate_jobspy_query(site_name: str, location: str) -> str | None:
     """Validate query against source capabilities. Returns skip reason string if unsupported, None if supported."""
     site = (site_name or "").lower().strip()
     loc = (location or "").lower().strip()
+    if site in ("zip_recruiter", "ziprecruiter"):
+        return "ZipRecruiter source is currently unavailable in this environment"
     if site == "glassdoor" and loc == "worldwide":
         return "Glassdoor does not support worldwide location search"
     return None
@@ -256,7 +258,6 @@ class JobSpyIntegrationService:
                         {"query": q_dict, "error": str(err)}
                     )
                     continue
-
 
                 if jobs_df is None or jobs_df.empty:
                     continue

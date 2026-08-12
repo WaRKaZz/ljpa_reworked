@@ -173,25 +173,38 @@ def test_job_search_query_set_rejects_normalized_duplicates():
         )
 
 
-
-
 def test_job_search_query_set_allows_up_to_15_queries():
     queries = [
-        JobSearchQuery(search_term=f"Python Engineer {index}", location="Remote", site_name="linkedin")
+        JobSearchQuery(
+            search_term=f"Python Engineer {index}",
+            location="Remote",
+            site_name="linkedin",
+        )
         for index in range(15)
     ]
     JobSearchQuerySet(profile_sha256="d" * 64, queries=queries)
 
     with pytest.raises(ValidationError):
-        JobSearchQuerySet(profile_sha256="d" * 64, queries=queries + [
-            JobSearchQuery(search_term="Python Engineer 16", location="Remote", site_name="linkedin")
-        ])
+        JobSearchQuerySet(
+            profile_sha256="d" * 64,
+            queries=queries
+            + [
+                JobSearchQuery(
+                    search_term="Python Engineer 16",
+                    location="Remote",
+                    site_name="linkedin",
+                )
+            ],
+        )
 
 
 def test_query_generation_prompt_uses_job_search_preferences_not_candidate_history():
     from pathlib import Path
 
-    task_config = (Path(__file__).parents[1] / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml").read_text(encoding="utf-8")
+    task_config = (
+        Path(__file__).parents[1]
+        / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
+    ).read_text(encoding="utf-8")
 
     assert "Job Search Preferences" in task_config
     assert "current or past residence" in task_config
@@ -207,3 +220,15 @@ def test_query_generation_prompt_preserves_explicit_worldwide_preference():
     ).read_text(encoding="utf-8")
 
     assert "Use location `worldwide`" in task_config
+
+
+def test_query_generation_prompt_restricts_site_names_to_working_sources():
+    from pathlib import Path
+
+    task_config = (
+        Path(__file__).parents[1]
+        / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
+    ).read_text(encoding="utf-8")
+
+    assert "Allowed site_name values only: linkedin, indeed, google." in task_config
+    assert "zip_recruiter" not in task_config
