@@ -45,7 +45,7 @@ Development TODOs under `docs/plans/` run directly on `id-laptop` with `agy --pr
 1. **LinkedIn Post Vacancy Collector:** Antigravity/Playwright component that collects LinkedIn post vacancies.
 2. **JobSpy Vacancy Search:** searches JobSpy and saves or refreshes vacancies by URL before review.
 3. **Vacancy Review and Resume Generation:** reviews saved vacancies and creates a tailored resume for each eligible vacancy.
-4. **Application Harness:** submits an eligible, prepared vacancy through the harness; it is not yet verified.
+4. **Application Submission:** email path is implemented, Telegram notifications are disabled, and application harness is not yet verified.
 
 ## LLM configuration
 
