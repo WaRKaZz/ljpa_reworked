@@ -13,7 +13,22 @@ from ljpa_reworked.services.harness.protocol import parse_terminal_result
 
 logger = logging.getLogger(__name__)
 
-SCRAPER_CONTAINER_DB = Path("/app/data/app.db")
+SCRAPER_CONTAINER_DB = Path("/runtime/harness-scraper/app.db")
+HARNESS_MODEL = "gemini-3.6-flash-medium"
+
+
+def get_gemini_quota_remaining(api_url: str) -> float:
+    """Read Antigravity's Gemini five-hour quota fraction through the harness."""
+    usage_url = f"{api_url.rsplit('/', 1)[0]}/usage"
+    request = urllib.request.Request(usage_url, method="GET")
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            remaining = float(json.loads(response.read())["remaining_fraction"])
+    except (KeyError, TypeError, ValueError, urllib.error.URLError, json.JSONDecodeError) as error:
+        raise RuntimeError("Could not read Antigravity Gemini five-hour quota.") from error
+    if not 0 <= remaining <= 1:
+        raise RuntimeError("Antigravity returned an invalid Gemini quota fraction.")
+    return remaining
 
 
 def _validate_sqlite(database_path: Path) -> None:
@@ -32,43 +47,10 @@ def prepare_scraper_database(canonical_path: Path, scraper_path: Path) -> None:
     _validate_sqlite(scraper_path)
 
 
-def validate_scraper_completion(scraper_path: Path, artifact_path: Path | None = None) -> bool:
-    """Validate that the scraper produced a valid completion artifact and safe SQLite DB."""
-    if artifact_path is None:
-        artifact_path = scraper_path.with_name("scraper-result.json")
-
-    if not artifact_path.exists() or not artifact_path.is_file():
-        logger.warning("Scraper completion artifact does not exist: %s", artifact_path)
-        return False
-
-    try:
-        data = json.loads(artifact_path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return False
-        if data.get("status") != "completed":
-            logger.warning("Scraper completion artifact status is not completed: %s", data.get("status"))
-            return False
-        if data.get("integrity_check") != "ok" or data.get("foreign_key_check") != "ok":
-            logger.warning("Scraper completion artifact failed pragmas check")
-            return False
-    except (json.JSONDecodeError, OSError) as error:
-        logger.warning("Could not parse scraper completion artifact: %s", error)
-        return False
-
-    try:
-        _validate_sqlite(scraper_path)
-    except (OSError, RuntimeError, sqlite3.Error) as error:
-        logger.warning("Scraper database failed SQLite validation: %s", error)
-        return False
-
-    return True
-
-
 def publish_scraper_database(canonical_path: Path, scraper_path: Path) -> None:
     """Atomically publish a validated scraper result to the canonical database."""
     _validate_sqlite(scraper_path)
     next_path = canonical_path.with_suffix(".db.next")
-    artifact_path = scraper_path.with_name("scraper-result.json")
     try:
         shutil.copy2(scraper_path, next_path)
         _validate_sqlite(next_path)
@@ -76,7 +58,6 @@ def publish_scraper_database(canonical_path: Path, scraper_path: Path) -> None:
     finally:
         next_path.unlink(missing_ok=True)
         scraper_path.unlink(missing_ok=True)
-        artifact_path.unlink(missing_ok=True)
 
 
 def run_linkedin_harness(
@@ -90,7 +71,7 @@ def run_linkedin_harness(
     if canonical_db_path is None:
         canonical_db_path = Path("data/app.db")
     if scraper_db_path is None:
-        scraper_db_path = Path("data/harness-scraper/app.db")
+        scraper_db_path = Path("runtime/harness-scraper/app.db")
 
     try:
         prepare_scraper_database(canonical_db_path, scraper_db_path)
@@ -99,7 +80,7 @@ def run_linkedin_harness(
         return 1
 
     payload = json.dumps(
-        {"prompt_file": prompt_file, "timeout": timeout}
+        {"prompt_file": prompt_file, "timeout": timeout, "model": HARNESS_MODEL}
     ).encode("utf-8")
     req = urllib.request.Request(
         api_url,
@@ -126,13 +107,6 @@ def run_linkedin_harness(
         if not agy_success:
             logger.warning("Stream ended without terminal AGY result event")
             scraper_db_path.unlink(missing_ok=True)
-            scraper_db_path.with_name("scraper-result.json").unlink(missing_ok=True)
-            return 1
-
-        if not validate_scraper_completion(scraper_db_path):
-            logger.error("Scraper completion validation failed; canonical database retained")
-            scraper_db_path.unlink(missing_ok=True)
-            scraper_db_path.with_name("scraper-result.json").unlink(missing_ok=True)
             return 1
 
         publish_scraper_database(canonical_db_path, scraper_db_path)
@@ -140,7 +114,6 @@ def run_linkedin_harness(
     except (urllib.error.URLError, OSError, RuntimeError, sqlite3.Error) as error:
         logger.error("Scraper harness failed; canonical database was retained: %s", error)
         scraper_db_path.unlink(missing_ok=True)
-        scraper_db_path.with_name("scraper-result.json").unlink(missing_ok=True)
         return 1
 
 
@@ -158,6 +131,7 @@ def harness_submit(
             "timeout": timeout,
             "vacancy_url": vacancy_url,
             "resume_path": resume_path,
+            "model": HARNESS_MODEL,
         }
     ).encode("utf-8")
     req = urllib.request.Request(

@@ -15,26 +15,27 @@ resume_generation_task:
     Prioritized facts: {prioritized_facts}
     Missing facts: {missing_mandatory_facts}
 
+    RETRY FEEDBACK (obey when non-empty): {retry_feedback}
+    Retry feedback is produced after deterministic RenderCV validation. If RETRY FEEDBACK is provided, apply the requested wording or bullet adjustments using only candidate profile facts.
+    PREVIOUS RESUME JSON (repair it when non-empty, return full replacement JSON): {prior_resume_json}
+
     Extract and cover every applicable verified profile section in strict order: Summary, Skills, Experience, Education, Certifications, Projects directly from the candidate profile supplied above.
 
+    STATIC FACTS POLICY:
+    The application restores identity, employer, job title, location, dates, and education from the candidate profile after this task. Do not invent, omit, rename, or alter those static facts. Generate only tailored wording for summary, skill categories/elements, experience bullet descriptions aligned to profile experience order, project descriptions/highlights, and certifications.
+
+    STRICT FACTUALITY RULE:
+    Use only verified candidate profile facts. Do NOT invent tools, roles, metrics, credentials, dates, duties, or outcomes not found in the candidate profile; omit unsupported tools, responsibilities, metrics, dates, credentials, and outcomes. You may adapt wording and order to emphasize vacancy-relevant experience, but every claim must remain strictly grounded in profile facts.
+
     FIELD-BY-FIELD OUTPUT CONTRACT:
-    1. personal_info: Copy name, email, phone, address, location, and linkedin_url. Set target_title to a short ATS-friendly title for this vacancy, for example "Controls Engineer | PLC / SCADA / DCS | Industrial Automation".
-    2. summary: Write one dense professional summary. Use role keywords from the vacancy and industrial-automation language: control systems, PLC, SCADA, DCS, FAT/SAT, commissioning, troubleshooting, industrial networks, process automation, and process optimization.
-    3. skills: Create several named categories, not one long list. Example categories: PLC & SCADA, DCS & Engineering Software, Networks & Protocols, Hardware Platforms, Engineering Practices. Put concrete products and keywords in elements, for example ControlLogix, CompactLogix, Studio 5000, Siemens S7-1200/S7-1500, TIA Portal, WinCC, ABB System 800xA, TwinCAT 3, and Modbus TCP/IP.
-    4. experience: For every job, write exactly 4 long bullets in description. Each bullet must state action, technical scope, and business/operational outcome. Use varied technical details. Keep the company, job title, location, and dates supplied by the profile.
+    1. personal_info: Copy name, email, phone, address, location, and linkedin_url. Set target_title to a short ATS-friendly title for this vacancy.
+    2. summary: Write one dense professional summary using relevant keywords grounded only in verified candidate profile facts.
+    3. skills: JSON schema is mandatory: each item is exactly `{"title": "category name", "elements": ["skill 1", "skill 2"]}`. Create several named categories with concrete profile skills in elements.
+    4. experience: HARD SCHEMA GATE. Every experience object MUST include `title`, `company`, `location`, `start_date`, `end_date`, and `description` (a JSON array). Copy static fields from profile. Write at least 3 description bullets per role detailing action, technical scope, and outcome grounded in profile facts.
     5. education: Include every supplied education entry once.
-    6. certifications: Include all supplied certifications once. Format each title as "Vendor — Certification Title (Code/ID), Year" when those details exist.
-    7. projects: For every project, write exactly 3-4 long highlights. State scope, technology, implementation work, and outcome. Do not duplicate the experience bullets word-for-word.
+    6. projects: Every project object MUST include `title`, `description`, and `highlights` (a JSON array of exactly 3 or 4 non-empty strings). Use candidate-profile facts only.
+    7. certifications: Every certification must be an object: `{"title": "Certification Title"}`. Add issuer, date, and url only when explicitly present in candidate profile.
 
-    PAGE TARGET — THIS IS A HARD OUTPUT REQUIREMENT:
-    RenderCV keeps every entry together. It moves a whole entry to the next page instead of splitting it. The section order is Summary, Skills, Experience, Education, Certifications, Projects.
-    Count every visible character you generate: summaries, skill labels/elements, job names, locations, dates, bullets, education, certifications, and project highlights. Before you return JSON, make the content long enough that each page except the last will contain 3300–3475 extracted characters. The last page must contain at least 1400 extracted characters. A one-page resume must contain at least 1400 extracted characters.
-    If page 1 would be short, expand the summary, add more skill categories/elements, and make experience/project bullets more specific and detailed. Do this before adding an entry that will move to page 2. Do not return a short first page.
-
-    CONTENT RULE:
-    Freely use the candidate profile, vacancy, and general domain information. Write confident ATS-relevant technical content with credible responsibilities, keywords, implementation detail, and outcomes. Do not write disclaimers, reasoning, or say that content is inferred/generic.
-
-    Do not access external URLs. Set linkedin_url literally in personal_info if provided.
     IMPORTANT: Output ONLY raw valid JSON matching the ResumeCrewAI schema. Do NOT wrap in ```json ``` code blocks. Do NOT include any intro text or reasoning content.
   expected_output: >
     Raw JSON object matching the ResumeCrewAI schema starting with '{' and ending with '}'.

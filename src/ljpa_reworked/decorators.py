@@ -1,33 +1,25 @@
 import functools
 import logging
+import time
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)  # TODO: Review if this logger is necessary.
+logger = logging.getLogger(__name__)
 
 
 def crewai_retry_handler(func):
-    """CrewAI retry decorator.
-
-    A decorator to handle errors and retry a function call up to 3 times
-    with a 60-second delay between retries.
-    """
+    """Retry transient CrewAI gateway failures with bounded backoff."""
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        retries = 3
-        for i in range(retries):
+        for attempt in range(3):
             try:
                 return func(*args, **kwargs)
-            except ValueError as e:
-                # Validation error (missing mandatory profile facts / invalid facts) fails without retry
-                raise e
-            except Exception as e:
-                logging.error(f"Attempt {i + 1} of {retries} failed with error: {e}")
-                if i < retries - 1:
-                    logging.info("Retrying in 60 seconds...")
-                else:
-                    logging.error("All retries failed.")
-                    raise e
+            except ValueError:
+                raise
+            except Exception:
+                if attempt == 2:
+                    raise
+                delay = 2**attempt
+                logger.warning("CrewAI attempt %d/3 failed; retrying in %ss", attempt + 1, delay)
+                time.sleep(delay)
 
     return wrapper

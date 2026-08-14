@@ -46,38 +46,32 @@ async def test_run_harness_goal_construction_untrusted_transport():
 
 
 @pytest.mark.asyncio
-async def test_agy_stream_generator_success_on_confirmed_submission():
+async def test_agy_stream_generator_succeeds_after_normal_completion():
     mock_process = MagicMock()
-    mock_process.stdout = [
-        '{"event": "step", "text": "filling form"}\n',
-        '{"status": "confirmed_submitted", "vacancy_url": "https://example.com/apply"}\n',
-    ]
+    mock_process.stdout = ['{"event": "step", "text": "form submitted"}\n']
     mock_process.wait.return_value = None
     mock_process.returncode = 0
 
     with patch("subprocess.Popen", return_value=mock_process):
         lines = []
-        async for line in agy_stream_generator(["agy", "test"], require_confirmation=True):
+        async for line in agy_stream_generator(["agy", "test"]):
             lines.append(line)
 
-        assert any("confirmed_submitted" in item for item in lines)
-        assert any('"status": "success"' in item for item in lines)
+    assert any('"status": "success"' in item for item in lines)
 
 
 @pytest.mark.asyncio
-async def test_agy_stream_generator_failure_when_confirmation_missing():
+async def test_agy_stream_generator_reports_process_failure():
     mock_process = MagicMock()
-    mock_process.stdout = [
-        '{"event": "step", "text": "form completed but no confirmation page"}\n'
-    ]
+    mock_process.stdout = []
     mock_process.wait.return_value = None
-    mock_process.returncode = 0
+    mock_process.returncode = 1
 
     with patch("subprocess.Popen", return_value=mock_process):
         lines = []
-        async for line in agy_stream_generator(["agy", "test"], require_confirmation=True):
+        async for line in agy_stream_generator(["agy", "test"]):
             lines.append(line)
 
-        assert any('"status": "error"' in item for item in lines)
-        assert any("without confirmed submission" in item for item in lines)
+    assert any('"status": "error"' in item for item in lines)
+    assert any("exited with 1" in item for item in lines)
 

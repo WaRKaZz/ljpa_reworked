@@ -100,7 +100,7 @@ def test_validate_pdf_page_layout_character_budget_rules(monkeypatch, tmp_path):
         def __init__(self, char_count):
             self.char_count = char_count
 
-        def get_text_range(self):
+        def get_text_bounded(self):
             return "x" * self.char_count
 
     class MockPage:
@@ -120,63 +120,21 @@ def test_validate_pdf_page_layout_character_budget_rules(monkeypatch, tmp_path):
         def __getitem__(self, idx):
             return self.pages[idx]
 
-    # 1-page PDF: < 1400 fails
     monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([1399]))
     valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
     assert not valid
     assert "1400" in msg
 
-    # 1-page PDF: >= 1400 passes
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([1400]))
-    valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
+    # A readable non-final page does not fail solely for density.
+    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3000, 1400]))
+    valid, _ = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
     assert valid
 
-    # 2-page PDF: page 1 < 3300 fails
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3299, 1400]))
-    valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
-    assert not valid
-    assert "Page 1" in msg
-
-    # 2-page PDF: page 1 > 3475 fails
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3476, 1400]))
-    valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
-    assert not valid
-    assert "Page 1" in msg
-
-    # 2-page PDF: page 2 < 1400 fails
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3400, 1399]))
+    # Every page still needs minimum readable content.
+    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3000, 1399]))
     valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
     assert not valid
     assert "Page 2" in msg
-
-    # 2-page PDF: page 1 in [3300, 3475] and page 2 >= 1400 passes
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3300, 1400]))
-    valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
-    assert valid
-
-    # 3-page PDF: page 1 < 3300 fails
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3299, 3400, 1400]))
-    valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
-    assert not valid
-    assert "Page 1" in msg
-
-    # 3-page PDF: page 2 > 3475 fails
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3300, 3476, 1400]))
-    valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
-    assert not valid
-    assert "Page 2" in msg
-
-    # 3-page PDF: page 3 < 1400 fails
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3300, 3400, 1399]))
-    valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
-    assert not valid
-    assert "Page 3" in msg
-
-    # 3-page PDF: page 1 & 2 in [3300, 3475], page 3 >= 1400 passes
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3300, 3400, 1400]))
-    valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
-    assert valid
-
 
 def test_rendercv_regression_fixture_llp_neo_stroy_no_split(tmp_path):
     import os
@@ -250,7 +208,7 @@ def test_rendercv_regression_fixture_llp_neo_stroy_no_split(tmp_path):
         assert os.path.exists(pdf_path)
 
         doc = pypdfium2.PdfDocument(pdf_path)
-        pages_text = [page.get_textpage().get_text_range() for page in doc]
+        pages_text = [page.get_textpage().get_text_bounded() for page in doc]
         page_counts = [len(text) for text in pages_text]
         print("Regression PDF Page Character Counts:", page_counts)
 

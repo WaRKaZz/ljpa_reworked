@@ -1,24 +1,25 @@
 import json
 import os
 import re
-import urllib.request
 from typing import TYPE_CHECKING
 
 from ljpa_reworked.config import (
     EMAIL_SIGNATURE,
     LINKEDIN_PROFILE_URL,
-    LLM_API_KEY,
-    LLM_BASE_URL,
-    LLM_MODEL,
     PROFILE_FILE_PATH,
 )
 from ljpa_reworked.crews.email_generation_crew import EmailGenerationCrew
 from ljpa_reworked.crews.resume_evaluation_crew import ResumeEvaluationCrew
+from ljpa_reworked.crews.resume_generation_crew import ResumeGenerationCrew
 from ljpa_reworked.decorators import crewai_retry_handler
 from ljpa_reworked.models.crewai_pydantic_models import (
     BasicEvaluationCrewAI,
     EmailCrewAI,  # noqa
     ResumeCrewAI,
+)
+from ljpa_reworked.resume_static_profile import (
+    merge_static_resume_profile,
+    parse_static_resume_profile,
 )
 from ljpa_reworked.services.dynamic_rate_limiter import DynamicRateLimiter
 from ljpa_reworked.services.rendercv_helper import render_resume_crewai_to_pdf
@@ -129,9 +130,14 @@ def crewai_evaluate_vacancy(vacancy: "Vacancy") -> BasicEvaluationCrewAI:
         "candidate_profile": profile_text,
         "required_profile_sections": present_sections,
     }
+    rate_limitter.acquire()
     crew_output = crew.kickoff(inputs=inputs)
-    rate_limitter.record(crew.usage_metrics.successful_requests)
-    return crew_output.tasks_output[0].pydantic
+    rate_limitter.record(getattr(crew_output.token_usage, "successful_requests", 0))
+    if crew_output.pydantic is None:
+        raise ValueError("CrewAI evaluation returned no structured output.")
+    # The profile passed the deterministic completeness check above. A vacancy
+    # requirement the candidate does not meet affects rating, never profile completeness.
+    return crew_output.pydantic.model_copy(update={"missing_mandatory_facts": []})
 
 
 def crewai_generate_resume(
@@ -141,120 +147,32 @@ def crewai_generate_resume(
     layout_feedback: str = "",
     prior_resume_json: str = "",
 ) -> ResumeCrewAI:
-    """Generate a JSON resume through the gateway, optionally correcting a prior layout miss."""
+    """Generate through CrewAI so Task guardrails retry invalid structured output."""
     profile_text = read_profile_text(PROFILE_FILE_PATH)
     present_sections = validate_profile_completeness(profile_text)
-
-    url = f"{LLM_BASE_URL.rstrip('/')}/chat/completions"
-    system_prompt = (
-        "Return one raw valid JSON object for ResumeCrewAI. No markdown, explanation, or extra keys. "
-        "Output fields: personal_info(name,email,phone,address,location,linkedin_url,target_title); "
-        "summary; education(course,institution,location,start_date,end_date); "
-        "experience(title,company,location,start_date,end_date,description); "
-        "skills(title,elements); projects(title,description,start_date,end_date,highlights); "
-        "certifications(title,issuer,date,url).\n"
-        "SCHEMA LIMITS: summary <= 500 visible characters. skills is an array of objects; each object has title as a string and elements as a JSON array: [\"TIA Portal\", \"WinCC\"]. Never use a comma-separated string for elements.\n"
-        "Write sections in this order: Summary, Skills, Experience, Education, Certifications, Projects. "
-        "Create 3 skill categories with 4-5 elements per category. Every experience has 3 concise, highly relevant bullets. "
-        "Every project has 2-3 detailed highlights.\n"
-        "PAGE REQUIREMENT: RenderCV does not split an entry. Target overall length ~3350-3400 characters. "
-        "If a resume spans multiple pages, each non-final page must contain 3300-3475 visible characters; "
-        "the final page must contain at least 1400. If 1 page, it must contain 1400-3475 characters.\n"
-        "Use candidate, vacancy, and general industrial-automation knowledge freely. Add ATS keywords, credible technical "
-        "responsibilities, implementation details, and outcomes."
+    static_profile = parse_static_resume_profile(profile_text)
+    crew = ResumeGenerationCrew().crew()
+    rate_limitter.acquire()
+    crew_output = crew.kickoff(
+        inputs={
+            "title": vacancy.title,
+            "text": vacancy.text,
+            "linkedin_url": LINKEDIN_PROFILE_URL or "",
+            "candidate_profile": profile_text,
+            "summary": evaluation.summary,
+            "rating": evaluation.rating,
+            "required_profile_sections": present_sections,
+            "prioritized_facts": evaluation.prioritized_facts,
+            "missing_mandatory_facts": evaluation.missing_mandatory_facts,
+            "retry_feedback": layout_feedback,
+            "prior_resume_json": prior_resume_json,
+        }
     )
-    feedback_block = ""
-    if layout_feedback:
-        feedback_block = (
-            f"!!! CRITICAL LAYOUT RETRY CORRECTION REQUIRED !!!\n"
-            f"{layout_feedback}\n"
-            f"MUST satisfy the numeric character addition/trimming requirement specified above.\n"
-            f"==================================================\n\n"
-        )
-    prior_resume_block = ""
-    if prior_resume_json:
-        prior_resume_block = (
-            f"PREVIOUS RESUME JSON:\n"
-            f"```json\n{prior_resume_json}\n```\n"
-            f"INSTRUCTIONS FOR PREVIOUS RESUME:\n"
-            f"This is the previous generated resume JSON object that failed layout constraints.\n"
-            f"Preserve all its verified facts, candidate profile details, schema, and section order.\n"
-            f"Do not invent fake history or restructure unchanged sections.\n"
-            f"Modify only enough allowed existing text in this JSON to meet the numeric character layout correction above.\n"
-            f"Return a complete replacement raw JSON object.\n\n"
-        )
-
-    user_prompt = (
-        f"{feedback_block}"
-        f"{prior_resume_block}"
-        f"Vacancy title: {vacancy.title}\n"
-        f"Vacancy: {vacancy.text}\n"
-        f"Priorities: {evaluation.prioritized_facts}\n"
-        f"Required sections: {present_sections}\n"
-        f"Candidate profile:\n{profile_text}"
+    rate_limitter.record(getattr(crew_output.token_usage, "successful_requests", 0))
+    dynamic_resume = json.loads(crew_output.raw)
+    resume = ResumeCrewAI.model_validate(
+        merge_static_resume_profile(dynamic_resume, static_profile)
     )
-    if layout_feedback:
-        user_prompt += f"\n\nFINAL REMINDER: {layout_feedback}"
-
-    payload = {
-        "model": LLM_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "max_tokens": 4096,
-        "stream": False,
-    }
-
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {LLM_API_KEY}",
-    }
-
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers=headers,
-        method="POST",
-    )
-
-    with urllib.request.urlopen(req, timeout=120.0) as resp:
-        res_data = json.loads(resp.read().decode("utf-8"))
-        raw_content = res_data["choices"][0]["message"]["content"].strip()
-        if raw_content.startswith("```json"):
-            raw_content = raw_content[7:]
-        if raw_content.startswith("```"):
-            raw_content = raw_content[3:]
-        if raw_content.endswith("```"):
-            raw_content = raw_content[:-3]
-        payload_json = json.loads(raw_content.strip())
-        # ponytail: tolerate common JSON-shape slips from the gateway; schema remains strict after normalization.
-        if isinstance(payload_json.get("summary"), str):
-            payload_json["summary"] = payload_json["summary"][:500]
-        for skill in payload_json.get("skills", []):
-            if isinstance(skill.get("elements"), str):
-                skill["elements"] = [
-                    item.strip() for item in skill["elements"].split(",") if item.strip()
-                ]
-        for entry in payload_json.get("experience", []):
-            if isinstance(entry.get("description"), str):
-                entry["description"] = [
-                    item.strip(" •-\t")
-                    for item in re.split(r"(?:\r?\n|(?<=[.!?])\s+)", entry["description"])
-                    if item.strip(" •-\t")
-                ]
-        for entry in payload_json.get("projects", []):
-            if isinstance(entry.get("description"), list):
-                entry["description"] = " ".join(entry["description"])
-            if isinstance(entry.get("highlights"), str):
-                entry["highlights"] = [
-                    item.strip(" •-\t")
-                    for item in re.split(r"(?:\r?\n|(?<=[.!?])\s+)", entry["highlights"])
-                    if item.strip(" •-\t")
-                ]
-        resume = ResumeCrewAI.model_validate(payload_json)
-
-    rate_limitter.record(1)
     validate_resume_facts(resume, evaluation, present_sections=present_sections)
     return resume
 
@@ -277,13 +195,28 @@ def crewai_generate_email(vacancy: "Vacancy") -> EmailCrewAI:
         else (vacancy.submit_url or "")
     )
     inputs["email_signature"] = EMAIL_SIGNATURE
+    rate_limitter.acquire()
     crew_output = crew.kickoff(inputs=inputs)
-    rate_limitter.record(crew.usage_metrics.successful_requests)
-    return crew_output.tasks_output[0].pydantic
+    rate_limitter.record(getattr(crew_output.token_usage, "successful_requests", 0))
+    if crew_output.pydantic is None:
+        raise ValueError("CrewAI email returned no structured output.")
+    return crew_output.pydantic
 
 
 def _format_numeric_layout_feedback(raw_error: str) -> str:
     """Extract numeric deficit/excess from validation error and formulate explicit correction instructions."""
+    project_bullet_match = re.search(
+        r"Project entry '(.+)' has fewer than 3 bullet points\.", raw_error
+    )
+    if project_bullet_match:
+        title = project_bullet_match.group(1)
+        return (
+            f"{raw_error}\n"
+            f"PROJECT BULLET CORRECTION REQUIRED: Project '{title}' must contain exactly 3 or 4 highlights. "
+            f"Add truthful technical scope, implementation work, and outcome details from the candidate profile. "
+            f"Do not remove the project or invent facts. Return the complete replacement JSON."
+        )
+
     common_instructions = (
         "\nRenderCV entry policy: RenderCV has allow_page_break_in_entries set to false, so whole section entries move together to the next page when overflow occurs instead of splitting.\n"
         "ALLOWED FIELDS IN PRIORITY ORDER:\n"
@@ -296,31 +229,20 @@ def _format_numeric_layout_feedback(raw_error: str) -> str:
     )
 
     match = re.search(
-        r"Page (\d+) \(non-final\) character count \((\d+)\) is outside required range \[3300, 3475\]",
+        r"Page (\d+) \(non-final\) character count \((\d+)\) is less than minimum 3000 characters",
         raw_error,
     )
     if match:
         page_num = match.group(1)
         count = int(match.group(2))
-        target_mid = 3387
-        if count < 3300:
-            add_target = target_mid - count
-            return (
-                f"{raw_error}\n"
-                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters (SHORT of 3300 min in range [3300, 3475]). "
-                f"You MUST expand the resume text by approximately {add_target} characters to land near {target_mid} characters. "
-                f"Add 1 technical sentence to 2-3 experience bullets or expand skill elements."
-                f"{common_instructions}"
-            )
-        elif count > 3475:
-            trim_target = count - target_mid
-            return (
-                f"{raw_error}\n"
-                f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters (EXCEEDS 3475 max in range [3300, 3475]). "
-                f"You MUST trim the resume text by approximately {trim_target} characters to land near {target_mid} characters. "
-                f"Slightly shorten 2-3 experience bullets."
-                f"{common_instructions}"
-            )
+        add_target = 3100 - count
+        return (
+            f"{raw_error}\n"
+            f"NUMERIC CORRECTION REQUIRED: Page {page_num} has {count} characters (SHORT of 3000 minimum). "
+            f"You MUST expand the resume text by approximately {add_target} characters to land near 3100 characters. "
+            f"Add truthful technical detail to existing experience descriptions, project highlights, or skill elements. "
+            f"{common_instructions}"
+        )
 
     match_final = re.search(
         r"Page (\d+) \(final\) character count \((\d+)\) is less than minimum 1400 characters",
@@ -345,7 +267,7 @@ def crewai_generate_resume_with_retry(
     vacancy: "Vacancy",
     evaluation: BasicEvaluationCrewAI,
     *,
-    max_retries: int = 1,
+    max_retries: int = 3,
 ) -> tuple[ResumeCrewAI, str]:
     """Generate a resume and render to PDF, making at most max_retries retry with factual layout feedback if page budget fails."""
     import tempfile
@@ -375,6 +297,10 @@ def crewai_generate_resume_with_retry(
             render_resume_crewai_to_pdf(resume, temp_pdf_path)
             return resume, temp_pdf_path
         except Exception as err:
+            if not str(err).startswith("RenderCV output failed page layout validation:"):
+                if os.path.exists(temp_pdf_path):
+                    os.remove(temp_pdf_path)
+                raise
             last_error = err
             if os.path.exists(temp_pdf_path):
                 try:

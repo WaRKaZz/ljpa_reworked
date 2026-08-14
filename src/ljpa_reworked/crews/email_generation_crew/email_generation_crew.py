@@ -31,14 +31,13 @@ class EmailGenerationCrew:
 
     def __init__(
         self,
-        cv_file_path: str = CV_FILE_PATH,
+        cv_file_path: str | None = CV_FILE_PATH,
         embed_provider: str = EMBED_PROVIDER,
         embed_model: str = EMBED_MODEL,
         embed_api_key: str = EMBED_API_KEY,
         embed_api_base: str = EMBED_BASE_URL,
+        knowledge_sources: list | None = None,
     ) -> None:
-        super().__init__()
-        pdf_path = Path(cv_file_path)
         self.embedder = {
             "provider": embed_provider,
             "config": {
@@ -48,11 +47,12 @@ class EmailGenerationCrew:
             },
         }
         self.llm = create_llm()
-        self.resume_pdf = PDFKnowledgeSource(
-            file_paths=[
-                pdf_path,
-            ]
-        )
+        if knowledge_sources is not None:
+            self.knowledge_sources = knowledge_sources
+        elif cv_file_path and os.path.exists(cv_file_path):
+            self.knowledge_sources = [PDFKnowledgeSource(file_paths=[Path(cv_file_path)])]
+        else:
+            self.knowledge_sources = []
 
     @agent
     def email_generator_agent(self) -> Agent:
@@ -60,7 +60,8 @@ class EmailGenerationCrew:
             config=self.agents_config["email_generator_agent"],
             llm=self.llm,
             tools=[scrape_tool],
-            knowledge_sources=[self.resume_pdf],
+            knowledge_sources=self.knowledge_sources if self.knowledge_sources else None,
+            allow_delegation=False,
         )
 
     @task

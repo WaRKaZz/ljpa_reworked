@@ -21,6 +21,7 @@ LINKEDIN_URL = os.getenv("LINKEDIN_URL")
 LLM_API_KEY = os.getenv("LLM_API_KEY")
 LLM_MODEL = os.getenv("LLM_MODEL")
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://id-vps:20128/v1")
+HARNESS_API_URL = os.getenv("HARNESS_API_URL", "http://127.0.0.1:8080/run-harness")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
 EMBED_PROVIDER = os.getenv("EMBED_PROVIDER")
@@ -62,12 +63,13 @@ def create_llm(timeout: float | int | None = None, max_tokens: int | None = None
     """Build the project LLM client for the configured OpenAI-compatible gateway."""
     from crewai import LLM
 
+    if not LLM_MODEL or not LLM_MODEL.strip():
+        raise ValueError("LLM_MODEL must be configured for CrewAI.")
     model = LLM_MODEL if LLM_MODEL.startswith("openai/") else f"openai/{LLM_MODEL}"
     kwargs = {
         "model": model,
         "api_key": LLM_API_KEY,
         "base_url": LLM_BASE_URL,
-        "custom_openai": True,
     }
     if timeout is not None:
         kwargs["timeout"] = timeout

@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from crewai import LLM
 
 
 def test_create_llm_uses_openai_provider_for_configured_gateway(monkeypatch):
@@ -16,7 +17,6 @@ def test_create_llm_uses_openai_provider_for_configured_gateway(monkeypatch):
         model="openai/ag/gemini-3.6-flash-high",
         api_key="test-key",
         base_url="http://id-vps:20128/v1",
-        custom_openai=True,
     )
 
 
@@ -54,7 +54,7 @@ def test_resume_related_crews_use_shared_llm_factory(
     import importlib
 
     module = importlib.import_module(module_name)
-    shared_llm = MagicMock()
+    shared_llm = LLM(model="openai/gpt-4o-mini", api_key="test-key", base_url="http://gateway/v1")
     factory = MagicMock(return_value=shared_llm)
     monkeypatch.setattr(module, "create_llm", factory)
 

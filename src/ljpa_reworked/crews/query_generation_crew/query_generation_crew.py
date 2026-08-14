@@ -21,7 +21,11 @@ class QueryGenerationCrew:
     @agent
     def query_strategist(self) -> Agent:
         llm = create_llm()
-        return Agent(config=self.agents_config["query_strategist"], llm=llm)
+        return Agent(
+            config=self.agents_config["query_strategist"],
+            llm=llm,
+            allow_delegation=False,
+        )
 
     @task
     def generate_job_search_queries_task(self) -> Task:

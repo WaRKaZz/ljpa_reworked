@@ -16,7 +16,9 @@ from ljpa_reworked.models.enums import VacancyStatus
 logger = logging.getLogger(__name__)
 
 TERMINAL_STATUSES = {
-    VacancyStatus.applied,
+    VacancyStatus.submitted_via_email,
+    VacancyStatus.submitted_via_url,
+    VacancyStatus.submitted_via_all,
     VacancyStatus.withdrawn,
     VacancyStatus.expired,
     VacancyStatus.archived,
@@ -209,16 +211,37 @@ def transition_vacancy_status(
     return vacancy
 
 
-def confirm_application_submitted(
+def _confirm_submission(
     db: Session,
     vacancy_id: int,
+    source_status: VacancyStatus,
+    opposite_status: VacancyStatus,
     applied_at: datetime | None = None,
 ) -> Vacancy:
-    """Transition vacancy to applied status and stamp applied_at timestamp only after confirmed application submission."""
-    vacancy = transition_vacancy_status(
+    """Record one delivery route while preserving a completed opposite route."""
+    vacancy = get_vacancy_by_id(db, vacancy_id)
+    if not vacancy:
+        raise ValueError(f"Vacancy with id {vacancy_id} not found.")
+
+    target_status = (
+        VacancyStatus.submitted_via_all
+        if vacancy.status in {opposite_status, VacancyStatus.submitted_via_all}
+        else source_status
+    )
+    transition_vacancy_status(
         db=db,
         vacancy_id=vacancy_id,
-        target_status=VacancyStatus.applied,
+        target_status=target_status,
+        allowed_from_statuses=[
+            VacancyStatus.created,
+            VacancyStatus.updated,
+            VacancyStatus.reviewed,
+            VacancyStatus.application_prepared,
+            VacancyStatus.application_error,
+            VacancyStatus.submitted_via_email,
+            VacancyStatus.submitted_via_url,
+            VacancyStatus.submitted_via_all,
+        ],
         commit=False,
     )
     vacancy.applied_at = applied_at or datetime.utcnow()
@@ -227,9 +250,30 @@ def confirm_application_submitted(
     return vacancy
 
 
-# Alias for backward compatibility
-confirm_email_application_submitted = confirm_application_submitted
+def confirm_email_application_submitted(
+    db: Session, vacancy_id: int, applied_at: datetime | None = None
+) -> Vacancy:
+    """Record a completed email application."""
+    return _confirm_submission(
+        db,
+        vacancy_id,
+        VacancyStatus.submitted_via_email,
+        VacancyStatus.submitted_via_url,
+        applied_at,
+    )
 
+
+def confirm_url_application_submitted(
+    db: Session, vacancy_id: int, applied_at: datetime | None = None
+) -> Vacancy:
+    """Record a completed URL application."""
+    return _confirm_submission(
+        db,
+        vacancy_id,
+        VacancyStatus.submitted_via_url,
+        VacancyStatus.submitted_via_email,
+        applied_at,
+    )
 
 def get_eligible_url_vacancies(
     db: Session,

@@ -1,8 +1,60 @@
-from sqlalchemy import and_, desc
+from dataclasses import dataclass
+from datetime import datetime
+
+from sqlalchemy import and_, desc, func
 from sqlalchemy.orm import Session
 
 from ljpa_reworked.models.crewai_pydantic_models import BasicEvaluationCrewAI
 from ljpa_reworked.models.database_models import BasicEvaluation, Vacancy
+from ljpa_reworked.models.enums import VacancyStatus
+
+MINIMUM_SCORE = 50.0
+DAILY_SCORE_PENALTY = 1.5
+
+
+@dataclass(frozen=True)
+class RankedVacancy:
+    vacancy: Vacancy
+    score: float
+
+
+def adjusted_score(rating: int, created_at: datetime, *, now: datetime) -> float:
+    """Return score after a 1.5-point penalty for every full day of age."""
+    age_days = max(0, (now - created_at).days)
+    return rating - (age_days * DAILY_SCORE_PENALTY)
+
+
+def build_ranked_submission_queue(
+    db: Session, *, now: datetime | None = None
+) -> list[RankedVacancy]:
+    """Discard low-score vacancies and rank prepared URL applications."""
+    now = now or datetime.utcnow()
+    latest_evaluation_id = (
+        db.query(BasicEvaluation.vacancy_id, func.max(BasicEvaluation.id).label("id"))
+        .group_by(BasicEvaluation.vacancy_id)
+        .subquery()
+    )
+    rows = (
+        db.query(Vacancy, BasicEvaluation)
+        .join(latest_evaluation_id, latest_evaluation_id.c.vacancy_id == Vacancy.id)
+        .join(BasicEvaluation, BasicEvaluation.id == latest_evaluation_id.c.id)
+        .filter(
+            Vacancy.deleted.is_(False),
+            Vacancy.status == VacancyStatus.application_prepared,
+            Vacancy.submit_url.isnot(None),
+            Vacancy.submit_url != "",
+        )
+        .all()
+    )
+    ranked: list[RankedVacancy] = []
+    for vacancy, evaluation in rows:
+        score = adjusted_score(evaluation.rating, vacancy.created_at, now=now)
+        if evaluation.rating < MINIMUM_SCORE or score < MINIMUM_SCORE:
+            vacancy.deleted = True
+            continue
+        ranked.append(RankedVacancy(vacancy=vacancy, score=score))
+    db.commit()
+    return sorted(ranked, key=lambda item: (-item.score, item.vacancy.id))
 
 
 def create_evaluation(

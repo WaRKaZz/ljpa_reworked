@@ -64,7 +64,7 @@ def cleanup_resume_pdfs(
         should_retain = False
         if (
             vacancy
-            and vacancy.status == VacancyStatus.applied
+            and vacancy.status == VacancyStatus.submitted_via_all
             and vacancy.applied_at is not None
         ):
             age = now - vacancy.applied_at

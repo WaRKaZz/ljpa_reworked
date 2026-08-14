@@ -7,7 +7,11 @@
 **/*.pyc
 **/*.pyo
 **/*.pyd
-/resources
+/resources/
+/docs/
+/data/
+/runtime/
+/person_info.md
 .env
 .venv
 *.log
@@ -15,7 +19,6 @@
 
 *test.py 
 /screenshots
-/docs
 .agents
 .superpowers
 .ruff_cache
@@ -24,10 +27,8 @@
 
 /ollama*
 typescript
-/prompts
 .gemini/
-data/*.db*
-data/state.json
-data/*.bak
 AGENTS.md
 GEMINI.md
+.hermes
+.imap-mcp/

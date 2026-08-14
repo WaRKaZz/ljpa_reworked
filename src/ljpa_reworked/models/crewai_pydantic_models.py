@@ -148,7 +148,7 @@ class JobSearchQuery(BaseModel):
     location: Annotated[
         str, StringConstraints(strip_whitespace=True, min_length=2, max_length=160)
     ]
-    site_name: Literal["linkedin", "indeed", "glassdoor", "google", "zip_recruiter"]
+    site_name: Literal["linkedin", "indeed"]
     google_search_term: StrippedStr | None = None
     results_wanted: Annotated[int, Field(ge=1, le=50)] = 25
 

@@ -4,9 +4,11 @@ services:
     container_name: cloak-browser
     security_opt:
       - seccomp:unconfined
+    env_file: [ .env ]
     volumes:
       - ./data:/app/data
-    command: cloakserve --host 0.0.0.0 --port 9222
+      - ./src/ljpa_reworked/services/docker/init_cloak.sh:/init_cloak.sh:ro
+    entrypoint: [ "/bin/sh", "/init_cloak.sh" ]
     networks: [ ljpa-network ]
 
   # linkedin-bot:
@@ -37,21 +39,17 @@ services:
       cloak-browser:
         condition: service_started
     volumes:
-      - ./data:/app/data
-      - ./resources:/app/resources:ro
-      - ./prompts:/app/prompts:ro
-      - ./src/ljpa_reworked/services/harness:/app:ro
-      - ./.agents:/app/.agents:ro
-      - ./.gemini:/home/agent/.gemini
-      - ./data/gcloud:/home/agent/.config/gcloud:ro
-      - agy-workspace:/workspace
+      - ./runtime:/runtime
+      - ./resources:/inputs/resources:ro
     env_file: [ .env ]
     environment:
       CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
-      GOOGLE_APPLICATION_CREDENTIALS: /home/agent/.config/gcloud/application_default_credentials.json
+      HARNESS_DATA_DIR: /runtime/harness-scraper
+      HARNESS_RESOURCES_DIR: /inputs/resources
+      GEMINI_DIR: /runtime/gemini
     stdin_open: true
     tty: true
-    command: python3 /app/harness_server.py
+    command: [ "python3", "/app/harness/harness_server.py" ]
     networks: [ ljpa-network ]
 
   sqlite-ui:
@@ -62,9 +60,6 @@ services:
     ports: [ "7901:7901" ]
     volumes: [ "./data:/data" ]
     networks: [ ljpa-network ]
-
-volumes:
-  agy-workspace:
 
 networks:
   ljpa-network:

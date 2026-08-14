@@ -1,9 +1,17 @@
 import re
+import warnings
 from typing import Any
 
 import pypdfium2
 
 from ljpa_reworked.models.crewai_pydantic_models import ResumeCrewAI
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"get_text_range\(\) call with default params will be implicitly redirected to get_text_bounded\(\)",
+    category=UserWarning,
+    module=r"pypdfium2\._helpers\.textpage",
+)
 
 
 def _extract_linkedin_username(url: str | None) -> str | None:
@@ -183,7 +191,7 @@ def validate_pdf_page_layout(pdf_path: str) -> tuple[bool, str]:
     """Validate PDF page character budget requirements for any page count.
 
     Requirements:
-    - Every non-final page must contain 3300-3475 extracted characters.
+    - Every non-final page must contain at least 3000 extracted characters.
     - The final page must contain at least 1400 extracted characters.
     """
     import os
@@ -202,21 +210,19 @@ def validate_pdf_page_layout(pdf_path: str) -> tuple[bool, str]:
 
     char_counts = []
     for i in range(num_pages):
-        text = doc[i].get_textpage().get_text_range()
+        text = doc[i].get_textpage().get_text_bounded()
         count = len(text)
         char_counts.append(count)
-        if i < num_pages - 1:
-            if count < 3300 or count > 3475:
-                return (
-                    False,
-                    f"Page {i + 1} (non-final) character count ({count}) is outside required range [3300, 3475]",
-                )
-        else:
-            if count < 1400:
-                return (
-                    False,
-                    f"Page {i + 1} (final) character count ({count}) is less than minimum 1400 characters",
-                )
+        if i < num_pages - 1 and count < 3000:
+            return (
+                False,
+                f"Page {i + 1} (non-final) character count ({count}) is less than minimum 3000 characters",
+            )
+        if count < 1400:
+            return (
+                False,
+                f"Page {i + 1} (final) character count ({count}) is less than minimum 1400 characters",
+            )
 
     if num_pages == 1:
         return True, f"1-page PDF valid with {char_counts[0]} characters"

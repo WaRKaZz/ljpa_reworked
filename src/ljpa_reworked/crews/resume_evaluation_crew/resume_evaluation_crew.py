@@ -23,7 +23,6 @@ class ResumeEvaluationCrew:
         max_execution_time: int = 300,
         max_iter: int | None = None,
     ) -> None:
-        super().__init__()
         self.llm_timeout = llm_timeout
         self.max_execution_time = max_execution_time
         self.max_iter = max_iter
@@ -35,6 +34,7 @@ class ResumeEvaluationCrew:
             "config": self.agents_config["resume_evaluation_agent"],
             "llm": self.llm,
             "tools": [],
+            "allow_delegation": False,
             "max_execution_time": self.max_execution_time,
         }
         if self.max_iter is not None:

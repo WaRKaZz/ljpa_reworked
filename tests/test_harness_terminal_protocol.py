@@ -78,5 +78,4 @@ def test_harness_scraper_prompt_contract():
 
     assert "Do not use background execution" in content
     assert "Stay in the foreground" in content
-    assert "/workspace/scraper-result.json" in content
-    assert '"status": "completed"' in content
+    assert "/workspace/scraper-result.json" not in content

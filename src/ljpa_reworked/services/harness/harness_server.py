@@ -7,6 +7,7 @@
 # ]
 # ///
 
+import json
 import logging
 import os
 import signal
@@ -15,16 +16,55 @@ import time
 from collections.abc import AsyncGenerator
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from ljpa_reworked.services.harness.protocol import parse_terminal_result
+try:
+    # The container mounts this directory directly at /app.
+    from protocol import parse_terminal_result
+except ModuleNotFoundError:  # Host-side package import used by tests.
+    from ljpa_reworked.services.harness.protocol import parse_terminal_result
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Antigravity Harness Runner API")
+HARNESS_MODEL = "gemini-3.6-flash-medium"
+
+
+def get_gemini_quota() -> float:
+    """Run documented /usage and return the Gemini group five-hour remainder."""
+    completed = subprocess.run(
+        [
+            "/home/agent/.local/bin/agy",
+            "--output-format",
+            "stream-json",
+            "--print",
+            "/usage",
+            "--print-timeout",
+            "45s",
+        ],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=90,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("Antigravity /usage command failed")
+    for line in completed.stdout.splitlines():
+        try:
+            event = json.loads(line)
+            groups = event["command"]["data"]["groups"]
+        except (KeyError, TypeError, json.JSONDecodeError):
+            continue
+        for group in groups:
+            if group.get("name") != "Gemini Models":
+                continue
+            for bucket in group.get("buckets", []):
+                if bucket.get("window") == "5h":
+                    return float(bucket["remaining_fraction"])
+    raise RuntimeError("Antigravity /usage returned no Gemini five-hour quota")
 
 
 class HarnessRequest(BaseModel):
@@ -32,6 +72,15 @@ class HarnessRequest(BaseModel):
     timeout: str = "8h"
     vacancy_url: str | None = None
     resume_path: str | None = None
+
+
+@app.get("/usage")
+async def usage():
+    try:
+        return {"remaining_fraction": get_gemini_quota()}
+    except (RuntimeError, subprocess.TimeoutExpired) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
 
 
 def _terminate_process_group(process: subprocess.Popen, grace_seconds: float = 0.5) -> None:
@@ -68,6 +117,7 @@ async def agy_stream_generator(cmd: list[str]) -> AsyncGenerator[str, None]:
     logger.info(f"Running command: {' '.join(cmd)}")
     process = subprocess.Popen(
         cmd,
+        cwd=os.getenv("AGY_WORKSPACE", "/runtime/workspace"),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -106,6 +156,8 @@ async def run_harness(req: HarnessRequest):
     cmd = [
         "agy",
         "--dangerously-skip-permissions",
+        "--model",
+        HARNESS_MODEL,
         "--print",
         f"/goal {goal_str}",
         "--print-timeout",

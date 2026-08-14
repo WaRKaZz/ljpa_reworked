@@ -28,15 +28,12 @@ def test_compose_yml_structure():
 
     cli = services["antigravity-cli"]
     volumes = [str(v) for v in cli.get("volumes", [])]
-    assert any("./resources:/app/resources" in v for v in volumes), (
-        "antigravity-cli must mount ./resources:/app/resources"
-    )
-    assert any("./data:/app/data" in v for v in volumes), (
-        "antigravity-cli must mount ./data:/app/data"
-    )
-    assert any("./.gemini:/home/agent/.gemini" in v for v in volumes), (
-        "antigravity-cli must mount .gemini to /home/agent/.gemini"
-    )
+    assert volumes == ["./runtime:/runtime", "./resources:/inputs/resources:ro"]
+    assert "agy-workspace" not in config.get("volumes", {})
+    assert cli["command"] == ["python3", "/app/harness/harness_server.py"]
+    assert cli["environment"]["HARNESS_DATA_DIR"] == "/runtime/harness-scraper"
+    assert cli["environment"]["HARNESS_RESOURCES_DIR"] == "/inputs/resources"
+    assert cli["environment"]["GEMINI_DIR"] == "/runtime/gemini"
 
 
 def test_dockerfile_antigravity_config():
@@ -45,3 +42,11 @@ def test_dockerfile_antigravity_config():
 
     content = dockerfile_path.read_text(encoding="utf-8")
     assert "uv" in content, "Dockerfile.antigravity must install uv"
+
+
+def test_compose_uses_imap_mcp_credentials_directly_from_env_file():
+    config = yaml.safe_load(Path("compose.yml").read_text(encoding="utf-8"))
+    cli = config["services"]["antigravity-cli"]
+    assert cli["env_file"] == [".env"]
+    assert "IMAP_MCP_ACCOUNT_LJPA_GMAIL_IMAP_USERNAME" not in cli.get("environment", {})
+    assert "IMAP_MCP_ACCOUNT_LJPA_GMAIL_IMAP_PASSWORD" not in cli.get("environment", {})

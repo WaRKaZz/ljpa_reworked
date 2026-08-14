@@ -7,7 +7,11 @@
 **/*.pyc
 **/*.pyo
 **/*.pyd
-/src/ljpa/resources
+/resources/
+/docs/
+/data/
+/runtime/
+/person_info.md
 .env
 .venv
 *.log

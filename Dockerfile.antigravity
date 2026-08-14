@@ -40,9 +40,12 @@ RUN npm install --global npm@latest \
 RUN npm install --global \
   unbrowse@latest \
   @playwright/mcp@latest \
+  imap-mcp-server@2.0.0 \
   && command -v unbrowse \
   && command -v playwright-mcp \
-  && unbrowse --version
+  && command -v imap-mcp-server \
+  && unbrowse --version \
+  && imap-mcp-server --version
 
 # Обновление pip и установка uv.
 # Antigravity SDK здесь не устанавливается.
@@ -97,7 +100,9 @@ RUN bash -o pipefail -c \
   && agy --version
 
 # MarkItDown service uses MCP 2.0 because Antigravity probes `server/discover` (2026-07-28).
-RUN python -m pip install --no-cache-dir "markitdown==0.1.7" "mcp==2.0.0" fastapi uvicorn pydantic
+# Python Playwright is required by Harness browser automation, independently of the Node MCP package.
+RUN python -m pip install --no-cache-dir "markitdown==0.1.7" "mcp==2.0.0" fastapi uvicorn pydantic playwright \
+  && python -c "import playwright; print(playwright.__version__ if hasattr(playwright, '__version__') else playwright.__file__)"
 
 COPY --chown=agent:agent src/ljpa_reworked/services/docker/markitdown_mcp.py /home/agent/.local/lib/markitdown_mcp.py
 
@@ -130,6 +135,12 @@ COPY --chown=agent:agent <<'JSON' /home/agent/.gemini/config/mcp_config.json
     },
     "playwright": {
       "command": "playwright-mcp"
+    },
+    "imap": {
+      "command": "imap-mcp-server",
+      "env": {
+        "IMAP_MCP_READ_ONLY": "true"
+      }
     }
   }
 }
@@ -179,6 +190,14 @@ For coding tasks:
 Always use Context7 for current library and API documentation, version-specific code examples, dependency setup, configuration instructions, and questions where the installed API may differ from model memory.
 RULES
 
+# Immutable Harness application content. Runtime state is mounted only at /runtime.
+COPY --chown=agent:agent prompts/ /app/prompts/
+COPY --chown=agent:agent src/ljpa_reworked/services/harness/ /app/harness/
+COPY --chown=agent:agent .agents/ /app/.agents/
+COPY --chown=agent:agent src/ljpa_reworked/services/docker/antigravity-entrypoint.sh /usr/local/bin/antigravity-entrypoint
+RUN chmod 0755 /usr/local/bin/antigravity-entrypoint \
+  && cp -a "${HOME}/.gemini" "${HOME}/.gemini-default"
+
 WORKDIR /app
 
 # Финальная статическая проверка.
@@ -196,7 +215,6 @@ RUN node --version \
   && test -s \
   "${HOME}/.gemini/config/skills/unbrowse/SKILL.md"
 
-VOLUME ["/home/agent/.gemini", "/home/agent/.unbrowse"]
-
-# Точка входа запускает HTTP API сервер для обработки запросов от linkedin-bot
-CMD ["/usr/bin/tini", "--", "python3", "/app/harness_server.py"]
+# Runtime state is supplied by the single writable /runtime bind mount.
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/antigravity-entrypoint"]
+CMD ["python3", "/app/harness/harness_server.py"]

@@ -1,0 +1,16 @@
+from unittest.mock import patch
+
+
+def test_main_resume_only_skips_discovery_and_processes_unevaluated_vacancies():
+    from ljpa_reworked import main
+
+    with patch("ljpa_reworked.main.run_linkedin_harness") as harness:
+        with patch("ljpa_reworked.main.JobSpyIntegrationService") as jobspy:
+            with patch("ljpa_reworked.main.SessionLocal") as session_local:
+                db = session_local.return_value.__enter__.return_value
+                with patch("ljpa_reworked.main.process_unevaluated_vacancies") as process:
+                    main.main(resume_only=True)
+
+    harness.assert_not_called()
+    jobspy.return_value.run.assert_not_called()
+    process.assert_called_once_with(db)
