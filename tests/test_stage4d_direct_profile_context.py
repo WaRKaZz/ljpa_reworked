@@ -32,28 +32,20 @@ def test_read_profile_text_success_and_failure(tmp_path):
 
 def test_resume_evaluation_crew_no_knowledge_or_embedder():
     """Verify ResumeEvaluationCrew does not construct Knowledge or embedder."""
-    with patch(
-        "ljpa_reworked.crews.resume_evaluation_crew.resume_evaluation_crew.create_llm",
-        return_value=MagicMock(),
-    ):
-        crew_obj = ResumeEvaluationCrew()
-        assert not hasattr(crew_obj, "profile_md")
-        assert not hasattr(crew_obj, "embedder") or crew_obj.embedder is None
-        c = crew_obj.crew()
-        assert getattr(c, "knowledge", None) is None
+    crew_obj = ResumeEvaluationCrew()
+    assert not hasattr(crew_obj, "profile_md")
+    assert not hasattr(crew_obj, "embedder") or crew_obj.embedder is None
+    c = crew_obj.crew()
+    assert getattr(c, "knowledge", None) is None
 
 
 def test_resume_generation_crew_no_knowledge_or_embedder():
     """Verify ResumeGenerationCrew does not construct Knowledge or embedder."""
-    with patch(
-        "ljpa_reworked.crews.resume_generation_crew.resume_generation_crew.create_llm",
-        return_value=MagicMock(),
-    ):
-        crew_obj = ResumeGenerationCrew()
-        assert not hasattr(crew_obj, "profile_md")
-        assert not hasattr(crew_obj, "embedder") or crew_obj.embedder is None
-        c = crew_obj.crew()
-        assert getattr(c, "knowledge", None) is None
+    crew_obj = ResumeGenerationCrew()
+    assert not hasattr(crew_obj, "profile_md")
+    assert not hasattr(crew_obj, "embedder") or crew_obj.embedder is None
+    c = crew_obj.crew()
+    assert getattr(c, "knowledge", None) is None
 
 
 def test_crewai_evaluate_vacancy_passes_candidate_profile(tmp_path):

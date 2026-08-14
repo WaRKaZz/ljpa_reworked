@@ -1,12 +1,13 @@
-#!/usr/bin/env python
 import argparse
 import logging
+import os
 import time
+import uuid
 
-from ljpa_reworked.config import HARNESS_API_URL
+from ljpa_reworked.config import HARNESS_API_URL, RESOURCES_DIR
 from ljpa_reworked.crew_workflow import (
     crewai_evaluate_vacancy,
-    crewai_generate_resume_with_retry,
+    crewai_generate_resume,
 )
 from ljpa_reworked.database import SessionLocal
 from ljpa_reworked.models.crewai_pydantic_models import BasicEvaluationCrewAI
@@ -17,6 +18,7 @@ from ljpa_reworked.operations import (
     create_evaluation,
     get_resume_by_vacancy,
     get_unrated_vacancies,
+    reconstruct_resume_crewai,
     transition_vacancy_status,
 )
 from ljpa_reworked.operations.evaluation_ops import build_ranked_submission_queue
@@ -26,6 +28,7 @@ from ljpa_reworked.services.harness_runner import (
     run_linkedin_harness,
 )
 from ljpa_reworked.services.jobspy import JobSpyIntegrationService
+from ljpa_reworked.services.rendercv_helper import render_resume_crewai_to_pdf
 from ljpa_reworked.workflow import save_resume
 
 logger = logging.getLogger(__name__)
@@ -62,10 +65,10 @@ def process_unevaluated_vacancies(db) -> None:
             rating=stored_evaluation.rating,
             summary=stored_evaluation.summary or "",
         )
-        resume, temp_pdf_path = crewai_generate_resume_with_retry(
+        resume = crewai_generate_resume(
             vacancy=vacancy, evaluation=evaluation
         )
-        save_resume(resume, vacancy, db, temp_pdf_path=temp_pdf_path)
+        save_resume(resume, vacancy, db)
         transition_vacancy_status(
             db=db,
             vacancy_id=vacancy.id,
@@ -84,10 +87,10 @@ def process_eligible_vacancies(db, vacancies) -> None:
             vacancy.deleted = True
             db.commit()
             continue
-        resume, temp_pdf_path = crewai_generate_resume_with_retry(
+        resume = crewai_generate_resume(
             vacancy=vacancy, evaluation=evaluation
         )
-        save_resume(resume, vacancy, db, temp_pdf_path=temp_pdf_path)
+        save_resume(resume, vacancy, db)
         transition_vacancy_status(
             db=db,
             vacancy_id=vacancy.id,
@@ -108,27 +111,59 @@ def submit_top_vacancies(db) -> int:
             )
             break
         vacancy = ranked.vacancy
-        resume = get_resume_by_vacancy(db, vacancy.id)
-        if resume is None or not resume.path:
-            logger.error("Vacancy %s is prepared without a rendered resume; skipping.", vacancy.id)
+        resume_orm = get_resume_by_vacancy(db, vacancy.id)
+        if resume_orm is None:
+            logger.error(
+                "Vacancy %s is prepared without a stored resume; skipping.",
+                vacancy.id,
+            )
             continue
         if submitted:
             time.sleep(SUBMISSION_DELAY_SECONDS)
-        result = harness_submit(
-            vacancy_url=vacancy.submit_url,
-            resume_path=f"/inputs/resources/resumes/{resume.path}",
-            prompt_file=SUBMIT_PROMPT_FILE,
-            timeout=SUBMIT_TIMEOUT,
-            api_url=HARNESS_API_URL,
-        )
-        if result == 0:
-            confirm_url_application_submitted(db=db, vacancy_id=vacancy.id)
-        else:
+
+        resumes_dir = os.path.join(RESOURCES_DIR, "resumes")
+        os.makedirs(resumes_dir, exist_ok=True)
+        pdf_filename = f"temp_resume_{vacancy.id}_{uuid.uuid4().hex[:8]}.pdf"
+        temp_pdf_path = os.path.join(resumes_dir, pdf_filename)
+        harness_resume_path = f"/inputs/resources/resumes/{pdf_filename}"
+
+        try:
+            resume_crewai = reconstruct_resume_crewai(resume_orm)
+            render_resume_crewai_to_pdf(resume_crewai, temp_pdf_path)
+            result = harness_submit(
+                vacancy_url=vacancy.submit_url,
+                resume_path=harness_resume_path,
+                prompt_file=SUBMIT_PROMPT_FILE,
+                timeout=SUBMIT_TIMEOUT,
+                api_url=HARNESS_API_URL,
+            )
+            if result == 0:
+                confirm_url_application_submitted(db=db, vacancy_id=vacancy.id)
+            else:
+                transition_vacancy_status(
+                    db=db,
+                    vacancy_id=vacancy.id,
+                    target_status=VacancyStatus.application_error,
+                )
+                if os.path.exists(temp_pdf_path):
+                    try:
+                        os.remove(temp_pdf_path)
+                    except OSError:
+                        pass
+        except Exception as exc:
+            logger.error(
+                "Application submission error for vacancy %s: %s", vacancy.id, exc
+            )
             transition_vacancy_status(
                 db=db,
                 vacancy_id=vacancy.id,
                 target_status=VacancyStatus.application_error,
             )
+            if os.path.exists(temp_pdf_path):
+                try:
+                    os.remove(temp_pdf_path)
+                except OSError:
+                    pass
         submitted += 1
     return 0
 
@@ -147,10 +182,15 @@ def main(*, resume_only: bool = False, submit: bool = False) -> int:
         logger.info("[Resume-only] Skipping LinkedIn harness and JobSpy discovery.")
 
     with SessionLocal() as db:
-        logger.info("[Step 3/4] Evaluating unreviewed vacancies and creating resumes...")
+        logger.info(
+            "[Step 3/4] Evaluating unreviewed vacancies and creating resumes..."
+        )
         process_unevaluated_vacancies(db)
         if submit:
-            logger.info("[Step 4/4] Submitting up to %s top-ranked vacancies...", SUBMISSION_LIMIT)
+            logger.info(
+                "[Step 4/4] Submitting up to %s top-ranked vacancies...",
+                SUBMISSION_LIMIT,
+            )
             return submit_top_vacancies(db)
     return 0
 

@@ -9,7 +9,7 @@ def test_guardrail_feedback_includes_required_replacement_json_shape():
     allowed, feedback = resume_output_guardrail(
         TaskOutput(
             description="resume",
-            raw='''{"projects":[{"title":"FGP","highlights":["One factual result"]}]}''',
+            raw="""{"projects":[{"title":"FGP","highlights":["One factual result"]}]}""",
             agent="resume_agent",
         )
     )

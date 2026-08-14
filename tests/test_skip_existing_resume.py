@@ -35,9 +35,10 @@ def test_existing_resume_skips_evaluation_and_generation():
         )
         session.commit()
 
-        with patch("ljpa_reworked.main.crewai_evaluate_vacancy") as evaluate, patch(
-            "ljpa_reworked.main.crewai_generate_resume_with_retry"
-        ) as generate:
+        with (
+            patch("ljpa_reworked.main.crewai_evaluate_vacancy") as evaluate,
+            patch("ljpa_reworked.main.crewai_generate_resume") as generate,
+        ):
             process_eligible_vacancies(session, [vacancy])
 
         evaluate.assert_not_called()

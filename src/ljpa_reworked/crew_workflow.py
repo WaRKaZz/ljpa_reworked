@@ -50,7 +50,13 @@ SECTION_ALIAS_MAP = {
     "summary": "summary",
     "executive summary": "summary",
 }
-CORE_PROFILE_SECTIONS = {"personal_info", "summary", "experience", "education", "skills"}
+CORE_PROFILE_SECTIONS = {
+    "personal_info",
+    "summary",
+    "experience",
+    "education",
+    "skills",
+}
 
 
 def read_profile_text(profile_path: str = PROFILE_FILE_PATH) -> str:
@@ -133,11 +139,12 @@ def crewai_evaluate_vacancy(vacancy: "Vacancy") -> BasicEvaluationCrewAI:
     rate_limitter.acquire()
     crew_output = crew.kickoff(inputs=inputs)
     rate_limitter.record(getattr(crew_output.token_usage, "successful_requests", 0))
-    if crew_output.pydantic is None:
+    evaluation = crew_output.tasks_output[-1].pydantic
+    if evaluation is None:
         raise ValueError("CrewAI evaluation returned no structured output.")
     # The profile passed the deterministic completeness check above. A vacancy
     # requirement the candidate does not meet affects rating, never profile completeness.
-    return crew_output.pydantic.model_copy(update={"missing_mandatory_facts": []})
+    return evaluation.model_copy(update={"missing_mandatory_facts": []})
 
 
 def crewai_generate_resume(
@@ -175,7 +182,6 @@ def crewai_generate_resume(
     )
     validate_resume_facts(resume, evaluation, present_sections=present_sections)
     return resume
-
 
 
 @crewai_retry_handler
@@ -297,9 +303,14 @@ def crewai_generate_resume_with_retry(
             render_resume_crewai_to_pdf(resume, temp_pdf_path)
             return resume, temp_pdf_path
         except Exception as err:
-            if not str(err).startswith("RenderCV output failed page layout validation:"):
+            if not str(err).startswith(
+                "RenderCV output failed page layout validation:"
+            ):
                 if os.path.exists(temp_pdf_path):
-                    os.remove(temp_pdf_path)
+                    try:
+                        os.remove(temp_pdf_path)
+                    except OSError:
+                        pass
                 raise
             last_error = err
             if os.path.exists(temp_pdf_path):

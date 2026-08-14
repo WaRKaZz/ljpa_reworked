@@ -9,7 +9,7 @@ def test_resume_generation_task_retries_project_with_fewer_than_three_highlights
     allowed, feedback = resume_output_guardrail(
         TaskOutput(
             description="resume",
-            raw='''{"projects":[{"title":"Flow Monitoring System Telemetry Deployment","highlights":["Only one"]}]}''',
+            raw="""{"projects":[{"title":"Flow Monitoring System Telemetry Deployment","highlights":["Only one"]}]}""",
             agent="resume_agent",
         )
     )

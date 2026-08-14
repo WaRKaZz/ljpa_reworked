@@ -34,7 +34,6 @@ def test_resume_generation_crew_hermetic_probe():
         ),
     }
 
-    mock_llm = MagicMock()
     mock_crew = MagicMock()
     mock_crew_output = MagicMock()
     mock_task_output = MagicMock()
@@ -58,13 +57,7 @@ def test_resume_generation_crew_hermetic_probe():
     mock_crew_output.tasks_output = [mock_task_output]
     mock_crew.kickoff.return_value = mock_crew_output
 
-    with (
-        patch(
-            "ljpa_reworked.crews.resume_generation_crew.resume_generation_crew.create_llm",
-            return_value=mock_llm,
-        ),
-        patch("crewai.Crew.kickoff", return_value=mock_crew_output) as mock_kickoff,
-    ):
+    with patch("crewai.Crew.kickoff", return_value=mock_crew_output) as mock_kickoff:
         crew_instance = ResumeGenerationCrew()
         c = crew_instance.crew()
 

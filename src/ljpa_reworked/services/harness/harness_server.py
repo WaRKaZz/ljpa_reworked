@@ -82,8 +82,9 @@ async def usage():
         raise HTTPException(status_code=503, detail=str(error)) from error
 
 
-
-def _terminate_process_group(process: subprocess.Popen, grace_seconds: float = 0.5) -> None:
+def _terminate_process_group(
+    process: subprocess.Popen, grace_seconds: float = 0.5
+) -> None:
     if process.poll() is not None:
         return
     try:
@@ -170,7 +171,6 @@ async def run_harness(req: HarnessRequest):
         agy_stream_generator(cmd),
         media_type="application/x-ndjson",
     )
-
 
 
 if __name__ == "__main__":

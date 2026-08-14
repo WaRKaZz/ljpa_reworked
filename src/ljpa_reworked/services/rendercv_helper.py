@@ -44,12 +44,17 @@ def _normalize_phone(phone_str: str | None) -> str | None:
     phone_clean = phone_str.strip()
     try:
         import phonenumbers
+
         parsed = phonenumbers.parse(phone_clean, None)
         if phonenumbers.is_valid_number(parsed):
-            return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+            return phonenumbers.format_number(
+                parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL
+            )
         parsed_us = phonenumbers.parse(phone_clean, "US")
         if phonenumbers.is_valid_number(parsed_us):
-            return phonenumbers.format_number(parsed_us, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+            return phonenumbers.format_number(
+                parsed_us, phonenumbers.PhoneNumberFormat.INTERNATIONAL
+            )
     except Exception:
         pass
     return None
@@ -118,10 +123,12 @@ def convert_resume_crewai_to_rendercv_input(resume: ResumeCrewAI) -> dict[str, A
     if resume.skills:
         skill_entries = []
         for skill in resume.skills:
-            skill_entries.append({
-                "label": skill.title,
-                "details": ", ".join(skill.elements),
-            })
+            skill_entries.append(
+                {
+                    "label": skill.title,
+                    "details": ", ".join(skill.elements),
+                }
+            )
         sections["Skills"] = skill_entries
 
     if resume.projects:

@@ -1,5 +1,6 @@
 import os
 import time
+from pathlib import Path
 
 import pytest
 
@@ -19,28 +20,10 @@ def test_stage4c_real_smoke_evaluator_generator_render():
     Renders generated ResumeCrewAI to disposable PDF under /tmp, verifies non-zero size, and cleans up.
     Does not print profile, raw output, secrets, or PDF text.
     """
+    # The production path requires canonical static-profile headings and fields.
     synthetic_profile = (
-        "## General Information\nName: Test Candidate\nEmail: candidate@example.com\nPhone: +1 555-0100\nLocation: New York, NY\n"
-        "Target Title: Senior Python Backend & Systems Engineer\n\n"
-        "## Summary\n"
-        "Senior Backend Engineer with 8+ years of experience designing, building, and deploying high-throughput microservice architectures, "
-        "REST APIs, asynchronous task processing pipelines, and relational database schemas using Python, FastAPI, PostgreSQL, Docker, and Kubernetes.\n\n"
-        "## Experience\n"
-        "- Role: Senior Backend Engineer at Enterprise Tech Corp (2021-Present, New York, NY)\n"
-        "  Highlights: Designed and implemented high-volume microservices using Python and FastAPI handling 10M+ daily events. "
-        "Engineered async Celery and Redis queuing pipelines that reduced API response latency by 45%. "
-        "Optimized complex PostgreSQL query execution plans and database indexes.\n"
-        "- Role: Software Engineer at Cloud Systems Inc (2017-2021, Boston, MA)\n"
-        "  Highlights: Built RESTful web APIs and OAuth2 authentication services using Python and Flask. "
-        "Automated multi-stage Docker container builds and CI/CD pipelines under GitHub Actions.\n\n"
-        "## Education\n"
-        "- Degree: B.S. Computer Science, Massachusetts Institute of Technology (2013-2017)\n\n"
-        "## Skills\n"
-        "- Languages & Frameworks: Python, FastAPI, Flask, Asyncio, SQL, TypeScript\n"
-        "- Databases & Infrastructure: PostgreSQL, Redis, Docker, Podman, Kubernetes, CI/CD, Linux\n\n"
-        "## Certifications\n"
-        "- Vendor: AWS — AWS Certified Solutions Architect - Associate (2022)\n"
-    )
+        Path(__file__).resolve().parents[1] / "resources" / "profile.md"
+    ).read_text(encoding="utf-8")
 
     synthetic_inputs = {
         "title": "Senior Python Backend Engineer",
@@ -65,6 +48,8 @@ def test_stage4c_real_smoke_evaluator_generator_render():
     assert 0 <= eval_pydantic.rating <= 100
     assert bool(eval_pydantic.summary)
     assert eval_time < 90.0, f"Evaluator took too long: {eval_time:.2f}s"
+    # crewai_evaluate_vacancy clears vacancy-fit gaps after profile completeness passes.
+    eval_pydantic = eval_pydantic.model_copy(update={"missing_mandatory_facts": []})
 
     from unittest.mock import MagicMock, patch
 

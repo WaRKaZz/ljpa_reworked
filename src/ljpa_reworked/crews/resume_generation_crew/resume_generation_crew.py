@@ -37,7 +37,14 @@ def resume_output_guardrail(task_output: TaskOutput) -> tuple[bool, str]:
                 item for item in highlights if isinstance(item, str)
             )
 
-    experience_required = ("title", "company", "location", "start_date", "end_date", "description")
+    experience_required = (
+        "title",
+        "company",
+        "location",
+        "start_date",
+        "end_date",
+        "description",
+    )
     for index, experience in enumerate(payload.get("experience", [])):
         missing = [field for field in experience_required if field not in experience]
         if missing:
@@ -72,7 +79,10 @@ def resume_output_guardrail(task_output: TaskOutput) -> tuple[bool, str]:
             )
 
     if not isinstance(payload.get("summary"), str) or not payload["summary"].strip():
-        return False, "Provide a non-empty summary string and return only the complete JSON object."
+        return (
+            False,
+            "Provide a non-empty summary string and return only the complete JSON object.",
+        )
     for index, experience in enumerate(payload.get("experience", [])):
         description = experience.get("description", [])
         if not isinstance(description, list) or len(description) < 3:

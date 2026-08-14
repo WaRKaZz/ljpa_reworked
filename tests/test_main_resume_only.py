@@ -8,7 +8,9 @@ def test_main_resume_only_skips_discovery_and_processes_unevaluated_vacancies():
         with patch("ljpa_reworked.main.JobSpyIntegrationService") as jobspy:
             with patch("ljpa_reworked.main.SessionLocal") as session_local:
                 db = session_local.return_value.__enter__.return_value
-                with patch("ljpa_reworked.main.process_unevaluated_vacancies") as process:
+                with patch(
+                    "ljpa_reworked.main.process_unevaluated_vacancies"
+                ) as process:
                     main.main(resume_only=True)
 
     harness.assert_not_called()

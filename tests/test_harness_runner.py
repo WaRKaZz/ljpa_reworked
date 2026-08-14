@@ -14,25 +14,36 @@ def test_run_linkedin_harness_sends_http_request(tmp_path):
         connection.execute("CREATE TABLE marker (value TEXT)")
 
     mock_response = MagicMock()
-    mock_response.__enter__.return_value = [b'{"event":"result","result":{"status":"SUCCESS"}}\n']
+    mock_response.__enter__.return_value = [
+        b'{"event":"result","result":{"status":"SUCCESS"}}\n'
+    ]
 
     def side_effect_urlopen(*args, **kwargs):
         artifact = scraper.with_name("scraper-result.json")
-        artifact.write_text(json.dumps({
-            "status": "completed",
-            "workspace_db": "/app/data/app.db",
-            "integrity_check": "ok",
-            "foreign_key_check": "ok",
-            "final_valid_vacancy_count": 1,
-        }))
+        artifact.write_text(
+            json.dumps(
+                {
+                    "status": "completed",
+                    "workspace_db": "/app/data/app.db",
+                    "integrity_check": "ok",
+                    "foreign_key_check": "ok",
+                    "final_valid_vacancy_count": 1,
+                }
+            )
+        )
         return mock_response
 
-    with patch("urllib.request.urlopen", side_effect=side_effect_urlopen) as mock_urlopen:
-        assert run_linkedin_harness(
-            api_url="http://localhost:8080/run-harness",
-            canonical_db_path=canonical,
-            scraper_db_path=scraper,
-        ) == 0
+    with patch(
+        "urllib.request.urlopen", side_effect=side_effect_urlopen
+    ) as mock_urlopen:
+        assert (
+            run_linkedin_harness(
+                api_url="http://localhost:8080/run-harness",
+                canonical_db_path=canonical,
+                scraper_db_path=scraper,
+            )
+            == 0
+        )
     assert not scraper.exists()
 
     assert mock_urlopen.called
@@ -68,7 +79,6 @@ def test_scraper_runner_returns_at_terminal_agy_success(tmp_path):
         )
 
     assert consumed == ["line1", "line2"]
-
 
 
 def test_harness_submit_sends_payload_and_returns_0_on_confirmed_status():

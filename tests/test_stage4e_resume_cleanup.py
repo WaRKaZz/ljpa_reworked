@@ -59,7 +59,9 @@ def test_cleanup_removes_unsubmitted_vacancy_resume_pdf(db_session: Session, tmp
     assert db_session.query(Resume).filter_by(id=resume.id).first() is not None
 
 
-def test_cleanup_removes_stale_applied_vacancy_resume_pdf(db_session: Session, tmp_path):
+def test_cleanup_removes_stale_applied_vacancy_resume_pdf(
+    db_session: Session, tmp_path
+):
     resumes_dir = tmp_path / "resumes"
     resumes_dir.mkdir(parents=True, exist_ok=True)
     pdf_file = resumes_dir / "stale_applied.pdf"
@@ -74,7 +76,7 @@ def test_cleanup_removes_stale_applied_vacancy_resume_pdf(db_session: Session, t
         submit_email="test@example.com",
         source=DataSource.linkedin,
         visa_status=VisaStatus.not_required,
-        status=VacancyStatus.applied,
+        status=VacancyStatus.submitted_via_all,
         applied_at=stale_date,
     )
     db_session.add(vacancy)
@@ -98,7 +100,9 @@ def test_cleanup_removes_stale_applied_vacancy_resume_pdf(db_session: Session, t
     assert db_session.query(Resume).filter_by(id=resume.id).first() is not None
 
 
-def test_cleanup_retains_recent_applied_vacancy_resume_pdf(db_session: Session, tmp_path):
+def test_cleanup_retains_recent_applied_vacancy_resume_pdf(
+    db_session: Session, tmp_path
+):
     resumes_dir = tmp_path / "resumes"
     resumes_dir.mkdir(parents=True, exist_ok=True)
     pdf_file = resumes_dir / "recent_applied.pdf"
@@ -113,7 +117,7 @@ def test_cleanup_retains_recent_applied_vacancy_resume_pdf(db_session: Session, 
         submit_email="test@example.com",
         source=DataSource.linkedin,
         visa_status=VisaStatus.not_required,
-        status=VacancyStatus.applied,
+        status=VacancyStatus.submitted_via_all,
         applied_at=recent_date,
     )
     db_session.add(vacancy)
@@ -198,7 +202,9 @@ def test_cleanup_rejects_non_pdf_path(db_session: Session, tmp_path):
     assert txt_file.exists(), "Non-PDF file must not be deleted"
 
 
-def test_cleanup_rejects_absolute_path_and_path_traversal(db_session: Session, tmp_path):
+def test_cleanup_rejects_absolute_path_and_path_traversal(
+    db_session: Session, tmp_path
+):
     resumes_dir = tmp_path / "resumes"
     resumes_dir.mkdir(parents=True, exist_ok=True)
     outside_file = tmp_path / "outside.pdf"

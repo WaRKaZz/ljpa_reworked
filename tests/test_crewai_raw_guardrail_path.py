@@ -8,26 +8,27 @@ def test_resume_generation_parses_guardrail_approved_raw_json(tmp_path):
 
     profile = tmp_path / "profile.md"
     profile.write_text(
-        '## General Information\n- **Name:** A\n- **Target Title:** Controls Engineer\n- **Location:** A\n## Job Search Preferences\n- **Email:** a@example.com\n- **Phone:** 1\n## Summary\nSummary\n## Experience\n### Co — Engineer\n**Dates:** 2014 – Now\n**Location:** A\n- Source fact.\n## Education\n### U\n**Degree:** BSc\n**Dates:** 2010 – 2014\n## Skills\nSkills\n',
+        "## General Information\n- **Name:** A\n- **Target Title:** Controls Engineer\n- **Location:** A\n## Job Search Preferences\n- **Email:** a@example.com\n- **Phone:** 1\n## Summary\nSummary\n## Experience\n### Co — Engineer\n**Dates:** 2014 – Now\n**Location:** A\n- Source fact.\n## Education\n### U\n**Degree:** BSc\n**Dates:** 2010 – 2014\n## Skills\nSkills\n",
         encoding="utf-8",
     )
-    raw_resume = '''{
+    raw_resume = """{
       "personal_info":{"name":"A","email":"a@example.com","phone":"1","address":"A","location":"A"},
       "summary":"Automation engineer",
       "education":[{"course":"BSc","institution":"U","location":"A","start_date":"2010","end_date":"2014"}],
       "experience":[{"title":"Engineer","company":"Co","location":"A","start_date":"2014","end_date":"Now","description":["One","Two","Three"]}],
       "skills":[{"title":"PLC","elements":["TIA"]}],
       "projects":[]
-    }'''
+    }"""
     output = MagicMock()
     output.raw = raw_resume
     crew = MagicMock()
     crew.kickoff.return_value = output
     output.token_usage.successful_requests = 1
 
-    with patch("ljpa_reworked.crew_workflow.PROFILE_FILE_PATH", str(profile)), patch(
-        "ljpa_reworked.crew_workflow.ResumeGenerationCrew"
-    ) as crew_class:
+    with (
+        patch("ljpa_reworked.crew_workflow.PROFILE_FILE_PATH", str(profile)),
+        patch("ljpa_reworked.crew_workflow.ResumeGenerationCrew") as crew_class,
+    ):
         crew_class.return_value.crew.return_value = crew
         resume = crewai_generate_resume(
             MagicMock(title="Controls Engineer", text="PLC role"),

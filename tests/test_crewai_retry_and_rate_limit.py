@@ -28,7 +28,10 @@ def test_retry_handler_does_not_retry_value_error():
     def operation():
         raise ValueError("invalid profile")
 
-    with pytest.raises(ValueError, match="invalid profile"), patch("ljpa_reworked.decorators.time.sleep") as sleep:
+    with (
+        pytest.raises(ValueError, match="invalid profile"),
+        patch("ljpa_reworked.decorators.time.sleep") as sleep,
+    ):
         operation()
     sleep.assert_not_called()
 

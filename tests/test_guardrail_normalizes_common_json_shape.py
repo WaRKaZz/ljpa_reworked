@@ -9,7 +9,13 @@ def test_guardrail_normalizes_category_skills_and_long_summary():
     )
 
     raw = {
-        "personal_info": {"name": "A", "email": "a@example.com", "phone": "1", "address": "A", "location": "A"},
+        "personal_info": {
+            "name": "A",
+            "email": "a@example.com",
+            "phone": "1",
+            "address": "A",
+            "location": "A",
+        },
         "summary": "S" * 501,
         "education": [],
         "experience": [],

@@ -29,7 +29,9 @@ async def test_run_harness_goal_construction_untrusted_transport():
         resume_path="/app/resources/resumes/resume_999.pdf",
     )
 
-    with patch("ljpa_reworked.services.harness.harness_server.agy_stream_generator") as mock_gen:
+    with patch(
+        "ljpa_reworked.services.harness.harness_server.agy_stream_generator"
+    ) as mock_gen:
         mock_gen.return_value = (x for x in [])
         response = await run_harness(req)
 
@@ -42,7 +44,9 @@ async def test_run_harness_goal_construction_untrusted_transport():
         goal_arg = next(arg for arg in cmd if arg.startswith("/goal"))
         assert "/app/prompts/harness_submit.md" in goal_arg
         assert "UNTRUSTED_VACANCY_URL: https://example.com/apply?id=999" in goal_arg
-        assert "UNTRUSTED_RESUME_PATH: /app/resources/resumes/resume_999.pdf" in goal_arg
+        assert (
+            "UNTRUSTED_RESUME_PATH: /app/resources/resumes/resume_999.pdf" in goal_arg
+        )
 
 
 @pytest.mark.asyncio
@@ -74,4 +78,3 @@ async def test_agy_stream_generator_reports_process_failure():
 
     assert any('"status": "error"' in item for item in lines)
     assert any("exited with 1" in item for item in lines)
-

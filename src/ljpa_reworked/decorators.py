@@ -19,7 +19,9 @@ def crewai_retry_handler(func):
                 if attempt == 2:
                     raise
                 delay = 2**attempt
-                logger.warning("CrewAI attempt %d/3 failed; retrying in %ss", attempt + 1, delay)
+                logger.warning(
+                    "CrewAI attempt %d/3 failed; retrying in %ss", attempt + 1, delay
+                )
                 time.sleep(delay)
 
     return wrapper

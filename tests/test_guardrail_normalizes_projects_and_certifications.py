@@ -9,12 +9,23 @@ def test_guardrail_normalizes_missing_project_description_and_certification_stri
     )
 
     raw = {
-        "personal_info": {"name": "A", "email": "a@example.com", "phone": "1", "address": "A", "location": "A"},
+        "personal_info": {
+            "name": "A",
+            "email": "a@example.com",
+            "phone": "1",
+            "address": "A",
+            "location": "A",
+        },
         "summary": "Automation engineer",
         "education": [],
         "experience": [],
         "skills": [],
-        "projects": [{"title": "Water Supply Automation", "highlights": ["Scope", "Implementation", "Outcome"]}],
+        "projects": [
+            {
+                "title": "Water Supply Automation",
+                "highlights": ["Scope", "Implementation", "Outcome"],
+            }
+        ],
         "certifications": ["Siemens — SIMATIC S7 Programming, 2022"],
     }
 

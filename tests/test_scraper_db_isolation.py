@@ -38,8 +38,14 @@ def test_scraper_database_copy_round_trip(tmp_path: Path):
 def test_submit_never_uses_scraper_database_lifecycle():
     from ljpa_reworked.services import harness_runner
 
-    assert "prepare_scraper_database" not in harness_runner.harness_submit.__code__.co_names
-    assert "publish_scraper_database" not in harness_runner.harness_submit.__code__.co_names
+    assert (
+        "prepare_scraper_database"
+        not in harness_runner.harness_submit.__code__.co_names
+    )
+    assert (
+        "publish_scraper_database"
+        not in harness_runner.harness_submit.__code__.co_names
+    )
 
 
 def test_harness_success_publishes_valid_scraper_database(tmp_path: Path):
@@ -49,7 +55,9 @@ def test_harness_success_publishes_valid_scraper_database(tmp_path: Path):
     _create_database(canonical, "before")
 
     mock_response = MagicMock()
-    mock_response.__enter__.return_value = [b'{"event":"result","result":{"status":"SUCCESS"}}\n']
+    mock_response.__enter__.return_value = [
+        b'{"event":"result","result":{"status":"SUCCESS"}}\n'
+    ]
 
     with patch("urllib.request.urlopen", return_value=mock_response):
         result = run_linkedin_harness(
@@ -70,7 +78,9 @@ def test_harness_success_publishes_updated_scraper_database(tmp_path: Path):
     _create_database(canonical, "before")
 
     mock_response = MagicMock()
-    mock_response.__enter__.return_value = [b'{"event":"result","result":{"status":"SUCCESS"}}\n']
+    mock_response.__enter__.return_value = [
+        b'{"event":"result","result":{"status":"SUCCESS"}}\n'
+    ]
 
     def side_effect_urlopen(*args, **kwargs):
         with sqlite3.connect(scraper) as connection:

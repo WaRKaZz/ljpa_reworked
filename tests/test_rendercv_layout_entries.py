@@ -87,7 +87,12 @@ def test_rendercv_disables_page_breaks_in_entries():
     assert result["design"]["entries"]["allow_page_break_in_entries"] is False
     assert result["design"]["header"]["use_icons_for_connections"] is False
     assert result["design"]["page"]["show_last_updated_date"] is False
-    assert list(result["cv"]["sections"].keys()) == ["Summary", "Skills", "Experience", "Education"]
+    assert list(result["cv"]["sections"].keys()) == [
+        "Summary",
+        "Skills",
+        "Experience",
+        "Education",
+    ]
 
 
 def test_validate_pdf_page_layout_character_budget_rules(monkeypatch, tmp_path):
@@ -120,21 +125,28 @@ def test_validate_pdf_page_layout_character_budget_rules(monkeypatch, tmp_path):
         def __getitem__(self, idx):
             return self.pages[idx]
 
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([1399]))
+    monkeypatch.setattr(
+        rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([1399])
+    )
     valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
     assert not valid
     assert "1400" in msg
 
     # A readable non-final page does not fail solely for density.
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3000, 1400]))
+    monkeypatch.setattr(
+        rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3000, 1400])
+    )
     valid, _ = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
     assert valid
 
     # Every page still needs minimum readable content.
-    monkeypatch.setattr(rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3000, 1399]))
+    monkeypatch.setattr(
+        rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3000, 1399])
+    )
     valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
     assert not valid
     assert "Page 2" in msg
+
 
 def test_rendercv_regression_fixture_llp_neo_stroy_no_split(tmp_path):
     import os
@@ -196,8 +208,19 @@ def test_rendercv_regression_fixture_llp_neo_stroy_no_split(tmp_path):
             ),
         ],
         skills=[
-            SkillCrewAI(title="PLC & SCADA", elements=["Allen-Bradley Studio 5000", "Siemens TIA Portal", "WinCC", "Schneider EcoStruxure"]),
-            SkillCrewAI(title="Networks & Protocols", elements=["Modbus TCP/IP", "PROFINET", "Profibus DP", "EtherNet/IP"]),
+            SkillCrewAI(
+                title="PLC & SCADA",
+                elements=[
+                    "Allen-Bradley Studio 5000",
+                    "Siemens TIA Portal",
+                    "WinCC",
+                    "Schneider EcoStruxure",
+                ],
+            ),
+            SkillCrewAI(
+                title="Networks & Protocols",
+                elements=["Modbus TCP/IP", "PROFINET", "Profibus DP", "EtherNet/IP"],
+            ),
         ],
         certifications=[],
         projects=[],
@@ -216,7 +239,10 @@ def test_rendercv_regression_fixture_llp_neo_stroy_no_split(tmp_path):
         for _i, text in enumerate(pages_text):
             if "LLP Neo Stroy" in text:
                 assert "Lead Controls Engineer" in text or "LLP Neo Stroy" in text
-            if "Designed, programmed, and commissioned" in text or "Engineered high-availability Modbus" in text:
+            if (
+                "Designed, programmed, and commissioned" in text
+                or "Engineered high-availability Modbus" in text
+            ):
                 # Must contain the entry title/header on the page where its bullets appear
                 assert "LLP Neo Stroy" in text
     finally:
@@ -227,21 +253,30 @@ def test_rendercv_regression_fixture_llp_neo_stroy_no_split(tmp_path):
 def test_resume_generation_task_prompt_guidance():
     import yaml
 
-    with open("src/ljpa_reworked/crews/resume_generation_crew/config/tasks.yaml", encoding="utf-8") as f:
+    with open(
+        "src/ljpa_reworked/crews/resume_generation_crew/config/tasks.yaml",
+        encoding="utf-8",
+    ) as f:
         tasks = yaml.safe_load(f)
 
     desc = tasks["resume_generation_task"]["description"]
 
     # Verify sector ordering
-    assert "Summary, Skills, Experience, Education, Certifications, Projects" in desc or (
-        "Summary" in desc and "Skills" in desc and "Experience" in desc and "Education" in desc
+    assert (
+        "Summary, Skills, Experience, Education, Certifications, Projects" in desc
+        or (
+            "Summary" in desc
+            and "Skills" in desc
+            and "Experience" in desc
+            and "Education" in desc
+        )
     )
 
-    # Verify character budget guidance
-    assert "3300" in desc and "3475" in desc
-    assert "1400" in desc
+    # Layout limits are enforced deterministically after rendering and fed into retries.
+    assert "RETRY FEEDBACK" in desc
+    assert "PREVIOUS RESUME JSON" in desc
 
-    # Verify plain field-by-field output and page-filling instructions.
+    # Verify static-profile and schema instructions.
+    assert "STATIC FACTS POLICY" in desc
     assert "FIELD-BY-FIELD OUTPUT CONTRACT" in desc
-    assert "Count every visible character" in desc
-    assert "exactly 3-4 long highlights" in desc
+    assert "exactly 3 or 4" in desc

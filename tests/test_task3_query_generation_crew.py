@@ -230,11 +230,10 @@ def test_query_generation_prompt_source_aware_worldwide_contract():
         / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "Require at least one LinkedIn query with location `worldwide`." in task_config
     assert (
-        "Require Indeed queries to use individual country locations"
-        in task_config
+        "Require at least one LinkedIn query with location `worldwide`." in task_config
     )
+    assert "Require Indeed queries to use individual country locations" in task_config
     assert "Never use `worldwide` for Indeed queries." in task_config
     assert (
         "not their current or past residence unless profile preferences explicitly choose them"
@@ -250,7 +249,13 @@ def test_query_generation_prompt_has_no_fixed_hardcoded_markets():
         / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
     ).read_text(encoding="utf-8")
 
-    for prohibited in ["Saudi Arabia", "UAE", "United Arab Emirates", "USA", "United States"]:
+    for prohibited in [
+        "Saudi Arabia",
+        "UAE",
+        "United Arab Emirates",
+        "USA",
+        "United States",
+    ]:
         assert prohibited not in task_config
 
 
@@ -266,21 +271,16 @@ def test_query_generation_prompt_restricts_site_names_to_working_sources():
     assert "zip_recruiter" not in task_config
 
 
-def test_job_search_query_google_search_term_field():
-    query_google = JobSearchQuery(
-        search_term="Python Engineer",
-        location="Munich, Germany",
-        site_name="google",
-        google_search_term="Python Engineer jobs near Munich, Germany",
-    )
-    assert query_google.google_search_term == "Python Engineer jobs near Munich, Germany"
-
-    query_linkedin = JobSearchQuery(
-        search_term="Python Engineer",
-        location="Remote",
-        site_name="linkedin",
-    )
-    assert query_linkedin.google_search_term is None
+@pytest.mark.parametrize(
+    "site_name", ["google", "glassdoor", "zip_recruiter", "ziprecruiter"]
+)
+def test_job_search_query_rejects_disabled_sources(site_name):
+    with pytest.raises(ValidationError):
+        JobSearchQuery(
+            search_term="Python Engineer",
+            location="Remote",
+            site_name=site_name,
+        )
 
 
 def test_query_generation_prompt_keyword_query_rules():
@@ -306,7 +306,7 @@ def test_query_generation_prompt_excludes_google_site_and_worldwide_rule():
     ).read_text(encoding="utf-8")
 
     assert "Allowed site_name values only: linkedin, indeed." in task_config
-    assert "Google queries"  not in task_config
+    assert "Google queries" not in task_config
     assert "google_search_term" not in task_config
 
 

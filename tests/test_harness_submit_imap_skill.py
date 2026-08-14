@@ -9,10 +9,14 @@ def test_submit_prompt_uses_imap_mcp_credentials_from_env_file():
     assert "IMAP_MCP_ACCOUNT_LJPA_GMAIL_IMAP_PASSWORD" in prompt
     assert "Do not read `.env`" in prompt
     assert "profile-only contact-data rule" in prompt
+    assert "/runtime/workspace/credentials.json" in prompt
+    assert "/inputs/resources/profile.md" in prompt
 
 
 def test_imap_registration_skill_prohibits_secret_handling_and_writes():
-    skill = Path(".gemini/skills/imap-email-registration/SKILL.md").read_text(encoding="utf-8")
+    skill = Path("runtime/gemini/skills/imap-email-registration/SKILL.md").read_text(
+        encoding="utf-8"
+    )
     assert "Read-only tools are intentional" in skill
     assert "Do not ask for, read, print, write, or store mailbox credentials" in skill
     assert "imap_search_emails" in skill

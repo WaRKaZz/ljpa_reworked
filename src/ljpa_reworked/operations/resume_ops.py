@@ -81,3 +81,23 @@ def delete_resume(db: Session, resume_id: int) -> bool:
         db.commit()
         return True
     return False
+
+
+def reconstruct_resume_crewai(resume: Resume) -> ResumeCrewAI:
+    """Reconstruct a ResumeCrewAI model from a stored Resume ORM instance."""
+    personal_info = resume.personal_info or {
+        "name": resume.fullname or "",
+        "email": resume.email or "",
+        "phone": resume.phone or "",
+        "address": resume.address or "",
+        "location": resume.address or "",
+    }
+    return ResumeCrewAI(
+        personal_info=personal_info,
+        summary=resume.summary or "",
+        education=resume.education or [],
+        experience=resume.experience or [],
+        skills=resume.skills or [],
+        projects=resume.projects or [],
+        certifications=resume.certifications or [],
+    )

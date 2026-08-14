@@ -32,16 +32,23 @@ def test_existing_passing_evaluation_without_resume_creates_resume_without_reeva
         db.commit()
         evaluation = BasicEvaluationCrewAI(rating=80, summary="match")
 
-        with patch("ljpa_reworked.main.crewai_evaluate_vacancy") as evaluate, patch(
-            "ljpa_reworked.main.crewai_generate_resume_with_retry",
-            return_value=("resume", "/tmp/resume.pdf"),
-        ) as generate, patch("ljpa_reworked.main.save_resume") as save:
+        with (
+            patch("ljpa_reworked.main.crewai_evaluate_vacancy") as evaluate,
+            patch(
+                "ljpa_reworked.main.crewai_generate_resume",
+                return_value="resume",
+            ) as generate,
+            patch("ljpa_reworked.main.save_resume") as save,
+        ):
             process_unevaluated_vacancies(db)
 
         evaluate.assert_not_called()
         generate.assert_called_once_with(vacancy=vacancy, evaluation=evaluation)
         save.assert_called_once()
-        assert db.get(type(vacancy), vacancy.id).status == VacancyStatus.application_prepared
+        assert (
+            db.get(type(vacancy), vacancy.id).status
+            == VacancyStatus.application_prepared
+        )
     finally:
         db.close()
         Base.metadata.drop_all(bind=engine)

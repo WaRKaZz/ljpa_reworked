@@ -50,7 +50,9 @@ class EmailGenerationCrew:
         if knowledge_sources is not None:
             self.knowledge_sources = knowledge_sources
         elif cv_file_path and os.path.exists(cv_file_path):
-            self.knowledge_sources = [PDFKnowledgeSource(file_paths=[Path(cv_file_path)])]
+            self.knowledge_sources = [
+                PDFKnowledgeSource(file_paths=[Path(cv_file_path)])
+            ]
         else:
             self.knowledge_sources = []
 
@@ -60,7 +62,9 @@ class EmailGenerationCrew:
             config=self.agents_config["email_generator_agent"],
             llm=self.llm,
             tools=[scrape_tool],
-            knowledge_sources=self.knowledge_sources if self.knowledge_sources else None,
+            knowledge_sources=self.knowledge_sources
+            if self.knowledge_sources
+            else None,
             allow_delegation=False,
         )
 

@@ -273,7 +273,9 @@ class JobSpyIntegrationService:
                         "hours_old": 72,
                         "country_indeed": indeed_country_for_location(q.location),
                     }
-                    if q.site_name == "google" and getattr(q, "google_search_term", None):
+                    if q.site_name == "google" and getattr(
+                        q, "google_search_term", None
+                    ):
                         scrape_kwargs["google_search_term"] = q.google_search_term
 
                     jobs_df = scrape_jobs(**scrape_kwargs)

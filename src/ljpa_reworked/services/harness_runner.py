@@ -24,8 +24,16 @@ def get_gemini_quota_remaining(api_url: str) -> float:
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             remaining = float(json.loads(response.read())["remaining_fraction"])
-    except (KeyError, TypeError, ValueError, urllib.error.URLError, json.JSONDecodeError) as error:
-        raise RuntimeError("Could not read Antigravity Gemini five-hour quota.") from error
+    except (
+        KeyError,
+        TypeError,
+        ValueError,
+        urllib.error.URLError,
+        json.JSONDecodeError,
+    ) as error:
+        raise RuntimeError(
+            "Could not read Antigravity Gemini five-hour quota."
+        ) from error
     if not 0 <= remaining <= 1:
         raise RuntimeError("Antigravity returned an invalid Gemini quota fraction.")
     return remaining
@@ -112,7 +120,9 @@ def run_linkedin_harness(
         publish_scraper_database(canonical_db_path, scraper_db_path)
         return 0
     except (urllib.error.URLError, OSError, RuntimeError, sqlite3.Error) as error:
-        logger.error("Scraper harness failed; canonical database was retained: %s", error)
+        logger.error(
+            "Scraper harness failed; canonical database was retained: %s", error
+        )
         scraper_db_path.unlink(missing_ok=True)
         return 1
 
@@ -141,7 +151,9 @@ def harness_submit(
         method="POST",
     )
 
-    logger.info("Sending submission harness request to %s for URL %s", api_url, vacancy_url)
+    logger.info(
+        "Sending submission harness request to %s for URL %s", api_url, vacancy_url
+    )
     completed = False
     try:
         with urllib.request.urlopen(req) as response:
@@ -164,8 +176,13 @@ def main() -> None:
     parser.add_argument("--prompt-file", default="/app/prompts/harness_scraper.md")
     parser.add_argument("--timeout", default="1h")
     parser.add_argument("--api-url", default="http://antigravity-cli:8080/run-harness")
-    parser.add_argument("--url", help="Target vacancy URL for manual one-vacancy submission")
-    parser.add_argument("--pdf-path", help="Path to rendered PDF resume for manual one-vacancy submission")
+    parser.add_argument(
+        "--url", help="Target vacancy URL for manual one-vacancy submission"
+    )
+    parser.add_argument(
+        "--pdf-path",
+        help="Path to rendered PDF resume for manual one-vacancy submission",
+    )
     args = parser.parse_args()
 
     if args.url and args.pdf_path:

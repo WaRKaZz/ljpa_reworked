@@ -29,13 +29,14 @@ from .resume_ops import (
     get_resume_by_id,
     get_resume_by_vacancy,
     get_resumes_by_email,
+    reconstruct_resume_crewai,
     search_resumes_by_name,
     update_resume_path,
 )
 from .telegram_ops import mark_vacancy_as_sent
 from .vacancy_ops import (
-    confirm_url_application_submitted,
     confirm_email_application_submitted,
+    confirm_url_application_submitted,
     create_vacancy,
     get_all_vacancies,
     get_eligble_vacancies,
@@ -78,6 +79,7 @@ __all__ = [
     "get_resume_by_id",
     "get_resume_by_vacancy",
     "get_resumes_by_email",
+    "reconstruct_resume_crewai",
     "search_resumes_by_name",
     "update_resume_path",
     # vacancy_ops

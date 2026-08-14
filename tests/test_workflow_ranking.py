@@ -46,7 +46,12 @@ def test_ranked_submission_queue_penalizes_age_and_soft_deletes_below_fifty():
         two_days_old = _vacancy(db, "Two Days")
         raw_low = _vacancy(db, "Raw Low")
         penalized_low = _vacancy(db, "Penalized Low")
-        for vacancy, age in ((fresh, 0), (two_days_old, 2), (raw_low, 0), (penalized_low, 2)):
+        for vacancy, age in (
+            (fresh, 0),
+            (two_days_old, 2),
+            (raw_low, 0),
+            (penalized_low, 2),
+        ):
             vacancy.created_at = now - timedelta(days=age)
             vacancy.status = VacancyStatus.application_prepared
         _evaluation(db, fresh, 88)
@@ -67,7 +72,9 @@ def test_ranked_submission_queue_penalizes_age_and_soft_deletes_below_fifty():
         Base.metadata.drop_all(bind=engine)
 
 
-def test_processes_only_unevaluated_vacancies_and_creates_resume_for_passing_match(monkeypatch):
+def test_processes_only_unevaluated_vacancies_and_creates_resume_for_passing_match(
+    monkeypatch,
+):
     from ljpa_reworked import main
 
     db, engine = _session()
@@ -80,16 +87,24 @@ def test_processes_only_unevaluated_vacancies_and_creates_resume_for_passing_mat
         calls = []
         monkeypatch.setattr(
             main,
-            "crewai_generate_resume_with_retry",
-            lambda vacancy, evaluation: ("resume", "/tmp/resume.pdf"),
+            "crewai_generate_resume",
+            lambda vacancy, evaluation: "resume",
         )
-        monkeypatch.setattr(main, "save_resume", lambda *args, **kwargs: calls.append(args[1]))
+        monkeypatch.setattr(
+            main, "save_resume", lambda *args, **kwargs: calls.append(args[1])
+        )
 
         main.process_unevaluated_vacancies(db)
 
         assert calls == [evaluated, pending]
-        assert db.get(type(evaluated), evaluated.id).status == VacancyStatus.application_prepared
-        assert db.get(type(pending), pending.id).status == VacancyStatus.application_prepared
+        assert (
+            db.get(type(evaluated), evaluated.id).status
+            == VacancyStatus.application_prepared
+        )
+        assert (
+            db.get(type(pending), pending.id).status
+            == VacancyStatus.application_prepared
+        )
     finally:
         db.close()
         Base.metadata.drop_all(bind=engine)
@@ -97,6 +112,7 @@ def test_processes_only_unevaluated_vacancies_and_creates_resume_for_passing_mat
 
 def test_submit_top_five_waits_three_hours_between_each_submission(monkeypatch):
     from ljpa_reworked import main
+    from ljpa_reworked.models.database_models import Resume
 
     db, engine = _session()
     try:
@@ -104,14 +120,23 @@ def test_submit_top_five_waits_three_hours_between_each_submission(monkeypatch):
         for number, vacancy in enumerate(vacancies):
             vacancy.status = VacancyStatus.application_prepared
             _evaluation(db, vacancy, 100 - number)
+            db.add(
+                Resume(
+                    vacancy_id=vacancy.id,
+                    fullname="Test User",
+                    email="test@example.com",
+                    summary="Test summary",
+                )
+            )
+        db.commit()
         sleeps = []
         submitted = []
         monkeypatch.setattr(main, "time", type("Clock", (), {"sleep": sleeps.append}))
         monkeypatch.setattr(main, "get_gemini_quota_remaining", lambda api_url: 1.0)
         monkeypatch.setattr(
             main,
-            "get_resume_by_vacancy",
-            lambda db, vacancy_id: type("Resume", (), {"path": "resume.pdf"})(),
+            "render_resume_crewai_to_pdf",
+            lambda resume_crewai, pdf_path: None,
         )
         monkeypatch.setattr(
             main,

@@ -54,7 +54,9 @@ def test_resume_related_crews_use_shared_llm_factory(
     import importlib
 
     module = importlib.import_module(module_name)
-    shared_llm = LLM(model="openai/gpt-4o-mini", api_key="test-key", base_url="http://gateway/v1")
+    shared_llm = LLM(
+        model="openai/gpt-4o-mini", api_key="test-key", base_url="http://gateway/v1"
+    )
     factory = MagicMock(return_value=shared_llm)
     monkeypatch.setattr(module, "create_llm", factory)
 

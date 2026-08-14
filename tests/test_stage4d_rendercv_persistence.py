@@ -1,5 +1,3 @@
-import os
-from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -81,135 +79,65 @@ def sample_vacancy(db_session: Session):
     return vacancy
 
 
-def test_save_resume_successful_persistence(
+def test_save_resume_stores_structured_data_only(
+    db_session: Session, sample_resume, sample_vacancy
+):
+    """Verify save_resume stores structured data only, with path and rendered_at set to None."""
+    orm_resume = save_resume(sample_resume, sample_vacancy, db_session)
+
+    # Path and rendered_at must be None
+    assert orm_resume.path is None
+    assert orm_resume.rendered_at is None
+    assert orm_resume.vacancy_id == sample_vacancy.id
+    assert orm_resume.fullname == sample_resume.personal_info.name
+    assert orm_resume.email == sample_resume.personal_info.email
+    assert orm_resume.summary == sample_resume.summary
+
+    # DB query verification
+    db_resume = db_session.query(Resume).filter(Resume.id == orm_resume.id).first()
+    assert db_resume is not None
+    assert db_resume.path is None
+    assert db_resume.rendered_at is None
+    assert db_resume.vacancy_id == sample_vacancy.id
+
+
+def test_save_resume_deletes_supplied_temp_pdf(
     db_session: Session, sample_resume, sample_vacancy, tmp_path
 ):
-    """Verify save_resume renders via RenderCV helper, creates non-empty file, and stores relative filename + rendered_at."""
+    """Verify save_resume removes supplied temp_pdf_path if it exists."""
+    temp_pdf = tmp_path / "temp.pdf"
+    temp_pdf.write_bytes(b"%PDF-1.4 mock content")
 
-    def mock_render(resume_data, out_path):
-        os.makedirs(os.path.dirname(out_path), exist_ok=True)
-        with open(out_path, "wb") as f:
-            f.write(b"%PDF-1.4 mock pdf content")
-        return out_path
+    save_resume(
+        sample_resume,
+        sample_vacancy,
+        db_session,
+        temp_pdf_path=str(temp_pdf),
+    )
 
-    with (
-        patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)),
-        patch(
-            "ljpa_reworked.workflow.render_resume_crewai_to_pdf",
-            side_effect=mock_render,
-        ) as mock_helper,
-    ):
-        orm_resume = save_resume(sample_resume, sample_vacancy, db_session)
-
-        mock_helper.assert_called_once()
-
-        # Path stored must be relative filename, not absolute path
-        assert not os.path.isabs(orm_resume.path)
-        assert "/" not in orm_resume.path
-        assert "\\" not in orm_resume.path
-        assert orm_resume.path.endswith(".pdf")
-
-        # rendered_at must be populated timestamp
-        assert orm_resume.rendered_at is not None
-        assert isinstance(orm_resume.rendered_at, datetime)
-
-        # File must exist under tmp_path/resumes/<path>
-        expected_file_path = tmp_path / "resumes" / orm_resume.path
-        assert expected_file_path.exists()
-        assert expected_file_path.stat().st_size > 0
-
-        # DB query verification
-        db_resume = db_session.query(Resume).filter(Resume.id == orm_resume.id).first()
-        assert db_resume is not None
-        assert db_resume.path == orm_resume.path
-        assert db_resume.rendered_at == orm_resume.rendered_at
+    assert not temp_pdf.exists()
 
 
-def test_save_resume_rendering_failure_leaves_no_db_row_or_file(
+def test_save_resume_create_resume_failure_propagation(
     db_session: Session, sample_resume, sample_vacancy, tmp_path
 ):
-    """Verify that if render_resume_crewai_to_pdf raises an error, no DB row or leftover file is created."""
-    with (
-        patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)),
-        patch(
-            "ljpa_reworked.workflow.render_resume_crewai_to_pdf",
-            side_effect=RuntimeError("RenderCV failed"),
-        ),
-    ):
-        with pytest.raises(RuntimeError, match="RenderCV failed"):
-            save_resume(sample_resume, sample_vacancy, db_session)
+    """Verify create_resume failure propagates and supplied temp_pdf_path is deleted."""
+    temp_pdf = tmp_path / "temp_fail.pdf"
+    temp_pdf.write_bytes(b"%PDF-1.4 mock content")
 
-        # No DB row
-        assert db_session.query(Resume).count() == 0
-
-        # No leftover PDF file in resumes directory
-        resumes_dir = tmp_path / "resumes"
-        if resumes_dir.exists():
-            pdf_files = list(resumes_dir.glob("*.pdf"))
-            assert len(pdf_files) == 0
-
-
-def test_save_resume_empty_file_leaves_no_db_row_or_file(
-    db_session: Session, sample_resume, sample_vacancy, tmp_path
-):
-    """Verify that if rendering produces a 0-byte file, save_resume raises RuntimeError and cleans up."""
-
-    def mock_render_empty(resume_data, out_path):
-        os.makedirs(os.path.dirname(out_path), exist_ok=True)
-        with open(out_path, "wb") as f:
-            f.write(b"")  # empty
-        return out_path
-
-    with (
-        patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)),
-        patch(
-            "ljpa_reworked.workflow.render_resume_crewai_to_pdf",
-            side_effect=mock_render_empty,
-        ),
-    ):
-        with pytest.raises(RuntimeError):
-            save_resume(sample_resume, sample_vacancy, db_session)
-
-        # No DB row
-        assert db_session.query(Resume).count() == 0
-
-        # Empty file removed
-        resumes_dir = tmp_path / "resumes"
-        if resumes_dir.exists():
-            pdf_files = list(resumes_dir.glob("*.pdf"))
-            assert len(pdf_files) == 0
-
-
-def test_save_resume_db_failure_cleans_up_pdf_and_reraises(
-    db_session: Session, sample_resume, sample_vacancy, tmp_path
-):
-    """Verify that if create_resume fails after rendering a non-empty PDF, the PDF is removed and error re-raised."""
-
-    def mock_render(resume_data, out_path):
-        os.makedirs(os.path.dirname(out_path), exist_ok=True)
-        with open(out_path, "wb") as f:
-            f.write(b"%PDF-1.4 valid content")
-        return out_path
-
-    with (
-        patch("ljpa_reworked.workflow.RESOURCES_DIR", str(tmp_path)),
-        patch(
-            "ljpa_reworked.workflow.render_resume_crewai_to_pdf",
-            side_effect=mock_render,
-        ),
-        patch(
-            "ljpa_reworked.workflow.create_resume",
-            side_effect=RuntimeError("DB Commit Failed"),
-        ),
+    with patch(
+        "ljpa_reworked.workflow.create_resume",
+        side_effect=RuntimeError("DB Commit Failed"),
     ):
         with pytest.raises(RuntimeError, match="DB Commit Failed"):
-            save_resume(sample_resume, sample_vacancy, db_session)
+            save_resume(
+                sample_resume,
+                sample_vacancy,
+                db_session,
+                temp_pdf_path=str(temp_pdf),
+            )
 
-        # PDF file cleaned up
-        resumes_dir = tmp_path / "resumes"
-        if resumes_dir.exists():
-            pdf_files = list(resumes_dir.glob("*.pdf"))
-            assert len(pdf_files) == 0
+    assert not temp_pdf.exists()
 
 
 def test_legacy_resume_generator_import_removed():

@@ -6,14 +6,18 @@ from ljpa_reworked.services.harness.protocol import parse_terminal_result
 
 
 def test_parse_terminal_result_success():
-    line = json.dumps({"event": "result", "result": {"status": "SUCCESS", "details": "done"}})
+    line = json.dumps(
+        {"event": "result", "result": {"status": "SUCCESS", "details": "done"}}
+    )
     is_terminal, is_success = parse_terminal_result(line)
     assert is_terminal is True
     assert is_success is True
 
 
 def test_parse_terminal_result_error():
-    line = json.dumps({"event": "result", "result": {"status": "ERROR", "message": "failed"}})
+    line = json.dumps(
+        {"event": "result", "result": {"status": "ERROR", "message": "failed"}}
+    )
     is_terminal, is_success = parse_terminal_result(line)
     assert is_terminal is True
     assert is_success is False
@@ -54,10 +58,11 @@ async def test_server_stops_agy_process_group_after_terminal_event():
     ]
     mock_process.poll.return_value = None
 
-    with patch("subprocess.Popen", return_value=mock_process) as mock_popen, \
-         patch("os.getpgid", return_value=9999) as mock_getpgid, \
-         patch("os.killpg") as mock_killpg:
-
+    with (
+        patch("subprocess.Popen", return_value=mock_process) as mock_popen,
+        patch("os.getpgid", return_value=9999) as mock_getpgid,
+        patch("os.killpg") as mock_killpg,
+    ):
         lines = []
         async for line in agy_stream_generator(["agy", "run"]):
             lines.append(line)
@@ -76,6 +81,6 @@ def test_harness_scraper_prompt_contract():
     assert prompt_path.exists()
     content = prompt_path.read_text(encoding="utf-8")
 
-    assert "Do not use background execution" in content
-    assert "Stay in the foreground" in content
+    assert "/runtime/harness-scraper/app.db" in content
+    assert "/runtime/workspace/app.db.work" in content
     assert "/workspace/scraper-result.json" not in content

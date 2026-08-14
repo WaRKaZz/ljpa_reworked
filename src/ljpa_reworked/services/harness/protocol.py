@@ -9,7 +9,9 @@ def parse_terminal_result(line: str) -> tuple[bool, bool]:
             return False, False
         if data.get("event") == "result":
             result_obj = data.get("result")
-            is_success = isinstance(result_obj, dict) and result_obj.get("status") == "SUCCESS"
+            is_success = (
+                isinstance(result_obj, dict) and result_obj.get("status") == "SUCCESS"
+            )
             return True, is_success
         return False, False
     except (json.JSONDecodeError, TypeError):

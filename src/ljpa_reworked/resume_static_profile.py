@@ -11,13 +11,17 @@ def _section(text: str, heading: str) -> str:
 
 
 def _field(text: str, name: str) -> str:
-    match = re.search(rf"^[-*]?\s*\*\*{re.escape(name)}:\*\*\s*(.+)$", text, re.MULTILINE)
+    match = re.search(
+        rf"^[-*]?\s*\*\*{re.escape(name)}:\*\*\s*(.+)$", text, re.MULTILINE
+    )
     return match.group(1).strip() if match else ""
 
 
 def _dates(value: str) -> tuple[str, str]:
     parts = re.split(r"\s+[–-]\s+", value, maxsplit=1)
-    return (parts[0].strip(), parts[1].strip()) if len(parts) == 2 else (value.strip(), "")
+    return (
+        (parts[0].strip(), parts[1].strip()) if len(parts) == 2 else (value.strip(), "")
+    )
 
 
 def _entries(section: str, fields: dict[str, str]) -> list[dict[str, str]]:
@@ -52,30 +56,44 @@ def parse_static_resume_profile(profile_text: str) -> dict:
     }
 
     experience = []
-    for entry in _entries(_section(profile_text, "Experience"), {"dates": "Dates", "location": "Location"}):
-        company, title = (part.strip() for part in entry.pop("_heading").split(" — ", maxsplit=1))
+    for entry in _entries(
+        _section(profile_text, "Experience"), {"dates": "Dates", "location": "Location"}
+    ):
+        company, title = (
+            part.strip() for part in entry.pop("_heading").split(" — ", maxsplit=1)
+        )
         start_date, end_date = _dates(entry.pop("dates"))
-        experience.append({
-            "company": company,
-            "title": title,
-            "location": entry["location"],
-            "start_date": start_date,
-            "end_date": end_date,
-            "description": entry["_bullets"],
-        })
+        experience.append(
+            {
+                "company": company,
+                "title": title,
+                "location": entry["location"],
+                "start_date": start_date,
+                "end_date": end_date,
+                "description": entry["_bullets"],
+            }
+        )
 
     education = []
-    for entry in _entries(_section(profile_text, "Education"), {"course": "Degree", "dates": "Dates"}):
+    for entry in _entries(
+        _section(profile_text, "Education"), {"course": "Degree", "dates": "Dates"}
+    ):
         start_date, end_date = _dates(entry.pop("dates"))
-        education.append({
-            "institution": entry.pop("_heading"),
-            "course": entry["course"],
-            "location": personal_info["location"],
-            "start_date": start_date,
-            "end_date": end_date,
-        })
+        education.append(
+            {
+                "institution": entry.pop("_heading"),
+                "course": entry["course"],
+                "location": personal_info["location"],
+                "start_date": start_date,
+                "end_date": end_date,
+            }
+        )
 
-    return {"personal_info": personal_info, "experience": experience, "education": education}
+    return {
+        "personal_info": personal_info,
+        "experience": experience,
+        "education": education,
+    }
 
 
 def merge_static_resume_profile(dynamic: dict, static: dict) -> dict:
@@ -86,7 +104,9 @@ def merge_static_resume_profile(dynamic: dict, static: dict) -> dict:
     dynamic_experience = dynamic.get("experience", [])
     result["experience"] = []
     for index, static_entry in enumerate(static["experience"]):
-        dynamic_entry = dynamic_experience[index] if index < len(dynamic_experience) else {}
+        dynamic_entry = (
+            dynamic_experience[index] if index < len(dynamic_experience) else {}
+        )
         description = dynamic_entry.get("description")
         if not isinstance(description, list) or len(description) < 3:
             description = static_entry["description"]

@@ -3,7 +3,9 @@ from unittest.mock import MagicMock, patch
 from ljpa_reworked.models.crewai_pydantic_models import BasicEvaluationCrewAI
 
 
-def test_evaluation_does_not_treat_vacancy_requirements_as_missing_profile_facts(tmp_path):
+def test_evaluation_does_not_treat_vacancy_requirements_as_missing_profile_facts(
+    tmp_path,
+):
     from ljpa_reworked.crew_workflow import crewai_evaluate_vacancy
 
     profile = tmp_path / "profile.md"
@@ -31,19 +33,26 @@ PLC
 """,
         encoding="utf-8",
     )
-    vacancy = MagicMock(title="Data Center Engineer", text="Requires data center experience")
-    output = MagicMock(
-        pydantic=BasicEvaluationCrewAI(
-            summary="Candidate lacks direct data center experience.",
-            rating=65,
-            missing_mandatory_facts=["Direct data center engineering experience."],
-        )
+    vacancy = MagicMock(
+        title="Data Center Engineer", text="Requires data center experience"
     )
+    output = MagicMock()
+    output.tasks_output = [
+        MagicMock(
+            pydantic=BasicEvaluationCrewAI(
+                summary="Candidate lacks direct data center experience.",
+                rating=65,
+                missing_mandatory_facts=["Direct data center engineering experience."],
+            )
+        )
+    ]
     output.token_usage.successful_requests = 1
 
-    with patch("ljpa_reworked.crew_workflow.PROFILE_FILE_PATH", str(profile)), patch(
-        "ljpa_reworked.crew_workflow.ResumeEvaluationCrew"
-    ) as crew_class, patch("ljpa_reworked.crew_workflow.rate_limitter"):
+    with (
+        patch("ljpa_reworked.crew_workflow.PROFILE_FILE_PATH", str(profile)),
+        patch("ljpa_reworked.crew_workflow.ResumeEvaluationCrew") as crew_class,
+        patch("ljpa_reworked.crew_workflow.rate_limitter"),
+    ):
         crew_class.return_value.crew.return_value.kickoff.return_value = output
         result = crewai_evaluate_vacancy(vacancy)
 

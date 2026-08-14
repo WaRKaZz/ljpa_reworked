@@ -1,4 +1,3 @@
-
 import pytest
 
 from ljpa_reworked.crew_workflow import (
@@ -264,9 +263,11 @@ def test_evaluator_and_generator_task_yaml_contracts():
     gen_desc = gen_tasks["resume_generation_task"]["description"]
     assert "three" in gen_desc.lower() or "3" in gen_desc
     assert (
-        "named categories" in gen_desc.lower() or "skills categories" in gen_desc.lower()
+        "named categories" in gen_desc.lower()
+        or "skills categories" in gen_desc.lower()
     )
-    assert "general domain information" in gen_desc.lower() or "content rule" in gen_desc.lower()
+    assert "static facts policy" in gen_desc.lower()
+    assert "strict factuality rule" in gen_desc.lower()
 
 
 def test_pdf_layout_validation_one_page_and_two_page(tmp_path):
@@ -321,9 +322,28 @@ def test_pdf_layout_validation_one_page_and_two_page(tmp_path):
             ),
         ],
         skills=[
-            SkillCrewAI(title="PLC & SCADA", elements=["Allen-Bradley Studio 5000", "Siemens TIA Portal", "WinCC", "Wonderware System Platform"]),
-            SkillCrewAI(title="Industrial Networks", elements=["Modbus TCP/IP", "PROFINET", "Profibus DP", "EtherNet/IP"]),
-            SkillCrewAI(title="Tools & Languages", elements=["Python", "Structured Text", "Ladder Logic", "Function Block Diagram"]),
+            SkillCrewAI(
+                title="PLC & SCADA",
+                elements=[
+                    "Allen-Bradley Studio 5000",
+                    "Siemens TIA Portal",
+                    "WinCC",
+                    "Wonderware System Platform",
+                ],
+            ),
+            SkillCrewAI(
+                title="Industrial Networks",
+                elements=["Modbus TCP/IP", "PROFINET", "Profibus DP", "EtherNet/IP"],
+            ),
+            SkillCrewAI(
+                title="Tools & Languages",
+                elements=[
+                    "Python",
+                    "Structured Text",
+                    "Ladder Logic",
+                    "Function Block Diagram",
+                ],
+            ),
         ],
     )
     pdf_out = str(tmp_path / "synthetic_resume.pdf")

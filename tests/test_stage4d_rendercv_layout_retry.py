@@ -117,6 +117,7 @@ def test_retry_orchestration_first_fails_layout_second_succeeds():
 
 def test_retry_orchestration_passes_prior_resume_json_on_second_call():
     import json
+
     mock_vacancy = MagicMock()
     mock_eval = MagicMock(spec=BasicEvaluationCrewAI)
     resume1 = _make_dummy_resume()
@@ -162,7 +163,6 @@ def test_retry_orchestration_passes_prior_resume_json_on_second_call():
         assert call2_kwargs.get("prior_resume_json") == expected_json
 
 
-
 def test_retry_orchestration_both_fail_cleans_files_and_raises(tmp_path):
     mock_vacancy = MagicMock()
     mock_eval = MagicMock(spec=BasicEvaluationCrewAI)
@@ -188,7 +188,7 @@ def test_retry_orchestration_both_fail_cleans_files_and_raises(tmp_path):
         ),
     ):
         with pytest.raises(RuntimeError) as exc_info:
-            crewai_generate_resume_with_retry(mock_vacancy, mock_eval)
+            crewai_generate_resume_with_retry(mock_vacancy, mock_eval, max_retries=1)
 
         assert layout_err_msg in str(exc_info.value)
         assert mock_gen.call_count == 2
@@ -206,35 +206,41 @@ def test_save_resume_with_pre_rendered_temp_pdf(tmp_path):
     temp_pdf = tmp_path / "pre_rendered.pdf"
     temp_pdf.write_bytes(b"%PDF-1.4 dummy content")
 
-    with (
-        patch("ljpa_reworked.workflow.render_resume_crewai_to_pdf") as mock_render,
-        patch(
-            "ljpa_reworked.workflow.create_resume",
-            return_value=MagicMock(path="resume_42_abc.pdf"),
-        ) as mock_create_resume,
-    ):
+    mock_orm = MagicMock(path=None, rendered_at=None)
+    with patch(
+        "ljpa_reworked.workflow.create_resume",
+        return_value=mock_orm,
+    ) as mock_create_resume:
         orm_resume = save_resume(
             dummy_resume, mock_vacancy, db, temp_pdf_path=str(temp_pdf)
         )
 
-        assert orm_resume.path == "resume_42_abc.pdf"
-        assert mock_render.call_count == 0  # Should NOT render a 3rd time
-        assert mock_create_resume.call_count == 1
+        assert orm_resume == mock_orm
+        mock_create_resume.assert_called_once_with(
+            db=db,
+            vacancy_id=42,
+            resume_data=dummy_resume,
+            path=None,
+            rendered_at=None,
+        )
         assert not temp_pdf.exists()  # Temp PDF should be cleaned up after saving
 
 
 def test_format_numeric_layout_feedback_branches():
     from ljpa_reworked.crew_workflow import _format_numeric_layout_feedback
 
-    err_short = "Page 1 (non-final) character count (2800) is outside required range [3300, 3475]"
+    err_short = (
+        "Page 1 (non-final) character count (2800) is less than minimum 3000 characters"
+    )
     res_short = _format_numeric_layout_feedback(err_short)
-    assert "expand the resume text by approximately 587 characters" in res_short
+    assert "expand the resume text by approximately 300 characters" in res_short
 
-    err_long = "Page 1 (non-final) character count (3600) is outside required range [3300, 3475]"
-    res_long = _format_numeric_layout_feedback(err_long)
-    assert "trim the resume text by approximately 213 characters" in res_long
+    err_other = "Page 1 (non-final) character count (3600) is valid"
+    assert _format_numeric_layout_feedback(err_other) == err_other
 
-    err_final = "Page 2 (final) character count (1200) is less than minimum 1400 characters"
+    err_final = (
+        "Page 2 (final) character count (1200) is less than minimum 1400 characters"
+    )
     res_final = _format_numeric_layout_feedback(err_final)
     assert "add approximately 300 characters" in res_final
 
@@ -245,14 +251,16 @@ def test_format_numeric_layout_feedback_branches():
 def test_format_numeric_layout_feedback_detailed_instructions():
     from ljpa_reworked.crew_workflow import _format_numeric_layout_feedback
 
-    # 1. Short non-final page case (2800 < 3300)
-    err_short = "Page 1 (non-final) character count (2800) is outside required range [3300, 3475]"
+    # 1. Short non-final page case (2800 < 3000)
+    err_short = (
+        "Page 1 (non-final) character count (2800) is less than minimum 3000 characters"
+    )
     res_short = _format_numeric_layout_feedback(err_short)
     assert "Page 1" in res_short
     assert "2800" in res_short
-    assert "[3300, 3475]" in res_short
-    assert "587" in res_short  # 3387 - 2800 = 587
-    assert "3387" in res_short
+    assert "3000" in res_short
+    assert "300" in res_short  # 3100 - 2800 = 300
+    assert "3100" in res_short
     assert "RenderCV" in res_short and "move" in res_short.lower()
     assert "Priority" in res_short or "priority" in res_short.lower()
     assert "Summary" in res_short
@@ -262,20 +270,10 @@ def test_format_numeric_layout_feedback_detailed_instructions():
     assert "Preserve" in res_short or "preserve" in res_short.lower()
     assert "JSON" in res_short
 
-    # 2. Long non-final page case (3600 > 3475)
-    err_long = "Page 1 (non-final) character count (3600) is outside required range [3300, 3475]"
-    res_long = _format_numeric_layout_feedback(err_long)
-    assert "Page 1" in res_long
-    assert "3600" in res_long
-    assert "[3300, 3475]" in res_long
-    assert "213" in res_long  # 3600 - 3387 = 213
-    assert "3387" in res_long
-    assert "Summary" in res_long
-    assert "Forbidden" in res_long or "forbidden" in res_long.lower()
-    assert "JSON" in res_long
-
     # 3. Short final page case (1200 < 1400)
-    err_final = "Page 2 (final) character count (1200) is less than minimum 1400 characters"
+    err_final = (
+        "Page 2 (final) character count (1200) is less than minimum 1400 characters"
+    )
     res_final = _format_numeric_layout_feedback(err_final)
     assert "Page 2" in res_final
     assert "1200" in res_final
@@ -285,7 +283,6 @@ def test_format_numeric_layout_feedback_detailed_instructions():
     assert "Summary" in res_final
     assert "Forbidden" in res_final or "forbidden" in res_final.lower()
     assert "JSON" in res_final
-
 
 
 def test_save_resume_cleans_up_on_create_resume_error(tmp_path):
@@ -319,16 +316,23 @@ def test_save_resume_and_retry_oserror_cleanup_branches():
     mock_vacancy.id = 99
     dummy_resume = _make_dummy_resume()
 
-    with patch("shutil.copy", side_effect=RuntimeError("copy error")):
-        with patch("os.path.exists", return_value=True):
-            with patch("os.remove", side_effect=OSError("remove error")):
-                with pytest.raises(RuntimeError) as exc_info:
-                    save_resume(dummy_resume, mock_vacancy, db, temp_pdf_path="/tmp/fake.pdf")
-                assert "copy error" in str(exc_info.value)
+    with patch("os.path.exists", return_value=True):
+        with patch("os.remove", side_effect=OSError("remove error")):
+            with patch("ljpa_reworked.workflow.create_resume") as mock_create:
+                save_resume(
+                    dummy_resume, mock_vacancy, db, temp_pdf_path="/tmp/fake.pdf"
+                )
+                mock_create.assert_called_once()
 
     with (
-        patch("ljpa_reworked.crew_workflow.crewai_generate_resume", return_value=dummy_resume),
-        patch("ljpa_reworked.crew_workflow.render_resume_crewai_to_pdf", side_effect=RuntimeError("render fail")),
+        patch(
+            "ljpa_reworked.crew_workflow.crewai_generate_resume",
+            return_value=dummy_resume,
+        ),
+        patch(
+            "ljpa_reworked.crew_workflow.render_resume_crewai_to_pdf",
+            side_effect=RuntimeError("render fail"),
+        ),
         patch("os.path.exists", return_value=True),
         patch("os.remove", side_effect=OSError("remove fail")),
     ):

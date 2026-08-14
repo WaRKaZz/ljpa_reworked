@@ -9,10 +9,22 @@ def test_guardrail_returns_exact_required_experience_fields_before_pydantic():
     )
 
     raw = {
-        "personal_info": {"name": "A", "email": "a@example.com", "phone": "1", "address": "A", "location": "A"},
+        "personal_info": {
+            "name": "A",
+            "email": "a@example.com",
+            "phone": "1",
+            "address": "A",
+            "location": "A",
+        },
         "summary": "Automation engineer",
         "education": [],
-        "experience": [{"company": "TCO", "location": "Tengiz", "description": ["One", "Two", "Three"]}],
+        "experience": [
+            {
+                "company": "TCO",
+                "location": "Tengiz",
+                "description": ["One", "Two", "Three"],
+            }
+        ],
         "skills": [],
         "projects": [],
     }

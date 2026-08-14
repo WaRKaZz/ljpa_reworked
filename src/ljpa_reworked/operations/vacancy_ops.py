@@ -275,6 +275,7 @@ def confirm_url_application_submitted(
         applied_at,
     )
 
+
 def get_eligible_url_vacancies(
     db: Session,
     limit: int = 20,
@@ -282,6 +283,7 @@ def get_eligible_url_vacancies(
 ) -> list[Vacancy]:
     """Get up to limit freshest eligible URL vacancies created within max_age_days."""
     from datetime import timedelta
+
     cutoff = datetime.utcnow() - timedelta(days=max_age_days)
     return (
         db.query(Vacancy)
@@ -305,7 +307,6 @@ def get_eligible_url_vacancies(
         .limit(limit)
         .all()
     )
-
 
 
 def get_all_vacancies(db: Session, skip: int = 0, limit: int = 100) -> list[Vacancy]:

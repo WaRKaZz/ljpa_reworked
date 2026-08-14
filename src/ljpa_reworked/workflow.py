@@ -4,8 +4,7 @@ import logging
 import os
 import re
 import shutil
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from os import path
 from typing import TYPE_CHECKING
 
@@ -32,7 +31,6 @@ from ljpa_reworked.operations import (
     get_emails_by_recipient,
     mark_vacancy_as_sent,
 )
-from ljpa_reworked.services.rendercv_helper import render_resume_crewai_to_pdf
 from ljpa_reworked.services.smtp_client import SMTPClient
 from ljpa_reworked.services.telegram import Telegram
 
@@ -58,57 +56,23 @@ def save_resume(
     db: Session,
     temp_pdf_path: str | None = None,
 ) -> Resume:
-    """Saves a generated resume to the database and filesystem."""
-    resume_dir = os.path.join(RESOURCES_DIR, "resumes")
-    os.makedirs(resume_dir, exist_ok=True)
+    """Saves structured resume data to the database only."""
+    if temp_pdf_path and os.path.exists(temp_pdf_path):
+        try:
+            os.remove(temp_pdf_path)
+        except OSError:
+            pass
 
-    unique_id = uuid.uuid4().hex[:8]
-    resume_name = f"resume_{vacancy.id}_{unique_id}.pdf"
-    resume_path = os.path.join(resume_dir, resume_name)
-
-    try:
-        if temp_pdf_path and os.path.exists(temp_pdf_path):
-            shutil.copy(temp_pdf_path, resume_path)
-        else:
-            render_resume_crewai_to_pdf(resume, resume_path)
-        if not os.path.exists(resume_path) or os.path.getsize(resume_path) == 0:
-            raise RuntimeError(
-                f"RenderCV failed to generate a non-empty PDF at {resume_path}"
-            )
-    except Exception:
-        if os.path.exists(resume_path):
-            try:
-                os.remove(resume_path)
-            except OSError:
-                pass
-        raise
-    finally:
-        if temp_pdf_path and os.path.exists(temp_pdf_path):
-            try:
-                os.remove(temp_pdf_path)
-            except OSError:
-                pass
-
-    rendered_at = datetime.now(timezone.utc)
-
-    try:
-        orm_resume = create_resume(
-            db=db,
-            vacancy_id=vacancy.id,
-            resume_data=resume,
-            path=resume_name,
-            rendered_at=rendered_at,
-        )
-    except Exception:
-        if os.path.exists(resume_path):
-            try:
-                os.remove(resume_path)
-            except OSError:
-                pass
-        raise
-
-    logger.info(f"Saved resume {resume_name} for vacancy {vacancy.id}.")
+    orm_resume = create_resume(
+        db=db,
+        vacancy_id=vacancy.id,
+        resume_data=resume,
+        path=None,
+        rendered_at=None,
+    )
+    logger.info(f"Saved structured resume for vacancy {vacancy.id}.")
     return orm_resume
+
 
 
 def _prepare_resume_for_sending(resume_path: str) -> str:

@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 from ljpa_reworked.config import PROFILE_FILE_PATH, RESOURCES_DIR
 from ljpa_reworked.crews.resume_evaluation_crew.resume_evaluation_crew import (
@@ -95,27 +94,19 @@ def test_generation_crew_yaml_prompts_have_no_scraping_instructions():
 
 def test_crewai_classes_have_no_scrape_tool_or_rag_knowledge():
     """Hermetic test: Verify crews have no tools and no profile RAG knowledge source."""
-    with patch(
-        "ljpa_reworked.crews.resume_evaluation_crew.resume_evaluation_crew.create_llm",
-        return_value=MagicMock(),
-    ):
-        eval_crew_instance = ResumeEvaluationCrew()
-        agent_eval = eval_crew_instance.resume_evaluation_agent()
-        assert len(agent_eval.tools) == 0, (
-            f"Evaluator agent must have no tools, got: {agent_eval.tools}"
-        )
-        assert not hasattr(eval_crew_instance, "profile_md")
+    eval_crew_instance = ResumeEvaluationCrew()
+    agent_eval = eval_crew_instance.resume_evaluation_agent()
+    assert len(agent_eval.tools) == 0, (
+        f"Evaluator agent must have no tools, got: {agent_eval.tools}"
+    )
+    assert not hasattr(eval_crew_instance, "profile_md")
 
-    with patch(
-        "ljpa_reworked.crews.resume_generation_crew.resume_generation_crew.create_llm",
-        return_value=MagicMock(),
-    ):
-        gen_crew_instance = ResumeGenerationCrew()
-        agent_gen = gen_crew_instance.resume_agent()
-        assert len(agent_gen.tools) == 0, (
-            f"Resume agent must have no tools, got: {agent_gen.tools}"
-        )
-        assert not hasattr(gen_crew_instance, "profile_md")
+    gen_crew_instance = ResumeGenerationCrew()
+    agent_gen = gen_crew_instance.resume_agent()
+    assert len(agent_gen.tools) == 0, (
+        f"Resume agent must have no tools, got: {agent_gen.tools}"
+    )
+    assert not hasattr(gen_crew_instance, "profile_md")
 
 
 def test_convert_resume_crewai_to_rendercv_input():
@@ -258,9 +249,18 @@ def test_render_resume_crewai_to_pdf():
             ),
         ],
         skills=[
-            SkillCrewAI(title="Languages & Frameworks", elements=["Python", "FastAPI", "Flask", "SQL", "TypeScript"]),
-            SkillCrewAI(title="Databases & Caching", elements=["PostgreSQL", "Redis", "SQLAlchemy", "MongoDB"]),
-            SkillCrewAI(title="DevOps & Infrastructure", elements=["Docker", "Podman", "CI/CD", "Linux", "Git"]),
+            SkillCrewAI(
+                title="Languages & Frameworks",
+                elements=["Python", "FastAPI", "Flask", "SQL", "TypeScript"],
+            ),
+            SkillCrewAI(
+                title="Databases & Caching",
+                elements=["PostgreSQL", "Redis", "SQLAlchemy", "MongoDB"],
+            ),
+            SkillCrewAI(
+                title="DevOps & Infrastructure",
+                elements=["Docker", "Podman", "CI/CD", "Linux", "Git"],
+            ),
         ],
         projects=[],
         certifications=[],

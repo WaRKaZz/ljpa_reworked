@@ -153,7 +153,6 @@ class JobSearchQuery(BaseModel):
     results_wanted: Annotated[int, Field(ge=1, le=50)] = 25
 
 
-
 class JobSearchQuerySet(BaseModel):
     profile_sha256: Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
     queries: Annotated[list[JobSearchQuery], Field(min_length=1, max_length=15)]
