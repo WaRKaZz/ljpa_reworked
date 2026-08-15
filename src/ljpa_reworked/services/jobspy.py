@@ -36,7 +36,7 @@ class JobSpyRunSummary(BaseModel):
 # src/ljpa_reworked/services/jobspy.py -> parents[3] is project root
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_PROFILE_PATH = PROJECT_ROOT / "resources" / "profile.md"
-DEFAULT_CACHE_PATH = PROJECT_ROOT / "resources" / "profile_search_query.json"
+DEFAULT_CACHE_PATH = PROJECT_ROOT / "data" / "profile_search_query.json"
 
 
 def compute_profile_sha256(profile_path: Path) -> tuple[str, str]:

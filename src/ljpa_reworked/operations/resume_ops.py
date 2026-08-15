@@ -12,6 +12,8 @@ def create_resume(
     resume_data: ResumeCrewAI,
     path: str | None = None,
     rendered_at: datetime | None = None,
+    *,
+    commit: bool = True,
 ) -> Resume:
     """Create resume for specific vacancy."""
     personal_info = resume_data.personal_info
@@ -33,8 +35,11 @@ def create_resume(
         rendered_at=rendered_at,
     )
     db.add(resume)
-    db.commit()
-    db.refresh(resume)
+    if commit:
+        db.commit()
+        db.refresh(resume)
+    else:
+        db.flush()
     return resume
 
 

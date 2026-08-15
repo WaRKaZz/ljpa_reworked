@@ -74,6 +74,53 @@ def save_resume(
     return orm_resume
 
 
+def persist_prepared_resume(
+    resume: ResumeCrewAI,
+    vacancy: Vacancy,
+    db: Session,
+    temp_pdf_path: str,
+) -> Resume:
+    """Atomically persist a validated PDF, resume record, and prepared status."""
+    from uuid import uuid4
+
+    from ljpa_reworked.models.enums import VacancyStatus
+    from ljpa_reworked.operations import transition_vacancy_status
+
+    if not path.isfile(temp_pdf_path):
+        raise FileNotFoundError(f"Validated resume PDF not found at {temp_pdf_path}")
+
+    resumes_dir = path.join(RESOURCES_DIR, "resumes")
+    os.makedirs(resumes_dir, exist_ok=True)
+    filename = f"resume_{vacancy.id}_{uuid4().hex[:8]}.pdf"
+    target_path = path.join(resumes_dir, filename)
+    try:
+        shutil.move(temp_pdf_path, target_path)
+        orm_resume = create_resume(
+            db=db,
+            vacancy_id=vacancy.id,
+            resume_data=resume,
+            path=filename,
+            rendered_at=datetime.now(),
+            commit=False,
+        )
+        transition_vacancy_status(
+            db=db,
+            vacancy_id=vacancy.id,
+            target_status=VacancyStatus.application_prepared,
+            commit=False,
+        )
+        db.commit()
+        db.refresh(orm_resume)
+        return orm_resume
+    except Exception:
+        db.rollback()
+        if path.exists(target_path):
+            try:
+                os.remove(target_path)
+            except OSError:
+                pass
+        raise
+
 
 def _prepare_resume_for_sending(resume_path: str) -> str:
     """Copies the resume to a temporary location for sending."""

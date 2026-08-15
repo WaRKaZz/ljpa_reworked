@@ -84,9 +84,7 @@ def test_rendercv_disables_page_breaks_in_entries():
         skills=[SkillCrewAI(title="Languages", elements=["Python"])],
     )
     result = convert_resume_crewai_to_rendercv_input(resume)
-    assert result["design"]["entries"]["allow_page_break_in_entries"] is False
-    assert result["design"]["header"]["use_icons_for_connections"] is False
-    assert result["design"]["page"]["show_last_updated_date"] is False
+    assert result["design"]["entries"]["allow_page_break"] is False
     assert list(result["cv"]["sections"].keys()) == [
         "Summary",
         "Skills",
@@ -95,7 +93,9 @@ def test_rendercv_disables_page_breaks_in_entries():
     ]
 
 
-def test_validate_pdf_page_layout_character_budget_rules(monkeypatch, tmp_path):
+def test_validate_pdf_page_layout_rejects_blank_and_overlong_pdfs(
+    monkeypatch, tmp_path
+):
     from ljpa_reworked.services import rendercv_helper
 
     dummy_pdf = tmp_path / "dummy.pdf"
@@ -126,38 +126,36 @@ def test_validate_pdf_page_layout_character_budget_rules(monkeypatch, tmp_path):
             return self.pages[idx]
 
     monkeypatch.setattr(
-        rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([1399])
+        rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([99])
     )
     valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
     assert not valid
-    assert "1400" in msg
+    assert "insufficient readable text" in msg
 
-    # A readable non-final page does not fail solely for density.
     monkeypatch.setattr(
-        rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3000, 1400])
+        rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([2811, 100])
     )
     valid, _ = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
     assert valid
 
-    # Every page still needs minimum readable content.
     monkeypatch.setattr(
-        rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([3000, 1399])
+        rendercv_helper.pypdfium2, "PdfDocument", lambda path: MockDoc([100, 100, 100])
     )
     valid, msg = rendercv_helper.validate_pdf_page_layout(str(dummy_pdf))
     assert not valid
-    assert "Page 2" in msg
+    assert "one or two pages" in msg
 
 
-def test_rendercv_regression_fixture_llp_neo_stroy_no_split(tmp_path):
+def test_rendercv_regression_fixture_whole_entry_no_split(tmp_path):
     import os
 
     import pypdfium2
 
     from ljpa_reworked.services.rendercv_helper import render_resume_crewai_to_pdf
 
-    target_pdf = str(tmp_path / "llp_neo_stroy_test.pdf")
+    target_pdf = str(tmp_path / "synthetic_industrial_systems_test.pdf")
 
-    # Create a resume with a prominent LLP Neo Stroy experience entry with multiple bullets
+    # Create a resume with a prominent Example Industrial Systems Ltd. experience entry with multiple bullets
     resume = ResumeCrewAI(
         personal_info=PersonalInfoCrewAI(
             name="Ivan Operator",
@@ -184,7 +182,7 @@ def test_rendercv_regression_fixture_llp_neo_stroy_no_split(tmp_path):
         experience=[
             ExperienceCrewAI(
                 title="Lead Controls Engineer",
-                company="LLP Neo Stroy",
+                company="Example Industrial Systems Ltd.",
                 location="Almaty, Kazakhstan",
                 start_date="2020-01",
                 end_date="Present",
@@ -235,16 +233,19 @@ def test_rendercv_regression_fixture_llp_neo_stroy_no_split(tmp_path):
         page_counts = [len(text) for text in pages_text]
         print("Regression PDF Page Character Counts:", page_counts)
 
-        # Assert no page contains only continuation bullets from LLP Neo Stroy without the entry header
+        # Assert no page contains only continuation bullets from Example Industrial Systems Ltd. without the entry header
         for _i, text in enumerate(pages_text):
-            if "LLP Neo Stroy" in text:
-                assert "Lead Controls Engineer" in text or "LLP Neo Stroy" in text
+            if "Example Industrial Systems Ltd." in text:
+                assert (
+                    "Lead Controls Engineer" in text
+                    or "Example Industrial Systems Ltd." in text
+                )
             if (
                 "Designed, programmed, and commissioned" in text
                 or "Engineered high-availability Modbus" in text
             ):
                 # Must contain the entry title/header on the page where its bullets appear
-                assert "LLP Neo Stroy" in text
+                assert "Example Industrial Systems Ltd." in text
     finally:
         if os.path.exists(target_pdf):
             os.remove(target_pdf)

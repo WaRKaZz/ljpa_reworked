@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session, joinedload
 
@@ -32,7 +32,7 @@ def mark_vacancy_as_sent(db: Session, vacancy_id: int) -> TelegramStatus:
 
     if vacancy.telegram_status:
         vacancy.telegram_status.sent = True
-        vacancy.telegram_status.date = datetime.utcnow()
+        vacancy.telegram_status.date = datetime.now(UTC).replace(tzinfo=None)
         status = vacancy.telegram_status
     else:
         status = TelegramStatus(sent=True, vacancy_id=vacancy_id)

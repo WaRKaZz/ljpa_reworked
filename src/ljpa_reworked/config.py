@@ -28,16 +28,10 @@ EMBED_PROVIDER = os.getenv("EMBED_PROVIDER")
 EMBED_MODEL = os.getenv("EMBED_MODEL")
 EMBED_API_KEY = os.getenv("EMBED_API_KEY")
 EMBED_BASE_URL = os.getenv("EMBED_BASE_URL")
-# Selenium configuration
-SELENIUM_HOST = os.getenv("SELENIUM_HOST")
-SELENIUM_PORT = os.getenv("SELENIUM_PORT")
-
 LINKEDIN_PROFILE_URL = os.getenv("LINKEDIN_PROFILE_URL")
 
 AGY_BIN_PATH = os.getenv("AGY_BIN_PATH", "/home/warkazz/.local/bin/agy")
 GEMINI_DIR = os.getenv("GEMINI_DIR", os.path.expanduser("~/.gemini_alt"))
-
-SELENIUM_COMMAND_EXECUTOR = f"http://{SELENIUM_HOST}:{SELENIUM_PORT}/wd/hub"
 
 # =============================================================================
 # File Paths and Resource Settings

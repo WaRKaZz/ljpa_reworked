@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class VacancyStatus(str, Enum):
+class VacancyStatus(StrEnum):
     created = "created"  # discovered/upserted; not yet reviewed
     updated = "updated"  # source fields refreshed on existing vacancy
     reviewed = "reviewed"  # review completed and candidate may proceed

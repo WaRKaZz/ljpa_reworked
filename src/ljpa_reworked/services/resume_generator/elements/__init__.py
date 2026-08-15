@@ -1,1 +1,0 @@
-"""Resume generator elements package."""

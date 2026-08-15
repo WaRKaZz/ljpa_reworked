@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -23,7 +23,7 @@ def cleanup_resume_pdfs(
     - Do NOT delete or modify any DB records.
     """
     if now is None:
-        now = datetime.utcnow()
+        now = datetime.now(UTC).replace(tzinfo=None)
 
     resumes_dir_path = Path(resumes_dir).resolve()
     if not resumes_dir_path.exists() or not resumes_dir_path.is_dir():

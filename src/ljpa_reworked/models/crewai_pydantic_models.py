@@ -166,3 +166,8 @@ class JobSearchQuerySet(BaseModel):
         if len(keys) != len(self.queries):
             raise ValueError("duplicate normalized job search queries are not allowed")
         return self
+
+
+class SubmissionReviewCrewAI(BaseModel):
+    decision: Literal["success", "error"]
+    error_description: str | None = None

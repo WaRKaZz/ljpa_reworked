@@ -1,8 +1,9 @@
 from pathlib import Path
 
 
-def test_layout_requires_3000_characters_on_each_non_final_page():
+def test_layout_no_longer_requires_density_padding():
+    """Readable pages are accepted without arbitrary character-density targets."""
     source = Path("src/ljpa_reworked/services/rendercv_helper.py").read_text()
-
-    assert "if i < num_pages - 1 and count < 3000:" in source
-    assert "if count < 1400:" in source
+    assert "count < 3000" not in source
+    assert "count < 1400" not in source
+    assert "insufficient readable text" in source

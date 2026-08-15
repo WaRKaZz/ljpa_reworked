@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, desc, func
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ def build_ranked_submission_queue(
     db: Session, *, now: datetime | None = None
 ) -> list[RankedVacancy]:
     """Discard low-score vacancies and rank prepared URL applications."""
-    now = now or datetime.utcnow()
+    now = now or datetime.now(UTC).replace(tzinfo=None)
     latest_evaluation_id = (
         db.query(BasicEvaluation.vacancy_id, func.max(BasicEvaluation.id).label("id"))
         .group_by(BasicEvaluation.vacancy_id)

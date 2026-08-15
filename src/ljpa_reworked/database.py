@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from sqlalchemy import String, create_engine
+from sqlalchemy import String, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from ljpa_reworked.config import DATABASE_URL
@@ -44,3 +44,9 @@ def init_db(bind_engine=None) -> None:
     import ljpa_reworked.models.database_models  # noqa: F401
 
     Base.metadata.create_all(bind=bind_engine)
+    with bind_engine.begin() as connection:
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ux_resume_vacancy_id ON resume (vacancy_id)"
+            )
+        )

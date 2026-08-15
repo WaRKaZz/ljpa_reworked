@@ -1,0 +1,6 @@
+review_submission_task:
+  description: >
+    Analyze the log tail provided as {stream_tail}. Return decision ('success' or 'error') and an error_description if decision is 'error'.
+  expected_output: >
+    A structured JSON result with decision ('success' or 'error') and error_description if applicable.
+  agent: submission_review_agent

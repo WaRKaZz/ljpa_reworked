@@ -12,8 +12,9 @@ import logging
 import os
 import signal
 import subprocess
+import threading
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -30,20 +31,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Antigravity Harness Runner API")
-HARNESS_MODEL = "gemini-3.6-flash-medium"
+HARNESS_MODEL = "gemini-3.7-flash-medium"
+harness_lock = threading.Lock()
 
 
 def get_gemini_quota() -> float:
     """Run documented /usage and return the Gemini group five-hour remainder."""
     completed = subprocess.run(
         [
-            "/home/agent/.local/bin/agy",
-            "--output-format",
-            "stream-json",
-            "--print",
-            "/usage",
-            "--print-timeout",
-            "45s",
+            "/usr/bin/script",
+            "-qec",
+            "/home/agent/.local/bin/agy --output-format stream-json --print /usage --print-timeout 45s",
+            "/dev/null",
         ],
         capture_output=True,
         check=False,
@@ -72,10 +71,11 @@ class HarnessRequest(BaseModel):
     timeout: str = "8h"
     vacancy_url: str | None = None
     resume_path: str | None = None
+    conversation_id: str | None = None
 
 
 @app.get("/usage")
-async def usage():
+def usage():
     try:
         return {"remaining_fraction": get_gemini_quota()}
     except (RuntimeError, subprocess.TimeoutExpired) as error:
@@ -114,38 +114,39 @@ def _terminate_process_group(
             pass
 
 
-async def agy_stream_generator(cmd: list[str]) -> AsyncGenerator[str, None]:
-    logger.info(f"Running command: {' '.join(cmd)}")
-    process = subprocess.Popen(
-        cmd,
-        cwd=os.getenv("AGY_WORKSPACE", "/runtime/workspace"),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-        start_new_session=True,
-    )
+def agy_stream_generator(cmd: list[str]) -> Generator[str, None, None]:
+    with harness_lock:
+        logger.info(f"Running command: {' '.join(cmd)}")
+        process = subprocess.Popen(
+            cmd,
+            cwd=os.getenv("AGY_WORKSPACE", "/runtime/workspace"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            start_new_session=True,
+        )
 
-    received_terminal = False
-    if process.stdout:
-        for line in process.stdout:
-            yield line
-            is_terminal, _ = parse_terminal_result(line)
-            if is_terminal:
-                received_terminal = True
-                _terminate_process_group(process)
-                break
+        received_terminal = False
+        if process.stdout:
+            for line in process.stdout:
+                yield line
+                is_terminal, _ = parse_terminal_result(line)
+                if is_terminal:
+                    received_terminal = True
+                    _terminate_process_group(process)
+                    break
 
-    if not received_terminal:
-        process.wait()
-        if process.returncode != 0:
-            yield f'{{"status": "error", "message": "agy process exited with {process.returncode}"}}\n'
-        else:
-            yield '{"status": "success", "message": "agy process finished successfully"}\n'
+        if not received_terminal:
+            process.wait()
+            if process.returncode != 0:
+                yield f'{{"status": "error", "message": "agy process exited with {process.returncode}"}}\n'
+            else:
+                yield '{"status": "success", "message": "agy process finished successfully"}\n'
 
 
 @app.post("/run-harness")
-async def run_harness(req: HarnessRequest):
+def run_harness(req: HarnessRequest):
     goal_str = f"Execute the task defined in {req.prompt_file}"
     if req.vacancy_url and req.resume_path:
         goal_str += (
@@ -159,18 +160,25 @@ async def run_harness(req: HarnessRequest):
         "--dangerously-skip-permissions",
         "--model",
         HARNESS_MODEL,
-        "--print",
-        f"/goal {goal_str}",
-        "--print-timeout",
-        req.timeout,
-        "--output-format",
-        "stream-json",
     ]
+    if req.conversation_id:
+        cmd.extend(["--conversation", req.conversation_id])
+    cmd.extend(
+        [
+            "--print",
+            f"/goal {goal_str}",
+            "--print-timeout",
+            req.timeout,
+            "--output-format",
+            "stream-json",
+        ]
+    )
 
     return StreamingResponse(
         agy_stream_generator(cmd),
         media_type="application/x-ndjson",
     )
+
 
 
 if __name__ == "__main__":

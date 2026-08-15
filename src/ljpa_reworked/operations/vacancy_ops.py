@@ -1,6 +1,6 @@
 import logging
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, or_
@@ -244,7 +244,7 @@ def _confirm_submission(
         ],
         commit=False,
     )
-    vacancy.applied_at = applied_at or datetime.utcnow()
+    vacancy.applied_at = applied_at or datetime.now(UTC).replace(tzinfo=None)
     db.commit()
     db.refresh(vacancy)
     return vacancy
@@ -284,7 +284,7 @@ def get_eligible_url_vacancies(
     """Get up to limit freshest eligible URL vacancies created within max_age_days."""
     from datetime import timedelta
 
-    cutoff = datetime.utcnow() - timedelta(days=max_age_days)
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=max_age_days)
     return (
         db.query(Vacancy)
         .filter(

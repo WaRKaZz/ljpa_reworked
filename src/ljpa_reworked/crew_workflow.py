@@ -11,23 +11,26 @@ from ljpa_reworked.config import (
 from ljpa_reworked.crews.email_generation_crew import EmailGenerationCrew
 from ljpa_reworked.crews.resume_evaluation_crew import ResumeEvaluationCrew
 from ljpa_reworked.crews.resume_generation_crew import ResumeGenerationCrew
+from ljpa_reworked.crews.submission_review_crew import SubmissionReviewCrew
 from ljpa_reworked.decorators import crewai_retry_handler
 from ljpa_reworked.models.crewai_pydantic_models import (
     BasicEvaluationCrewAI,
     EmailCrewAI,  # noqa
     ResumeCrewAI,
+    SubmissionReviewCrewAI,
 )
 from ljpa_reworked.resume_static_profile import (
     merge_static_resume_profile,
     parse_static_resume_profile,
 )
-from ljpa_reworked.services.dynamic_rate_limiter import DynamicRateLimiter
-from ljpa_reworked.services.rendercv_helper import render_resume_crewai_to_pdf
+from ljpa_reworked.services.rendercv_helper import (
+    ResumeLayoutError,
+    render_resume_crewai_to_pdf,
+)
 
 if TYPE_CHECKING:
     from ljpa_reworked.models.database_models import Vacancy
 
-rate_limitter = DynamicRateLimiter()
 
 SECTION_ALIAS_MAP = {
     "experience": "experience",
@@ -136,9 +139,7 @@ def crewai_evaluate_vacancy(vacancy: "Vacancy") -> BasicEvaluationCrewAI:
         "candidate_profile": profile_text,
         "required_profile_sections": present_sections,
     }
-    rate_limitter.acquire()
     crew_output = crew.kickoff(inputs=inputs)
-    rate_limitter.record(getattr(crew_output.token_usage, "successful_requests", 0))
     evaluation = crew_output.tasks_output[-1].pydantic
     if evaluation is None:
         raise ValueError("CrewAI evaluation returned no structured output.")
@@ -159,7 +160,6 @@ def crewai_generate_resume(
     present_sections = validate_profile_completeness(profile_text)
     static_profile = parse_static_resume_profile(profile_text)
     crew = ResumeGenerationCrew().crew()
-    rate_limitter.acquire()
     crew_output = crew.kickoff(
         inputs={
             "title": vacancy.title,
@@ -175,7 +175,6 @@ def crewai_generate_resume(
             "prior_resume_json": prior_resume_json,
         }
     )
-    rate_limitter.record(getattr(crew_output.token_usage, "successful_requests", 0))
     dynamic_resume = json.loads(crew_output.raw)
     resume = ResumeCrewAI.model_validate(
         merge_static_resume_profile(dynamic_resume, static_profile)
@@ -201,9 +200,7 @@ def crewai_generate_email(vacancy: "Vacancy") -> EmailCrewAI:
         else (vacancy.submit_url or "")
     )
     inputs["email_signature"] = EMAIL_SIGNATURE
-    rate_limitter.acquire()
     crew_output = crew.kickoff(inputs=inputs)
-    rate_limitter.record(getattr(crew_output.token_usage, "successful_requests", 0))
     if crew_output.pydantic is None:
         raise ValueError("CrewAI email returned no structured output.")
     return crew_output.pydantic
@@ -303,9 +300,7 @@ def crewai_generate_resume_with_retry(
             render_resume_crewai_to_pdf(resume, temp_pdf_path)
             return resume, temp_pdf_path
         except Exception as err:
-            if not str(err).startswith(
-                "RenderCV output failed page layout validation:"
-            ):
+            if not isinstance(err, ResumeLayoutError):
                 if os.path.exists(temp_pdf_path):
                     try:
                         os.remove(temp_pdf_path)
@@ -327,3 +322,34 @@ def crewai_generate_resume_with_retry(
                     )
             else:
                 raise last_error from err
+
+
+def create_review_crew():
+    return SubmissionReviewCrew().crew()
+
+
+def crewai_review_submission_result(tail_lines: list[str]) -> SubmissionReviewCrewAI:
+    """Review stream tail with CrewAI and return structured decision."""
+    try:
+        stream_tail = "".join(tail_lines)
+        crew = create_review_crew()
+        crew_output = crew.kickoff(inputs={"stream_tail": stream_tail})
+        review = None
+        if hasattr(crew_output, "tasks_output") and crew_output.tasks_output:
+            review = getattr(crew_output.tasks_output[-1], "pydantic", None)
+        if review is None and hasattr(crew_output, "pydantic"):
+            review = crew_output.pydantic
+        if (
+            isinstance(review, SubmissionReviewCrewAI)
+            and review.decision in ("success", "error")
+        ):
+            return review
+        return SubmissionReviewCrewAI(
+            decision="error",
+            error_description="CrewAI submission review returned invalid or missing structured result.",
+        )
+    except Exception as exc:
+        return SubmissionReviewCrewAI(
+            decision="error",
+            error_description=f"Submission review failed: {exc}",
+        )

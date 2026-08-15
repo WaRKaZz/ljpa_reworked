@@ -11,6 +11,7 @@ from ljpa_reworked.models.crewai_pydantic_models import (
     ResumeCrewAI,
     SkillCrewAI,
 )
+from ljpa_reworked.services.rendercv_helper import ResumeLayoutError
 
 
 def _make_dummy_resume() -> ResumeCrewAI:
@@ -87,7 +88,7 @@ def test_retry_orchestration_first_fails_layout_second_succeeds():
 
     def mock_render(resume, path):
         if mock_render.call_count == 1:
-            raise RuntimeError(layout_err_msg)
+            raise ResumeLayoutError(layout_err_msg)
         return path
 
     mock_render.call_count = 0
@@ -132,7 +133,7 @@ def test_retry_orchestration_passes_prior_resume_json_on_second_call():
 
     def mock_render(resume, path):
         if mock_render.call_count == 1:
-            raise RuntimeError(layout_err_msg)
+            raise ResumeLayoutError(layout_err_msg)
         return path
 
     mock_render.call_count = 0
@@ -175,7 +176,7 @@ def test_retry_orchestration_both_fail_cleans_files_and_raises(tmp_path):
     def mock_render_side_effect(resume, path):
         # Create a temp file to test cleanup
         temp_pdf_created.write_text("dummy pdf content")
-        raise RuntimeError(layout_err_msg)
+        raise ResumeLayoutError(layout_err_msg)
 
     with (
         patch(

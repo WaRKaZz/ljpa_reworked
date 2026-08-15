@@ -1,4 +1,3 @@
-import os
 from unittest.mock import patch
 
 import pytest
@@ -15,10 +14,12 @@ from ljpa_reworked.models.crewai_pydantic_models import (
     ProjectCrewAI,
     ResumeCrewAI,
     SkillCrewAI,
+    SubmissionReviewCrewAI,
 )
 from ljpa_reworked.models.database_models import BasicEvaluation, Vacancy
 from ljpa_reworked.models.enums import VacancyStatus
 from ljpa_reworked.operations.resume_ops import reconstruct_resume_crewai
+from ljpa_reworked.services.harness_runner import HarnessSubmitResult
 from ljpa_reworked.workflow import save_resume
 
 
@@ -118,7 +119,59 @@ def test_reconstruct_resume_crewai(db_session):
     assert reconstructed.experience[0].company == "Tech Co"
 
 
-def test_submit_top_vacancies_renders_temp_pdf_and_retains_on_success(
+def test_submit_top_vacancies_renders_pdf_on_demand(db_session, tmp_path):
+    vacancy = Vacancy(
+        title="Python Engineer",
+        text="Job details",
+        submit_url="https://example.com/job/1",
+        source="LinkedIn",
+        visa_status="not_required",
+        status=VacancyStatus.application_prepared,
+    )
+    db_session.add(vacancy)
+    db_session.commit()
+    db_session.add(
+        BasicEvaluation(vacancy_id=vacancy.id, rating=90, summary="Good fit")
+    )
+    db_session.commit()
+    resumes_dir = tmp_path / "resumes"
+    saved = save_resume(sample_resume_crewai(), vacancy, db_session)
+    assert saved.path is None
+
+    def fake_render(resume, target_path):
+        with open(target_path, "wb") as f:
+            f.write(b"%PDF-1.4")
+        return target_path
+
+    with (
+        patch("ljpa_reworked.main.SUBMISSION_RESUMES_DIR", str(resumes_dir)),
+        patch("ljpa_reworked.main.get_gemini_quota_remaining", return_value=1.0),
+        patch(
+            "ljpa_reworked.main.render_resume_crewai_to_pdf", side_effect=fake_render
+        ) as mock_render,
+        patch(
+            "ljpa_reworked.main.harness_submit",
+            return_value=HarnessSubmitResult(
+                completed=True, tail_lines=['{"status":"success"}\n']
+            ),
+        ) as harness,
+        patch(
+            "ljpa_reworked.main.crewai_review_submission_result",
+            return_value=SubmissionReviewCrewAI(decision="success"),
+        ),
+    ):
+        submit_top_vacancies(db_session)
+
+    mock_render.assert_called_once()
+    assert (
+        harness.call_args.kwargs["resume_path"]
+        == f"/inputs/resources/resumes/resume_{vacancy.id}.pdf"
+    )
+    assert vacancy.status == VacancyStatus.submitted_via_url
+    assert saved.path == f"resume_{vacancy.id}.pdf"
+
+
+def test_submit_top_vacancies_uses_persisted_pdf_without_rendering(
     db_session, tmp_path
 ):
     vacancy = Vacancy(
@@ -131,46 +184,41 @@ def test_submit_top_vacancies_renders_temp_pdf_and_retains_on_success(
     )
     db_session.add(vacancy)
     db_session.commit()
-
-    eval_record = BasicEvaluation(vacancy_id=vacancy.id, rating=90, summary="Good fit")
-    db_session.add(eval_record)
+    db_session.add(
+        BasicEvaluation(vacancy_id=vacancy.id, rating=90, summary="Good fit")
+    )
     db_session.commit()
-
-    saved_resume = save_resume(sample_resume_crewai(), vacancy, db_session)
-    assert saved_resume.path is None
-
     resumes_dir = tmp_path / "resumes"
     resumes_dir.mkdir()
-
-    created_pdf_path = None
-
-    def fake_render(resume_obj, pdf_path):
-        nonlocal created_pdf_path
-        created_pdf_path = pdf_path
-        with open(pdf_path, "w") as f:
-            f.write("PDF Content")
-
+    (resumes_dir / "resume.pdf").write_bytes(b"%PDF-1.4")
+    saved = save_resume(sample_resume_crewai(), vacancy, db_session)
+    saved.path = "resume.pdf"
+    db_session.commit()
     with (
-        patch("ljpa_reworked.main.RESOURCES_DIR", str(tmp_path)),
+        patch("ljpa_reworked.main.SUBMISSION_RESUMES_DIR", str(resumes_dir)),
         patch("ljpa_reworked.main.get_gemini_quota_remaining", return_value=1.0),
+        patch("ljpa_reworked.main.render_resume_crewai_to_pdf") as mock_render,
         patch(
-            "ljpa_reworked.main.render_resume_crewai_to_pdf", side_effect=fake_render
-        ) as mock_render,
-        patch("ljpa_reworked.main.harness_submit", return_value=0) as mock_harness,
+            "ljpa_reworked.main.harness_submit",
+            return_value=HarnessSubmitResult(
+                completed=True, tail_lines=['{"status":"success"}\n']
+            ),
+        ) as harness,
+        patch(
+            "ljpa_reworked.main.crewai_review_submission_result",
+            return_value=SubmissionReviewCrewAI(decision="success"),
+        ),
     ):
         submit_top_vacancies(db_session)
-
-    mock_render.assert_called_once()
-    mock_harness.assert_called_once()
-    harness_path = mock_harness.call_args.kwargs["resume_path"]
-    assert harness_path.startswith("/inputs/resources/resumes/temp_resume_")
-
-    assert created_pdf_path is not None
-    assert os.path.exists(created_pdf_path)
+    mock_render.assert_not_called()
+    assert (
+        harness.call_args.kwargs["resume_path"]
+        == "/inputs/resources/resumes/resume.pdf"
+    )
     assert vacancy.status == VacancyStatus.submitted_via_url
 
 
-def test_submit_top_vacancies_marks_application_error_and_cleans_up_on_harness_error(
+def test_submit_top_vacancies_marks_rendering_error_as_application_error(
     db_session, tmp_path
 ):
     vacancy = Vacancy(
@@ -183,83 +231,18 @@ def test_submit_top_vacancies_marks_application_error_and_cleans_up_on_harness_e
     )
     db_session.add(vacancy)
     db_session.commit()
-
-    eval_record = BasicEvaluation(vacancy_id=vacancy.id, rating=90, summary="Good fit")
-    db_session.add(eval_record)
-    db_session.commit()
-
-    save_resume(sample_resume_crewai(), vacancy, db_session)
-
-    resumes_dir = tmp_path / "resumes"
-    resumes_dir.mkdir()
-
-    created_pdf_path = None
-
-    def fake_render(resume_obj, pdf_path):
-        nonlocal created_pdf_path
-        created_pdf_path = pdf_path
-        with open(pdf_path, "w") as f:
-            f.write("PDF Content")
-
-    with (
-        patch("ljpa_reworked.main.RESOURCES_DIR", str(tmp_path)),
-        patch("ljpa_reworked.main.get_gemini_quota_remaining", return_value=1.0),
-        patch(
-            "ljpa_reworked.main.render_resume_crewai_to_pdf", side_effect=fake_render
-        ),
-        patch("ljpa_reworked.main.harness_submit", return_value=1),
-    ):
-        submit_top_vacancies(db_session)
-
-    assert created_pdf_path is not None
-    assert not os.path.exists(created_pdf_path)
-    assert vacancy.status == VacancyStatus.application_error
-
-
-def test_submit_top_vacancies_marks_application_error_and_cleans_up_on_exception(
-    db_session, tmp_path
-):
-    vacancy = Vacancy(
-        title="Python Engineer",
-        text="Job details",
-        submit_url="https://example.com/job/3",
-        source="LinkedIn",
-        visa_status="not_required",
-        status=VacancyStatus.application_prepared,
+    db_session.add(
+        BasicEvaluation(vacancy_id=vacancy.id, rating=90, summary="Good fit")
     )
-    db_session.add(vacancy)
     db_session.commit()
-
-    eval_record = BasicEvaluation(vacancy_id=vacancy.id, rating=90, summary="Good fit")
-    db_session.add(eval_record)
-    db_session.commit()
-
     save_resume(sample_resume_crewai(), vacancy, db_session)
-
-    resumes_dir = tmp_path / "resumes"
-    resumes_dir.mkdir()
-
-    created_pdf_path = None
-
-    def fake_render(resume_obj, pdf_path):
-        nonlocal created_pdf_path
-        created_pdf_path = pdf_path
-        with open(pdf_path, "w") as f:
-            f.write("PDF Content")
-
     with (
-        patch("ljpa_reworked.main.RESOURCES_DIR", str(tmp_path)),
+        patch("ljpa_reworked.main.SUBMISSION_RESUMES_DIR", str(tmp_path / "resumes")),
         patch("ljpa_reworked.main.get_gemini_quota_remaining", return_value=1.0),
         patch(
-            "ljpa_reworked.main.render_resume_crewai_to_pdf", side_effect=fake_render
-        ),
-        patch(
-            "ljpa_reworked.main.harness_submit",
-            side_effect=RuntimeError("Network timeout"),
+            "ljpa_reworked.main.render_resume_crewai_to_pdf",
+            side_effect=RuntimeError("Render error"),
         ),
     ):
         submit_top_vacancies(db_session)
-
-    assert created_pdf_path is not None
-    assert not os.path.exists(created_pdf_path)
     assert vacancy.status == VacancyStatus.application_error

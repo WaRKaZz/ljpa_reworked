@@ -1,5 +1,6 @@
 import re
 import warnings
+from subprocess import TimeoutExpired
 from typing import Any
 
 import pypdfium2
@@ -180,26 +181,18 @@ def convert_resume_crewai_to_rendercv_input(resume: ResumeCrewAI) -> dict[str, A
         "cv": cv,
         "design": {
             "theme": "classic",
-            "entries": {
-                "vertical_space_between_entries": "0.15cm",
-                "allow_page_break_in_entries": False,
-            },
-            "header": {
-                "use_icons_for_connections": False,
-            },
-            "page": {
-                "show_last_updated_date": False,
-            },
+            # RenderCV 2.8 renamed the per-entry page-break setting.
+            "entries": {"allow_page_break": False},
         },
     }
 
 
 def validate_pdf_page_layout(pdf_path: str) -> tuple[bool, str]:
-    """Validate PDF page character budget requirements for any page count.
+    """Reject malformed, blank, or unexpectedly long RenderCV PDFs.
 
-    Requirements:
-    - Every non-final page must contain at least 3000 extracted characters.
-    - The final page must contain at least 1400 extracted characters.
+    ponytail: extracted-character density is not visual layout. Keep only a
+    readable-page floor and the product's two-page ceiling; upgrade to a
+    renderer-native box/layout API when RenderCV exposes one.
     """
     import os
 
@@ -208,32 +201,27 @@ def validate_pdf_page_layout(pdf_path: str) -> tuple[bool, str]:
 
     try:
         doc = pypdfium2.PdfDocument(pdf_path)
-    except Exception as e:
-        return False, f"Failed to parse PDF: {e}"
+    except Exception as error:
+        return False, f"Failed to parse PDF: {error}"
 
-    num_pages = len(doc)
-    if num_pages < 1:
-        return False, "PDF contains no pages"
+    page_count = len(doc)
+    if not 1 <= page_count <= 2:
+        return False, f"PDF must contain one or two pages, got {page_count}"
 
-    char_counts = []
-    for i in range(num_pages):
-        text = doc[i].get_textpage().get_text_bounded()
-        count = len(text)
-        char_counts.append(count)
-        if i < num_pages - 1 and count < 3000:
-            return (
-                False,
-                f"Page {i + 1} (non-final) character count ({count}) is less than minimum 3000 characters",
-            )
-        if count < 1400:
-            return (
-                False,
-                f"Page {i + 1} (final) character count ({count}) is less than minimum 1400 characters",
-            )
+    for index in range(page_count):
+        text = doc[index].get_textpage().get_text_bounded().strip()
+        if len(text) < 100:
+            return False, f"Page {index + 1} has insufficient readable text"
 
-    if num_pages == 1:
-        return True, f"1-page PDF valid with {char_counts[0]} characters"
-    return True, f"{num_pages}-page PDF valid with character counts {char_counts}"
+    return True, f"{page_count}-page PDF has readable text on every page"
+
+
+class RenderCVError(RuntimeError):
+    """RenderCV could not produce a PDF."""
+
+
+class ResumeLayoutError(RenderCVError):
+    """A rendered PDF violates deterministic layout requirements."""
 
 
 def render_resume_crewai_to_pdf(resume: ResumeCrewAI, output_pdf_path: str) -> str:
@@ -261,10 +249,17 @@ def render_resume_crewai_to_pdf(resume: ResumeCrewAI, output_pdf_path: str) -> s
             "--dont-generate-html",
             "--dont-generate-png",
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True, cwd=temp_dir)
+        try:
+            res = subprocess.run(
+                cmd, capture_output=True, text=True, cwd=temp_dir, timeout=120
+            )
+        except TimeoutExpired as error:
+            raise RenderCVError(
+                "RenderCV rendering timed out after 120 seconds"
+            ) from error
         if res.returncode != 0 or not os.path.exists(output_pdf_path):
-            raise RuntimeError(
-                f"RenderCV rendering failed with exit code {res.returncode}: {res.stderr}\n{res.stdout}"
+            raise RenderCVError(
+                f"RenderCV rendering failed with exit code {res.returncode}"
             )
 
     is_valid, msg = validate_pdf_page_layout(output_pdf_path)
@@ -274,6 +269,6 @@ def render_resume_crewai_to_pdf(resume: ResumeCrewAI, output_pdf_path: str) -> s
                 os.remove(output_pdf_path)
             except OSError:
                 pass
-        raise RuntimeError(f"RenderCV output failed page layout validation: {msg}")
+        raise ResumeLayoutError(f"RenderCV output failed page layout validation: {msg}")
 
     return output_pdf_path

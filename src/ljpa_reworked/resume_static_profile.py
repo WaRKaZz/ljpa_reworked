@@ -102,12 +102,21 @@ def merge_static_resume_profile(dynamic: dict, static: dict) -> dict:
     result["personal_info"] = static["personal_info"]
     result["education"] = static["education"]
     dynamic_experience = dynamic.get("experience", [])
-    result["experience"] = []
-    for index, static_entry in enumerate(static["experience"]):
-        dynamic_entry = (
-            dynamic_experience[index] if index < len(dynamic_experience) else {}
+    dynamic_descriptions = {
+        (item.get("company"), item.get("title"), item.get("start_date")): item.get(
+            "description"
         )
-        description = dynamic_entry.get("description")
+        for item in dynamic_experience
+        if isinstance(item, dict)
+    }
+    result["experience"] = []
+    for static_entry in static["experience"]:
+        key = (
+            static_entry["company"],
+            static_entry["title"],
+            static_entry["start_date"],
+        )
+        description = dynamic_descriptions.get(key)
         if not isinstance(description, list) or len(description) < 3:
             description = static_entry["description"]
         result["experience"].append(static_entry | {"description": description})

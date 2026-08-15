@@ -275,9 +275,8 @@ def test_discovery_run_has_zero_calls_to_application_or_messaging_services(
 
 def test_pytest_coverage_gate_configured():
     """Assert pytest-cov configuration in pyproject.toml has coverage enabled, omissions, and fail_under gate."""
-    from pathlib import Path
-
     import tomllib
+    from pathlib import Path
 
     pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
     assert pyproject_path.exists()

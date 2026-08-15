@@ -51,7 +51,6 @@ PLC
     with (
         patch("ljpa_reworked.crew_workflow.PROFILE_FILE_PATH", str(profile)),
         patch("ljpa_reworked.crew_workflow.ResumeEvaluationCrew") as crew_class,
-        patch("ljpa_reworked.crew_workflow.rate_limitter"),
     ):
         crew_class.return_value.crew.return_value.kickoff.return_value = output
         result = crewai_evaluate_vacancy(vacancy)

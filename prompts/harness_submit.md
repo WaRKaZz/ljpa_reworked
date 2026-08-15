@@ -33,6 +33,8 @@ Use MCP Unbrowse connected through Playwright/CDP at `http://cloak-browser:9222`
 1. **Direct CDP Connection**: Connect Playwright directly over CDP: `browser = playwright.chromium.connect_over_cdp('http://cloak-browser:9222')`.
 2. **Context & Active Page**: Access existing context and active page: `context = browser.contexts[0]`, `page = context.pages[-1]`.
 3. **Local CDP Proxy Fallback**: If local CDP on `127.0.0.1:9222` is closed and required by background CLI utilities, run a background TCP proxy forwarding `127.0.0.1:9222` -> `cloak-browser:9222` and run `yes | unbrowse setup`.
+4. **Tab Teardown Protocol**: Before completing execution, close all created application tabs (`await page.close()`) to avoid leaving active IndexedDB database locks.
+
 
 ### Interaction Guidelines
 * **DOM Clicks**: Prefer JavaScript clicks (`page.evaluate("el => el.click()", element)`) or forced clicks (`element.click(force=True)`) if standard clicks are intercepted by sticky headers or overlays.
@@ -117,13 +119,11 @@ The only policy-based reason to stop the application flow is a requirement to ma
 
 ---
 
-## 8. WORKSPACE SITE SKILLS & ARTIFACT PERSISTENCE
+## 8. WORKSPACE PRIVACY & ARTIFACT RULES
 
 1. **Skill Discovery**: Before interacting with complex application forms, check `/runtime/workspace/README.md` and any matching `/runtime/workspace/<site-or-vacancy-name>/SKILL.md` for reusable navigation patterns and direct apply tricks (e.g. Indeed `applystart` redirects).
-2. **Artifact Directory**: Save all scripts, execution helpers, and application artifacts used during the submission flow into a dedicated folder under `/runtime/workspace/<site-or-vacancy-name>/`.
-3. **SKILL.md Documentation**: Inside `/runtime/workspace/<site-or-vacancy-name>/SKILL.md`, create/update a clear, step-by-step guide explaining how to handle applications for this ATS/portal (navigation steps, selector strategies, modal dismissal, file upload handling, and direct apply URL rules).
-4. **README.md Registry**: Update `/runtime/workspace/README.md` with an explicit entry mapping the target vacancy URL pattern or domain (e.g., `https://de.indeed.com/viewjob?jk=<jk>`) to its dedicated skill path (`/runtime/workspace/<site-or-vacancy-name>/SKILL.md`).
-5. **No Personal Data in Skills**: Never write candidate profile secrets, credentials, session tokens, passwords, or candidate identity data into skills or `README.md`. Store only reusable technical site automation knowledge. All site login credentials must be stored strictly inside `/runtime/workspace/credentials.json` as defined in Section 3.1.
+2. **Credential Storage**: Store all site login credentials strictly inside `/runtime/workspace/credentials.json` as defined in Section 3.1.
+3. **Privacy Boundary**: Never write candidate profile secrets, credentials, session tokens, passwords, OTPs, or candidate identity data into skills or `README.md`. Store permitted credentials exclusively in `/runtime/workspace/credentials.json`.
 
 ---
 
@@ -143,6 +143,5 @@ Execute form filling methodically:
 
 * After clicking submit, inspect the resulting page for confirmation messages or completed status.
 * If the site indicates the application was submitted or was previously completed, treat the task as finished.
-* Ensure that `/runtime/workspace/<site-or-vacancy-name>/SKILL.md` and `/runtime/workspace/README.md` are updated with the final application flow details.
 * Do not submit duplicate applications.
 * Finish normally without opening new vacancies or querying any database.

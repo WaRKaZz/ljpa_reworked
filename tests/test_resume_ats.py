@@ -69,7 +69,7 @@ def sample_resume_data() -> ResumeCrewAI:
             ),
             ExperienceCrewAI(
                 title="Automation Engineer",
-                company="LLP Neo Stroy",
+                company="Example Industrial Systems Ltd.",
                 location="Karaganda, Kazakhstan",
                 start_date="2017-08",
                 end_date="2019-12",

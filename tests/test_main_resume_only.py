@@ -16,3 +16,15 @@ def test_main_resume_only_skips_discovery_and_processes_unevaluated_vacancies():
     harness.assert_not_called()
     jobspy.return_value.run.assert_not_called()
     process.assert_called_once_with(db)
+
+
+def test_main_initializes_schema_before_opening_database_session():
+    from ljpa_reworked import main
+
+    with patch("ljpa_reworked.main.init_db") as init_db:
+        with patch("ljpa_reworked.main.SessionLocal") as session_local:
+            with patch("ljpa_reworked.main.process_unevaluated_vacancies"):
+                main.main(resume_only=True)
+
+    init_db.assert_called_once_with()
+    session_local.assert_called_once_with()

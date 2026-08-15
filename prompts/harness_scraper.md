@@ -16,6 +16,8 @@ Use MCP Unbrowse connected through Playwright/CDP at `http://cloak-browser:9222`
 1. **Direct CDP Connection**: Connect Playwright over CDP: `browser = playwright.chromium.connect_over_cdp('http://cloak-browser:9222')`.
 2. **Context & Active Page**: Access existing context and active page: `context = browser.contexts[0]`, `page = context.pages[-1]`. Bring active page to front (`page.bring_to_front()`).
 3. **Local CDP Fallback**: If local CDP on `127.0.0.1:9222` is closed and required by background utilities, run a local TCP proxy forwarding `127.0.0.1:9222` -> `cloak-browser:9222` and run `yes | unbrowse setup`.
+4. **Tab Teardown Protocol**: Before completing execution, close all non-essential created pages (`await page.close()`) to avoid leaving active IndexedDB database locks in Chromium.
+
 
 ---
 

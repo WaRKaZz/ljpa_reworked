@@ -87,12 +87,16 @@ def test_processes_only_unevaluated_vacancies_and_creates_resume_for_passing_mat
         calls = []
         monkeypatch.setattr(
             main,
-            "crewai_generate_resume",
-            lambda vacancy, evaluation: "resume",
+            "crewai_generate_resume_with_retry",
+            lambda vacancy, evaluation: ("resume", "/tmp/test-resume.pdf"),
         )
-        monkeypatch.setattr(
-            main, "save_resume", lambda *args, **kwargs: calls.append(args[1])
-        )
+
+        def fake_persist(_resume, vacancy, session, _pdf_path):
+            calls.append(vacancy)
+            vacancy.status = VacancyStatus.application_prepared
+            session.commit()
+
+        monkeypatch.setattr(main, "persist_prepared_resume", fake_persist)
 
         main.process_unevaluated_vacancies(db)
 
@@ -110,7 +114,9 @@ def test_processes_only_unevaluated_vacancies_and_creates_resume_for_passing_mat
         Base.metadata.drop_all(bind=engine)
 
 
-def test_submit_top_five_waits_three_hours_between_each_submission(monkeypatch):
+def test_submit_top_five_waits_three_hours_between_each_submission(
+    monkeypatch, tmp_path
+):
     from ljpa_reworked import main
     from ljpa_reworked.models.database_models import Resume
 
@@ -126,11 +132,17 @@ def test_submit_top_five_waits_three_hours_between_each_submission(monkeypatch):
                     fullname="Test User",
                     email="test@example.com",
                     summary="Test summary",
+                    path=f"resume_{number}.pdf",
                 )
             )
         db.commit()
+        resumes_dir = tmp_path / "resumes"
+        resumes_dir.mkdir()
+        for number in range(6):
+            (resumes_dir / f"resume_{number}.pdf").write_bytes(b"%PDF-1.4")
         sleeps = []
         submitted = []
+        monkeypatch.setattr(main, "SUBMISSION_RESUMES_DIR", str(resumes_dir))
         monkeypatch.setattr(main, "time", type("Clock", (), {"sleep": sleeps.append}))
         monkeypatch.setattr(main, "get_gemini_quota_remaining", lambda api_url: 1.0)
         monkeypatch.setattr(
@@ -171,4 +183,4 @@ def test_harness_forces_flash_medium_model(monkeypatch):
 
     monkeypatch.setattr(harness_runner.urllib.request, "urlopen", urlopen)
     assert harness_runner.harness_submit("https://example.com", "/tmp/resume.pdf") == 0
-    assert request["body"]["model"] == "gemini-3.6-flash-medium"
+    assert request["body"]["model"] == "gemini-3.7-flash-medium"

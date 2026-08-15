@@ -75,6 +75,7 @@ def test_static_profile_overlay_rejects_llm_static_fact_omissions():
                 "location": "A",
                 "start_date": "2021",
                 "end_date": "Present",
+                "description": ["Original one", "Original two", "Original three"],
             }
         ],
         "education": [
@@ -89,7 +90,14 @@ def test_static_profile_overlay_rejects_llm_static_fact_omissions():
     llm = {
         "summary": "Tailored summary",
         "skills": [],
-        "experience": [{"description": ["One", "Two", "Three"]}],
+        "experience": [
+            {
+                "company": "TCO",
+                "title": "PLC Engineer",
+                "start_date": "2021",
+                "description": ["One", "Two", "Three"],
+            }
+        ],
         "education": [],
         "projects": [],
         "certifications": [],

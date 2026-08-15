@@ -23,3 +23,34 @@ def test_imap_registration_skill_prohibits_secret_handling_and_writes():
     assert "imap_get_email" in skill
     assert "IMAP_MCP_ACCOUNT_LJPA_GMAIL_IMAP_USERNAME" in skill
     assert "IMAP_MCP_ACCOUNT_LJPA_GMAIL_IMAP_PASSWORD" in skill
+
+
+def test_antigravity_entrypoint_bootstraps_env_managed_ljpa_gmail_account():
+    entrypoint = Path(
+        "src/ljpa_reworked/services/docker/antigravity-entrypoint.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "LJPA Gmail" in entrypoint
+    assert '"host": "imap.gmail.com"' in entrypoint
+    assert '"password": ""' in entrypoint
+    assert "IMAP_MCP_ACCOUNT_LJPA_GMAIL_IMAP_USERNAME" not in entrypoint
+    assert "IMAP_MCP_ACCOUNT_LJPA_GMAIL_IMAP_PASSWORD" not in entrypoint
+
+
+def test_harness_submit_prompt_has_no_final_skill_authoring_task():
+    prompt = Path("prompts/harness_submit.md").read_text(encoding="utf-8")
+    assert "/runtime/workspace/credentials.json" in prompt
+    assert "SKILL.md Documentation" not in prompt
+    assert "README.md Registry" not in prompt
+    assert "updated with the final application flow details" not in prompt
+
+
+def test_harness_save_site_skill_prompt_contracts():
+    prompt = Path("prompts/harness_save_site_skill.md").read_text(encoding="utf-8")
+    assert "/runtime/workspace/<site-or-vacancy-name>/SKILL.md" in prompt
+    assert "/runtime/workspace/README.md" in prompt
+    assert "Technical selector strategies" in prompt or "selector strategies" in prompt
+    assert "No Personal Data" in prompt
+    assert "credentials.json" in prompt
+    assert "No Raw Logs" in prompt or "raw transcript" in prompt
+    assert "Do not access or query SQLite database" in prompt or "database" in prompt

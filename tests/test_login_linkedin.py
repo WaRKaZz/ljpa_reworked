@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ljpa_reworked.auth.login_linkedin import (
+from ljpa_reworked.services.auth.login_linkedin import (
     DEFAULT_SAVE_PATH,
     check_login_success,
     clean_env_val,
@@ -76,3 +76,41 @@ async def test_check_login_success_detected(tmp_path):
 
 def test_default_save_path_is_under_data():
     assert DEFAULT_SAVE_PATH.as_posix() == "data/state.json"
+
+
+@pytest.mark.asyncio
+async def test_login_linkedin_main_success(tmp_path):
+    from ljpa_reworked.services.auth.login_linkedin import main as login_main
+
+    mock_browser = AsyncMock()
+    mock_context = MagicMock()
+    mock_page = MagicMock()
+    mock_page.url = "https://www.linkedin.com/feed/"
+
+    mock_browser.contexts = [mock_context]
+    mock_context.pages = [mock_page]
+    mock_context.storage_state = AsyncMock()
+
+    mock_locator = MagicMock()
+    mock_locator.count = AsyncMock(return_value=1)
+    mock_page.locator.return_value = mock_locator
+
+    mock_p = MagicMock()
+    mock_p.chromium.connect_over_cdp = AsyncMock(return_value=mock_browser)
+
+    mock_cm = MagicMock()
+    mock_cm.__aenter__ = AsyncMock(return_value=mock_p)
+    mock_cm.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch(
+            "ljpa_reworked.services.auth.login_linkedin.async_playwright", return_value=mock_cm
+        ),
+        patch.dict(
+            "os.environ",
+            {"LINKEDIN_EMAIL": "test@example.com", "LINKEDIN_PASSWORD": "pass"},
+        ),
+    ):
+        res = await login_main(state_path=tmp_path / "state.json")
+        assert res is True
+        mock_browser.close.assert_called_once()

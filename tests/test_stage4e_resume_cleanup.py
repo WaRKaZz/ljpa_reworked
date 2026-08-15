@@ -228,12 +228,22 @@ def test_cleanup_rejects_absolute_path_and_path_traversal(
         path="../outside.pdf",
         vacancy_id=vacancy.id,
     )
+    other_vacancy = Vacancy(
+        title="Second invalid path vacancy",
+        text="Sample text",
+        submit_email="other@example.com",
+        source=DataSource.linkedin,
+        visa_status=VisaStatus.not_required,
+        status=VacancyStatus.created,
+    )
+    db_session.add(other_vacancy)
+    db_session.commit()
     resume2 = Resume(
         fullname="John Doe",
         email="john@example.com",
         summary="Summary",
         path=str(outside_file),
-        vacancy_id=vacancy.id,
+        vacancy_id=other_vacancy.id,
     )
     db_session.add_all([resume1, resume2])
     db_session.commit()
@@ -305,12 +315,22 @@ def test_cleanup_handles_none_and_dot_paths(db_session: Session, tmp_path):
         path=None,
         vacancy_id=vacancy.id,
     )
+    other_vacancy = Vacancy(
+        title="Second invalid resume path",
+        text="Sample text",
+        submit_email="other@example.com",
+        source=DataSource.linkedin,
+        visa_status=VisaStatus.not_required,
+        status=VacancyStatus.created,
+    )
+    db_session.add(other_vacancy)
+    db_session.commit()
     resume_dot = Resume(
         fullname="John Doe",
         email="john@example.com",
         summary="Summary",
         path=".",
-        vacancy_id=vacancy.id,
+        vacancy_id=other_vacancy.id,
     )
     db_session.add_all([resume_none, resume_dot])
     db_session.commit()

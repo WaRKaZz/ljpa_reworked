@@ -35,11 +35,17 @@ def test_existing_passing_evaluation_without_resume_creates_resume_without_reeva
         with (
             patch("ljpa_reworked.main.crewai_evaluate_vacancy") as evaluate,
             patch(
-                "ljpa_reworked.main.crewai_generate_resume",
-                return_value="resume",
+                "ljpa_reworked.main.crewai_generate_resume_with_retry",
+                return_value=("resume", "/tmp/test-resume.pdf"),
             ) as generate,
-            patch("ljpa_reworked.main.save_resume") as save,
+            patch("ljpa_reworked.main.persist_prepared_resume") as save,
         ):
+
+            def persist(_resume, persisted_vacancy, session, _pdf_path):
+                persisted_vacancy.status = VacancyStatus.application_prepared
+                session.commit()
+
+            save.side_effect = persist
             process_unevaluated_vacancies(db)
 
         evaluate.assert_not_called()

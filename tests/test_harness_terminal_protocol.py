@@ -1,7 +1,5 @@
 import json
 
-import pytest
-
 from ljpa_reworked.services.harness.protocol import parse_terminal_result
 
 
@@ -42,8 +40,7 @@ def test_parse_terminal_result_missing_keys():
     assert parse_terminal_result(json.dumps({"other": "value"})) == (False, False)
 
 
-@pytest.mark.asyncio
-async def test_server_stops_agy_process_group_after_terminal_event():
+def test_server_stops_agy_process_group_after_terminal_event():
     import signal
     from unittest.mock import MagicMock, patch
 
@@ -63,9 +60,7 @@ async def test_server_stops_agy_process_group_after_terminal_event():
         patch("os.getpgid", return_value=9999) as mock_getpgid,
         patch("os.killpg") as mock_killpg,
     ):
-        lines = []
-        async for line in agy_stream_generator(["agy", "run"]):
-            lines.append(line)
+        lines = list(agy_stream_generator(["agy", "run"]))
 
         assert mock_popen.call_args.kwargs.get("start_new_session") is True
         assert len(lines) == 2

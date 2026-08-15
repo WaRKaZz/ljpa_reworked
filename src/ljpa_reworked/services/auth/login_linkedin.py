@@ -86,7 +86,7 @@ async def check_login_success(
     context: BrowserContext,
     state_path: str | Path = DEFAULT_SAVE_PATH,
     poll_interval: float = 2.0,
-    timeout: float = 3600.0,
+    timeout: float = 3600.0,  # noqa: ASYNC109
 ) -> bool:
     """Polls the browser page until logged-in navigation element or feed URL is present,
     then saves storage_state to state_path.
@@ -132,6 +132,7 @@ async def main(state_path: str | Path = DEFAULT_SAVE_PATH):
     )
 
     async with async_playwright() as p:
+        browser = None
         try:
             browser = await p.chromium.connect_over_cdp(cdp_url)
             context = (
@@ -164,11 +165,16 @@ async def main(state_path: str | Path = DEFAULT_SAVE_PATH):
             else:
                 logger.error("Authentication failed or timed out.")
 
-            await browser.close()
             return success
         except Exception as e:
             logger.error(f"Error during CDP LinkedIn login: {e}")
             raise
+        finally:
+            if browser:
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
 
 
 if __name__ == "__main__":

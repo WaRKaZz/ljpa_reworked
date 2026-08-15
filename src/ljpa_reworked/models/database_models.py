@@ -28,7 +28,7 @@ created_at = Annotated[
 updated_at = Annotated[
     datetime,
     mapped_column(
-        DateTime(timezone=False), server_default=func.now(), onupdate=datetime.utcnow
+        DateTime(timezone=False), server_default=func.now(), onupdate=func.now()
     ),
 ]
 
@@ -142,7 +142,9 @@ class Resume(Base):
     skills: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     projects: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     path: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    vacancy_id: Mapped[int] = mapped_column(Integer, ForeignKey("vacancy.id"))
+    vacancy_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("vacancy.id"), unique=True, nullable=False
+    )
     created_at: Mapped[created_at]
     rendered_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=False), nullable=True

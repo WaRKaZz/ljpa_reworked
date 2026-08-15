@@ -1,7 +1,5 @@
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from ljpa_reworked.services.harness.harness_server import (
     HarnessRequest,
     agy_stream_generator,
@@ -21,8 +19,7 @@ def test_harness_request_model_defaults_and_extensions():
     assert req.timeout == "8h"
 
 
-@pytest.mark.asyncio
-async def test_run_harness_goal_construction_untrusted_transport():
+def test_run_harness_goal_construction_untrusted_transport():
     req = HarnessRequest(
         prompt_file="/app/prompts/harness_submit.md",
         vacancy_url="https://example.com/apply?id=999",
@@ -33,7 +30,7 @@ async def test_run_harness_goal_construction_untrusted_transport():
         "ljpa_reworked.services.harness.harness_server.agy_stream_generator"
     ) as mock_gen:
         mock_gen.return_value = (x for x in [])
-        response = await run_harness(req)
+        response = run_harness(req)
 
         assert response.media_type == "application/x-ndjson"
         mock_gen.assert_called_once()
@@ -49,32 +46,99 @@ async def test_run_harness_goal_construction_untrusted_transport():
         )
 
 
-@pytest.mark.asyncio
-async def test_agy_stream_generator_succeeds_after_normal_completion():
+def test_run_harness_with_conversation_id_adds_conversation_flag():
+    req = HarnessRequest(
+        prompt_file="/app/prompts/harness_save_site_skill.md",
+        conversation_id="conv-12345-xyz",
+    )
+
+    with patch(
+        "ljpa_reworked.services.harness.harness_server.agy_stream_generator"
+    ) as mock_gen:
+        mock_gen.return_value = (x for x in [])
+        response = run_harness(req)
+
+        assert response.media_type == "application/x-ndjson"
+        mock_gen.assert_called_once()
+        cmd = mock_gen.call_args.args[0]
+        assert "--conversation" in cmd
+        conv_idx = cmd.index("--conversation")
+        assert cmd[conv_idx + 1] == "conv-12345-xyz"
+
+
+
+def test_agy_stream_generator_succeeds_after_normal_completion():
     mock_process = MagicMock()
     mock_process.stdout = ['{"event": "step", "text": "form submitted"}\n']
     mock_process.wait.return_value = None
     mock_process.returncode = 0
 
     with patch("subprocess.Popen", return_value=mock_process):
-        lines = []
-        async for line in agy_stream_generator(["agy", "test"]):
-            lines.append(line)
+        lines = list(agy_stream_generator(["agy", "test"]))
 
     assert any('"status": "success"' in item for item in lines)
 
 
-@pytest.mark.asyncio
-async def test_agy_stream_generator_reports_process_failure():
+def test_agy_stream_generator_reports_process_failure():
     mock_process = MagicMock()
     mock_process.stdout = []
     mock_process.wait.return_value = None
     mock_process.returncode = 1
 
     with patch("subprocess.Popen", return_value=mock_process):
-        lines = []
-        async for line in agy_stream_generator(["agy", "test"]):
-            lines.append(line)
+        lines = list(agy_stream_generator(["agy", "test"]))
 
     assert any('"status": "error"' in item for item in lines)
     assert any("exited with 1" in item for item in lines)
+
+
+def test_run_harness_concurrency_serialization():
+    import asyncio
+    import threading
+    import time
+
+    from ljpa_reworked.services.harness.harness_server import harness_lock
+
+    req = HarnessRequest(prompt_file="/app/prompts/harness_scraper.md")
+    active_count = 0
+    max_concurrent = 0
+
+    def mock_popen(cmd, **kwargs):
+        nonlocal active_count, max_concurrent
+        active_count += 1
+        if active_count > max_concurrent:
+            max_concurrent = active_count
+
+        mock_proc = MagicMock()
+        time.sleep(0.05)
+        mock_proc.stdout = ['{"event": "result", "result": {"status": "SUCCESS"}}\n']
+        mock_proc.poll.return_value = 0
+        active_count -= 1
+        return mock_proc
+
+    with patch("subprocess.Popen", side_effect=mock_popen):
+        results = []
+
+        def worker():
+            resp = run_harness(req)
+
+            async def _collect():
+                return [line async for line in resp.body_iterator]
+
+            lines = asyncio.run(_collect())
+            results.append((resp, lines))
+
+        t1 = threading.Thread(target=worker)
+        t2 = threading.Thread(target=worker)
+
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert len(results) == 2
+        for resp, _lines in results:
+            assert resp.media_type == "application/x-ndjson"
+
+    assert max_concurrent == 1
+    assert harness_lock.locked() is False

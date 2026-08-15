@@ -3,7 +3,6 @@ from unittest.mock import patch
 import pytest
 
 from ljpa_reworked.decorators import crewai_retry_handler
-from ljpa_reworked.services.dynamic_rate_limiter import DynamicRateLimiter
 
 
 def test_retry_handler_waits_with_bounded_backoff():
@@ -34,12 +33,3 @@ def test_retry_handler_does_not_retry_value_error():
     ):
         operation()
     sleep.assert_not_called()
-
-
-def test_rate_limiter_acquires_before_exceeding_window():
-    limiter = DynamicRateLimiter(max_requests=1, period_seconds=60)
-    limiter.acquire()
-    with patch("ljpa_reworked.services.dynamic_rate_limiter.time.sleep") as sleep:
-        limiter.acquire()
-    sleep.assert_called_once()
-    assert limiter.used_requests == 1

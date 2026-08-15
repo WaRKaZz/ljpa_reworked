@@ -1,4 +1,40 @@
+import json
 from unittest.mock import MagicMock
+
+
+def test_usage_command_runs_under_a_pseudoterminal(monkeypatch):
+    from ljpa_reworked.services.harness import harness_server
+
+    completed = MagicMock(
+        returncode=0,
+        stdout=json.dumps(
+            {
+                "event": "command_result",
+                "command": {
+                    "data": {
+                        "groups": [
+                            {
+                                "name": "Gemini Models",
+                                "buckets": [
+                                    {"window": "5h", "remaining_fraction": 0.5}
+                                ],
+                            }
+                        ]
+                    }
+                },
+            }
+        ),
+    )
+    run = MagicMock(return_value=completed)
+    monkeypatch.setattr(harness_server.subprocess, "run", run)
+
+    assert harness_server.get_gemini_quota() == 0.5
+    assert run.call_args.args[0] == [
+        "/usr/bin/script",
+        "-qec",
+        "/home/agent/.local/bin/agy --output-format stream-json --print /usage --print-timeout 45s",
+        "/dev/null",
+    ]
 
 
 def test_usage_http_returns_gemini_five_hour_remaining_fraction(monkeypatch):
@@ -39,7 +75,7 @@ def test_submission_stops_before_harness_when_gemini_five_hour_remaining_is_at_o
 
 
 def test_submission_continues_when_gemini_five_hour_remaining_is_above_seven_percent(
-    monkeypatch,
+    monkeypatch, tmp_path
 ):
     from ljpa_reworked import main
 
@@ -47,8 +83,10 @@ def test_submission_continues_when_gemini_five_hour_remaining_is_above_seven_per
     ranked = MagicMock(vacancy=vacancy)
     resume = MagicMock(path="resume.pdf")
     monkeypatch.setattr(main, "get_gemini_quota_remaining", lambda api_url: 0.071)
+    monkeypatch.setattr(main, "SUBMISSION_RESUMES_DIR", str(tmp_path))
     monkeypatch.setattr(main, "build_ranked_submission_queue", lambda db: [ranked])
     monkeypatch.setattr(main, "get_resume_by_vacancy", lambda db, vacancy_id: resume)
+    monkeypatch.setattr(main, "render_resume_crewai_to_pdf", lambda *args: None)
     monkeypatch.setattr(main, "harness_submit", lambda **kwargs: 0)
     monkeypatch.setattr(
         main, "confirm_url_application_submitted", lambda **kwargs: None

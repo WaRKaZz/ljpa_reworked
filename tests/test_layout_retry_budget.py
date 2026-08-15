@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 from ljpa_reworked.crew_workflow import crewai_generate_resume_with_retry
 from ljpa_reworked.models.crewai_pydantic_models import BasicEvaluationCrewAI
+from ljpa_reworked.services.rendercv_helper import ResumeLayoutError
 
 
 def test_resume_retry_defaults_to_three_layout_corrections():
@@ -17,9 +18,8 @@ def test_resume_retry_defaults_to_three_layout_corrections():
 
     def render(_resume, _path):
         if len(calls) < 4:
-            raise RuntimeError(
-                "RenderCV output failed page layout validation: "
-                "Page 1 (non-final) character count (2990) is less than minimum 3000 characters"
+            raise ResumeLayoutError(
+                "RenderCV output failed page layout validation: page is blank"
             )
 
     with (
@@ -34,7 +34,7 @@ def test_resume_retry_defaults_to_three_layout_corrections():
         crewai_generate_resume_with_retry(vacancy, evaluation)
 
     assert len(calls) == 4
-    assert "expand the resume text" in calls[-1]["layout_feedback"]
+    assert calls[-1]["layout_feedback"]
     assert calls[-1]["prior_resume_json"]
 
 

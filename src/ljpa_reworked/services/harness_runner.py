@@ -7,6 +7,7 @@ import sqlite3
 import sys
 import urllib.error
 import urllib.request
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from ljpa_reworked.services.harness.protocol import parse_terminal_result
@@ -14,7 +15,7 @@ from ljpa_reworked.services.harness.protocol import parse_terminal_result
 logger = logging.getLogger(__name__)
 
 SCRAPER_CONTAINER_DB = Path("/runtime/harness-scraper/app.db")
-HARNESS_MODEL = "gemini-3.6-flash-medium"
+HARNESS_MODEL = "gemini-3.7-flash-medium"
 
 
 def get_gemini_quota_remaining(api_url: str) -> float:
@@ -127,13 +128,49 @@ def run_linkedin_harness(
         return 1
 
 
+@dataclass
+class HarnessSubmitResult:
+    completed: bool
+    conversation_id: str | None = None
+    tail_lines: list[str] = field(default_factory=list)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, int):
+            return (0 if self.completed else 1) == other
+        if isinstance(other, HarnessSubmitResult):
+            return (
+                self.completed == other.completed
+                and self.conversation_id == other.conversation_id
+                and self.tail_lines == other.tail_lines
+            )
+        return False
+
+    def __int__(self) -> int:
+        return 0 if self.completed else 1
+
+
+def _parse_timeout_seconds(timeout_str: str | float | int) -> float:
+    if isinstance(timeout_str, (int, float)):
+        return float(timeout_str)
+    s = str(timeout_str).strip().lower()
+    if s.endswith("s"):
+        return float(s[:-1])
+    if s.endswith("m"):
+        return float(s[:-1]) * 60
+    if s.endswith("h"):
+        return float(s[:-1]) * 3600
+    if s.endswith("d"):
+        return float(s[:-1]) * 86400
+    return float(s)
+
+
 def harness_submit(
     vacancy_url: str,
     resume_path: str,
     prompt_file: str = "/app/prompts/harness_submit.md",
     timeout: str = "1h",
     api_url: str = "http://antigravity-cli:8080/run-harness",
-) -> int:
+) -> HarnessSubmitResult:
     """Submit exactly one vacancy; normal harness completion counts as submitted."""
     payload = json.dumps(
         {
@@ -155,20 +192,111 @@ def harness_submit(
         "Sending submission harness request to %s for URL %s", api_url, vacancy_url
     )
     completed = False
+    conversation_id: str | None = None
+    tail_lines: list[str] = []
+
     try:
         with urllib.request.urlopen(req) as response:
             for line in response:
                 decoded_line = line.decode("utf-8")
                 sys.stdout.write(decoded_line)
                 sys.stdout.flush()
+                tail_lines.append(decoded_line)
+                if len(tail_lines) > 40:
+                    tail_lines.pop(0)
+
                 try:
-                    completed |= json.loads(decoded_line).get("status") == "success"
-                except json.JSONDecodeError:
+                    event = json.loads(decoded_line)
+                    if isinstance(event, dict):
+                        if not conversation_id:
+                            cid = event.get("conversation_id") or event.get("conversationId")
+                            if not cid and isinstance(event.get("result"), dict):
+                                res_dict = event.get("result")
+                                if isinstance(res_dict, dict):
+                                    cid = res_dict.get("conversation_id") or res_dict.get("conversationId")
+                            if cid and isinstance(cid, str) and cid.strip():
+                                conversation_id = cid.strip()
+
+                        completed |= (
+                            event.get("status") == "success"
+                            or (
+                                event.get("event") == "result"
+                                and event.get("result", {}).get("status") == "SUCCESS"
+                            )
+                        )
+                except (json.JSONDecodeError, TypeError):
                     pass
-        return 0 if completed else 1
+        return HarnessSubmitResult(
+            completed=completed,
+            conversation_id=conversation_id,
+            tail_lines=tail_lines,
+        )
     except urllib.error.URLError as error:
         logger.error("Failed to connect to Antigravity API: %s", error)
-        return 1
+        return HarnessSubmitResult(
+            completed=False,
+            conversation_id=conversation_id,
+            tail_lines=tail_lines,
+        )
+
+
+def harness_save_site_skill(
+    conversation_id: str,
+    prompt_file: str = "/app/prompts/harness_save_site_skill.md",
+    timeout: str = "30m",
+    api_url: str = "http://antigravity-cli:8080/run-harness",
+    http_timeout: float | None = None,
+) -> int:
+    """Run second pass AGY request to save site skill bound to original conversation ID."""
+    if not conversation_id:
+        raise ValueError("conversation_id is required for harness_save_site_skill")
+    if http_timeout is None:
+        try:
+            http_timeout = _parse_timeout_seconds(timeout) + 30.0
+        except Exception:
+            http_timeout = 1830.0
+
+    payload = json.dumps(
+        {
+            "prompt_file": prompt_file,
+            "timeout": timeout,
+            "conversation_id": conversation_id,
+            "model": HARNESS_MODEL,
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        api_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    logger.info(
+        "Sending skill-save harness request to %s for conversation %s",
+        api_url,
+        conversation_id,
+    )
+    completed = False
+    with urllib.request.urlopen(req, timeout=http_timeout) as response:
+        for line in response:
+            decoded_line = line.decode("utf-8")
+            sys.stdout.write(decoded_line)
+            sys.stdout.flush()
+            try:
+                event = json.loads(decoded_line)
+                if isinstance(event, dict):
+                    completed |= (
+                        event.get("status") == "success"
+                        or (
+                            event.get("event") == "result"
+                            and event.get("result", {}).get("status") == "SUCCESS"
+                        )
+                    )
+            except (json.JSONDecodeError, TypeError):
+                pass
+    if not completed:
+        raise RuntimeError("Skill-save harness process did not report success.")
+    return 0
+
 
 
 def main() -> None:

@@ -4,7 +4,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ljpa_reworked.services.harness_runner import harness_submit, run_linkedin_harness
+from ljpa_reworked.services.harness_runner import (
+    harness_save_site_skill,
+    harness_submit,
+    run_linkedin_harness,
+)
 
 
 def test_run_linkedin_harness_sends_http_request(tmp_path):
@@ -150,3 +154,69 @@ def test_harness_runner_cli_manual_one_vacancy_path():
         timeout="1h",
         api_url="http://localhost:8080/run-harness",
     )
+
+
+def test_harness_submit_extracts_conversation_id_and_retains_40_line_tail():
+    lines = [
+        f'{{"event":"step","index":{i},"conversation_id":"conv-abc-123"}}\n'.encode()
+        for i in range(50)
+    ]
+    lines.append(b'{"status":"success","message":"finished"}\n')
+
+    mock_response = MagicMock()
+    mock_response.__enter__.return_value = lines
+
+    with patch("urllib.request.urlopen", return_value=mock_response):
+        result = harness_submit(
+            vacancy_url="https://example.com/apply",
+            resume_path="/app/resources/resumes/resume_1.pdf",
+            api_url="http://localhost:8080/run-harness",
+        )
+
+    assert hasattr(result, "conversation_id")
+    assert result.conversation_id == "conv-abc-123"
+    assert hasattr(result, "tail_lines")
+    assert len(result.tail_lines) == 40
+    assert result.completed is True
+    assert result == 0
+    assert '"index":49' in result.tail_lines[-2]
+
+
+def test_harness_submit_extracts_first_conversation_id_and_does_not_overwrite():
+    lines = [
+        b'{"event":"step","conversation_id":"first-cid-123"}\n',
+        b'{"event":"step","conversation_id":"second-cid-456"}\n',
+        b'{"event":"result","result":{"status":"SUCCESS","conversation_id":"third-cid-789"}}\n',
+    ]
+    mock_response = MagicMock()
+    mock_response.__enter__.return_value = lines
+
+    with patch("urllib.request.urlopen", return_value=mock_response):
+        result = harness_submit(
+            vacancy_url="https://example.com/apply",
+            resume_path="/app/resources/resumes/resume_1.pdf",
+            api_url="http://localhost:8080/run-harness",
+        )
+
+    assert result.conversation_id == "first-cid-123"
+
+
+def test_harness_save_site_skill_uses_finite_http_timeout():
+    mock_response = MagicMock()
+    mock_response.__enter__.return_value = [
+        b'{"event":"result","result":{"status":"SUCCESS"}}\n'
+    ]
+
+    with patch("urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
+        res = harness_save_site_skill(
+            conversation_id="conv-cid-99",
+            timeout="15m",
+            api_url="http://localhost:8080/run-harness",
+        )
+        assert res == 0
+
+    assert mock_urlopen.called
+    kwargs = mock_urlopen.call_args.kwargs
+    assert "timeout" in kwargs
+    assert isinstance(kwargs["timeout"], (int, float))
+    assert kwargs["timeout"] > 0

@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from ljpa_reworked.auth.session import (
+from ljpa_reworked.services.auth.session import (
     DEFAULT_STATE_PATH,
     load_auth_state,
     verify_auth_state,
