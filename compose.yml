@@ -11,51 +11,10 @@ services:
     command: [ "/bin/sh", "/init_cloak.sh" ]
     networks: [ ljpa-network ]
 
-  linkedin-bot:
+  linkedin-bot-collect:
+    profiles: [ modes ]
     image: localhost/ljpa_reworked_linkedin-bot:latest
     build: .
-    container_name: linkedin-bot
-    userns_mode: keep-id
-    depends_on:
-      cloak-browser:
-        condition: service_started
-      antigravity-cli:
-        condition: service_started
-      sqlite-ui:
-        condition: service_started
-    volumes:
-      - ./data:/app/data
-      - ./resources:/app/resources
-    env_file: [ .env ]
-    environment:
-      CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
-      UV_CACHE_DIR: /tmp/.uv-cache
-    command: uv run --no-dev python -m ljpa_reworked.main --mode full
-    networks: [ ljpa-network ]
-
-  linkedin-bot-full:
-    image: localhost/ljpa_reworked_linkedin-bot:latest
-    container_name: linkedin-bot-full
-    userns_mode: keep-id
-    depends_on:
-      cloak-browser:
-        condition: service_started
-      antigravity-cli:
-        condition: service_started
-      sqlite-ui:
-        condition: service_started
-    volumes:
-      - ./data:/app/data
-      - ./resources:/app/resources
-    env_file: [ .env ]
-    environment:
-      CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
-      UV_CACHE_DIR: /tmp/.uv-cache
-    command: uv run --no-dev python -m ljpa_reworked.main --mode full
-    networks: [ ljpa-network ]
-
-  linkedin-bot-collect:
-    image: localhost/ljpa_reworked_linkedin-bot:latest
     container_name: linkedin-bot-collect
     userns_mode: keep-id
     depends_on:
@@ -68,6 +27,7 @@ services:
     volumes:
       - ./data:/app/data
       - ./resources:/app/resources
+      - ./runtime/harness-scraper:/app/runtime/harness-scraper
     env_file: [ .env ]
     environment:
       CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
@@ -75,9 +35,10 @@ services:
     command: uv run --no-dev python -m ljpa_reworked.main --mode collect
     networks: [ ljpa-network ]
 
-  linkedin-bot-process:
+  linkedin-bot-url-process:
+    profiles: [ modes ]
     image: localhost/ljpa_reworked_linkedin-bot:latest
-    container_name: linkedin-bot-process
+    container_name: linkedin-bot-url-process
     userns_mode: keep-id
     depends_on:
       cloak-browser:
@@ -93,7 +54,29 @@ services:
     environment:
       CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
       UV_CACHE_DIR: /tmp/.uv-cache
-    command: uv run --no-dev python -m ljpa_reworked.main --mode process
+    command: uv run --no-dev python -m ljpa_reworked.main --mode url_process
+    networks: [ ljpa-network ]
+
+  linkedin-bot-email-process:
+    profiles: [ modes ]
+    image: localhost/ljpa_reworked_linkedin-bot:latest
+    container_name: linkedin-bot-email-process
+    userns_mode: keep-id
+    depends_on:
+      cloak-browser:
+        condition: service_started
+      antigravity-cli:
+        condition: service_started
+      sqlite-ui:
+        condition: service_started
+    volumes:
+      - ./data:/app/data
+      - ./resources:/app/resources
+    env_file: [ .env ]
+    environment:
+      CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
+      UV_CACHE_DIR: /tmp/.uv-cache
+    command: uv run --no-dev python -m ljpa_reworked.main --mode email_process
     networks: [ ljpa-network ]
 
   antigravity-cli:

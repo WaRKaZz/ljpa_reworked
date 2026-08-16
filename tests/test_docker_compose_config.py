@@ -22,11 +22,23 @@ def test_compose_yml_structure():
     assert cloak.get("image") == "docker.io/cloakhq/cloakbrowser:latest"
     assert "ports" not in cloak, "CDP must stay inside the Compose network"
 
+    assert "linkedin-bot" not in services, (
+        "Duplicate linkedin-bot service must be removed"
+    )
+    assert "linkedin-bot-full" not in services, (
+        "Legacy linkedin-bot-full service must be removed"
+    )
+    assert "linkedin-bot-process" not in services, (
+        "Legacy linkedin-bot-process service must be removed"
+    )
+    assert services["linkedin-bot-collect"].get("build") == ".", (
+        "linkedin-bot-collect must define the build context"
+    )
+
     for service_name, mode in {
-        "linkedin-bot": "full",
-        "linkedin-bot-full": "full",
         "linkedin-bot-collect": "collect",
-        "linkedin-bot-process": "process",
+        "linkedin-bot-url-process": "url_process",
+        "linkedin-bot-email-process": "email_process",
     }.items():
         bot = services[service_name]
         assert (
@@ -36,6 +48,9 @@ def test_compose_yml_structure():
         assert bot["userns_mode"] == "keep-id"
         assert "./runtime:/runtime" not in bot["volumes"]
         assert "./resources:/app/resources" in bot["volumes"]
+        assert bot.get("profiles") == ["modes"], (
+            f"{service_name} must use 'modes' profile"
+        )
 
     cli = services["antigravity-cli"]
     volumes = [str(v) for v in cli.get("volumes", [])]
@@ -76,3 +91,32 @@ def test_cloak_browser_keeps_image_entrypoint_that_starts_xvfb():
 
     assert "entrypoint" not in cloak
     assert cloak["command"] == ["/bin/sh", "/init_cloak.sh"]
+
+
+def test_antigravity_playwright_mcp_is_pinned_to_cloak_cdp():
+    content = Path("Dockerfile.antigravity").read_text(encoding="utf-8")
+
+    assert '"playwright": {' in content
+    assert '"args": ["--cdp-endpoint", "http://cloak-browser:9222"]' in content
+
+
+def test_submit_prompt_forbids_local_browser_fallbacks():
+    prompt = Path("prompts/harness_submit.md").read_text(encoding="utf-8")
+
+    assert (
+        "The configured `playwright` MCP is already pinned to `http://cloak-browser:9222`."
+        in prompt
+    )
+    assert (
+        "Do not run `npx playwright install`, `unbrowse setup`, or a local CDP proxy."
+        in prompt
+    )
+
+
+def test_antigravity_entrypoint_waits_for_cloak_cdp():
+    entrypoint = Path(
+        "src/ljpa_reworked/services/docker/antigravity-entrypoint.sh"
+    ).read_text(encoding="utf-8")
+
+    assert '"/json/version"' in entrypoint
+    assert "Cloak Browser CDP did not become ready" in entrypoint
