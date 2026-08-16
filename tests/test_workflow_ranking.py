@@ -54,6 +54,16 @@ def test_ranked_submission_queue_penalizes_age_and_soft_deletes_below_fifty():
         ):
             vacancy.created_at = now - timedelta(days=age)
             vacancy.status = VacancyStatus.application_prepared
+            from ljpa_reworked.models.database_models import Resume
+
+            db.add(
+                Resume(
+                    vacancy_id=vacancy.id,
+                    fullname="Test",
+                    email="test@example.com",
+                    summary="Test",
+                )
+            )
         _evaluation(db, fresh, 88)
         _evaluation(db, two_days_old, 90)
         _evaluation(db, raw_low, 49)
@@ -114,9 +124,7 @@ def test_processes_only_unevaluated_vacancies_and_creates_resume_for_passing_mat
         Base.metadata.drop_all(bind=engine)
 
 
-def test_submit_top_five_waits_three_hours_between_each_submission(
-    monkeypatch, tmp_path
-):
+def test_submit_top_vacancies_submits_all_eligible_vacancies_directly(monkeypatch, tmp_path):
     from ljpa_reworked import main
     from ljpa_reworked.models.database_models import Resume
 
@@ -140,10 +148,8 @@ def test_submit_top_five_waits_three_hours_between_each_submission(
         resumes_dir.mkdir()
         for number in range(6):
             (resumes_dir / f"resume_{number}.pdf").write_bytes(b"%PDF-1.4")
-        sleeps = []
         submitted = []
         monkeypatch.setattr(main, "SUBMISSION_RESUMES_DIR", str(resumes_dir))
-        monkeypatch.setattr(main, "time", type("Clock", (), {"sleep": sleeps.append}))
         monkeypatch.setattr(main, "get_gemini_quota_remaining", lambda api_url: 1.0)
         monkeypatch.setattr(
             main,
@@ -158,8 +164,7 @@ def test_submit_top_five_waits_three_hours_between_each_submission(
 
         assert main.submit_top_vacancies(db) == 0
 
-        assert submitted == [vacancy.submit_url for vacancy in vacancies[:5]]
-        assert sleeps == [main.SUBMISSION_DELAY_SECONDS] * 4
+        assert submitted == [vacancy.submit_url for vacancy in vacancies]
     finally:
         db.close()
         Base.metadata.drop_all(bind=engine)
