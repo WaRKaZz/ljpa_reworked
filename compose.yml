@@ -38,6 +38,7 @@ services:
   linkedin-bot-url-process:
     profiles: [ modes ]
     image: localhost/ljpa_reworked_linkedin-bot:latest
+    build: .
     container_name: linkedin-bot-url-process
     userns_mode: keep-id
     depends_on:
@@ -60,6 +61,7 @@ services:
   linkedin-bot-email-process:
     profiles: [ modes ]
     image: localhost/ljpa_reworked_linkedin-bot:latest
+    build: .
     container_name: linkedin-bot-email-process
     userns_mode: keep-id
     depends_on:

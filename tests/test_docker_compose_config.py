@@ -31,9 +31,6 @@ def test_compose_yml_structure():
     assert "linkedin-bot-process" not in services, (
         "Legacy linkedin-bot-process service must be removed"
     )
-    assert services["linkedin-bot-collect"].get("build") == ".", (
-        "linkedin-bot-collect must define the build context"
-    )
 
     for service_name, mode in {
         "linkedin-bot-collect": "collect",
@@ -41,6 +38,7 @@ def test_compose_yml_structure():
         "linkedin-bot-email-process": "email_process",
     }.items():
         bot = services[service_name]
+        assert bot.get("build") == ".", f"{service_name} must define build context"
         assert (
             bot["command"]
             == f"uv run --no-dev python -m ljpa_reworked.main --mode {mode}"
