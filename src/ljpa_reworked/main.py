@@ -400,7 +400,7 @@ def submit_top_vacancies(db, limit: int | None = None) -> int:
             )
             transition_vacancy_status(db, vacancy.id, VacancyStatus.application_error)
         submitted += 1
-    return submitted
+    return 0
 
 
 def main(mode: str = "collect") -> int:
@@ -427,7 +427,9 @@ def main(mode: str = "collect") -> int:
 
     if mode == "email_process":
         with SessionLocal() as db:
-            logger.info("[Step 1] Evaluating unreviewed vacancies and creating resumes...")
+            logger.info(
+                "[Step 1] Evaluating unreviewed vacancies and creating resumes..."
+            )
             process_unevaluated_vacancies(db)
 
             logger.info(
@@ -438,7 +440,9 @@ def main(mode: str = "collect") -> int:
 
     if mode == "url_process":
         with SessionLocal() as db:
-            logger.info("[Step 1] Evaluating unreviewed vacancies and creating resumes...")
+            logger.info(
+                "[Step 1] Evaluating unreviewed vacancies and creating resumes..."
+            )
             process_unevaluated_vacancies(db)
 
             logger.info(
@@ -464,4 +468,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     raise SystemExit(main(mode=args.mode))
-
