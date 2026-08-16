@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 import re
@@ -125,6 +126,43 @@ def validate_resume_facts(
             )
 
 
+def extract_clean_json(text: str) -> dict:
+    """Extract and parse a JSON dictionary from raw LLM output, markdown blocks, or python AST."""
+    if not text or not isinstance(text, str):
+        raise ValueError("Empty or invalid output from LLM.")
+    match = re.search(r"```(?:json|python)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
+    cleaned = match.group(1).strip() if match else text.strip()
+    first_brace = cleaned.find("{")
+    last_brace = cleaned.rfind("}")
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        try:
+            return json.loads(cleaned[first_brace : last_brace + 1])
+        except Exception:
+            pass
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        pass
+
+    # AST fallback if model returned Python code/instantiation
+    try:
+        tree = ast.parse(cleaned)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                payload = {}
+                for kw in node.keywords:
+                    if kw.arg:
+                        payload[kw.arg] = ast.literal_eval(kw.value)
+                if payload:
+                    return payload
+            elif isinstance(node, ast.Dict):
+                return ast.literal_eval(node)
+    except Exception:
+        pass
+
+    raise ValueError(f"Could not extract valid JSON from LLM output: {text[:200]}")
+
+
 @crewai_retry_handler
 def crewai_evaluate_vacancy(vacancy: "Vacancy") -> BasicEvaluationCrewAI:
     profile_text = read_profile_text(PROFILE_FILE_PATH)
@@ -140,9 +178,38 @@ def crewai_evaluate_vacancy(vacancy: "Vacancy") -> BasicEvaluationCrewAI:
         "required_profile_sections": present_sections,
     }
     crew_output = crew.kickoff(inputs=inputs)
-    evaluation = crew_output.tasks_output[-1].pydantic
-    if evaluation is None:
+    if isinstance(getattr(crew_output, "pydantic", None), BasicEvaluationCrewAI):
+        return crew_output.pydantic.model_copy(update={"missing_mandatory_facts": []})
+
+    merged_data: dict = {}
+    tasks_out = getattr(crew_output, "tasks_output", None) or []
+    for task_out in tasks_out:
+        if isinstance(getattr(task_out, "pydantic", None), BasicEvaluationCrewAI):
+            merged_data.update(task_out.pydantic.model_dump())
+        else:
+            raw_text = getattr(task_out, "raw", "")
+            if isinstance(raw_text, str) and raw_text.strip():
+                try:
+                    data = extract_clean_json(raw_text)
+                    if isinstance(data, dict):
+                        merged_data.update(data)
+                except Exception:
+                    pass
+
+    if not merged_data:
+        raw_text = getattr(crew_output, "raw", "")
+        if isinstance(raw_text, str) and raw_text.strip():
+            merged_data = extract_clean_json(raw_text)
+
+    if not merged_data:
         raise ValueError("CrewAI evaluation returned no structured output.")
+
+    if "visa_probability" not in merged_data:
+        merged_data["visa_probability"] = 100
+    if "missing_mandatory_facts" not in merged_data:
+        merged_data["missing_mandatory_facts"] = []
+
+    evaluation = BasicEvaluationCrewAI.model_validate(merged_data)
     # The profile passed the deterministic completeness check above. A vacancy
     # requirement the candidate does not meet affects rating, never profile completeness.
     return evaluation.model_copy(update={"missing_mandatory_facts": []})
@@ -175,7 +242,10 @@ def crewai_generate_resume(
             "prior_resume_json": prior_resume_json,
         }
     )
-    dynamic_resume = json.loads(crew_output.raw)
+    raw_text = getattr(crew_output, "raw", "")
+    if not raw_text and getattr(crew_output, "tasks_output", None):
+        raw_text = getattr(crew_output.tasks_output[-1], "raw", "")
+    dynamic_resume = extract_clean_json(raw_text)
     resume = ResumeCrewAI.model_validate(
         merge_static_resume_profile(dynamic_resume, static_profile)
     )
@@ -185,25 +255,48 @@ def crewai_generate_resume(
 
 @crewai_retry_handler
 def crewai_generate_email(vacancy: "Vacancy") -> EmailCrewAI:
+    profile_text = read_profile_text(PROFILE_FILE_PATH)
     crew = EmailGenerationCrew().crew()
-    inputs = {}
-    inputs["text"] = vacancy["text"] if isinstance(vacancy, dict) else vacancy.text
-    inputs["title"] = vacancy["title"] if isinstance(vacancy, dict) else vacancy.title
-    inputs["submit_email"] = (
-        vacancy.get("submit_email") or ""
-        if isinstance(vacancy, dict)
-        else (vacancy.submit_email or "")
-    )
-    inputs["submit_url"] = (
-        vacancy.get("submit_url") or ""
-        if isinstance(vacancy, dict)
-        else (vacancy.submit_url or "")
-    )
-    inputs["email_signature"] = EMAIL_SIGNATURE
+    inputs = {
+        "text": vacancy["text"] if isinstance(vacancy, dict) else vacancy.text,
+        "title": vacancy["title"] if isinstance(vacancy, dict) else vacancy.title,
+        "submit_email": (
+            vacancy.get("submit_email") or ""
+            if isinstance(vacancy, dict)
+            else (vacancy.submit_email or "")
+        ),
+        "submit_url": (
+            vacancy.get("submit_url") or ""
+            if isinstance(vacancy, dict)
+            else (vacancy.submit_url or "")
+        ),
+        "candidate_profile": profile_text,
+        "email_signature": EMAIL_SIGNATURE,
+    }
     crew_output = crew.kickoff(inputs=inputs)
-    if crew_output.pydantic is None:
-        raise ValueError("CrewAI email returned no structured output.")
-    return crew_output.pydantic
+    if isinstance(getattr(crew_output, "pydantic", None), EmailCrewAI):
+        return crew_output.pydantic
+
+    tasks_out = getattr(crew_output, "tasks_output", None) or []
+    for task_out in tasks_out:
+        if isinstance(getattr(task_out, "pydantic", None), EmailCrewAI):
+            return task_out.pydantic
+        raw_text = getattr(task_out, "raw", "")
+        if isinstance(raw_text, str) and raw_text.strip():
+            try:
+                data = extract_clean_json(raw_text)
+                if isinstance(data, dict):
+                    return EmailCrewAI.model_validate(data)
+            except Exception:
+                pass
+
+    raw_text = getattr(crew_output, "raw", "")
+    if isinstance(raw_text, str) and raw_text.strip():
+        data = extract_clean_json(raw_text)
+        if isinstance(data, dict):
+            return EmailCrewAI.model_validate(data)
+
+    raise ValueError("CrewAI email returned no structured output.")
 
 
 def _format_numeric_layout_feedback(raw_error: str) -> str:
@@ -339,9 +432,9 @@ def crewai_review_submission_result(tail_lines: list[str]) -> SubmissionReviewCr
             review = getattr(crew_output.tasks_output[-1], "pydantic", None)
         if review is None and hasattr(crew_output, "pydantic"):
             review = crew_output.pydantic
-        if (
-            isinstance(review, SubmissionReviewCrewAI)
-            and review.decision in ("success", "error")
+        if isinstance(review, SubmissionReviewCrewAI) and review.decision in (
+            "success",
+            "error",
         ):
             return review
         return SubmissionReviewCrewAI(
