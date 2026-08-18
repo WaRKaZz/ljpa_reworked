@@ -114,7 +114,7 @@ RUN bash -o pipefail -c \
 
 # MarkItDown service uses MCP 2.0 because Antigravity probes `server/discover` (2026-07-28).
 # Python Playwright is required by Harness browser automation, independently of the Node MCP package.
-RUN python -m pip install --no-cache-dir "markitdown==0.1.7" "mcp==2.0.0" fastapi uvicorn pydantic playwright "browser-use" "langchain-openai" \
+RUN python -m pip install --no-cache-dir "markitdown==0.1.7" "mcp==2.0.0" fastapi uvicorn pydantic pydantic-settings playwright "browser-use[cli]" "langchain-openai" \
   && python -c "import playwright; print(playwright.__version__ if hasattr(playwright, '__version__') else playwright.__file__)"
 
 COPY --chown=agent:agent src/ljpa_reworked/services/docker/markitdown_mcp.py /home/agent/.local/lib/markitdown_mcp.py
