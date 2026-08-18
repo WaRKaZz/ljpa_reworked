@@ -17,10 +17,11 @@ When Browser Use completes an application or recovers from an ATS form challenge
 
 ### What to Document in `/runtime/workspace/<site-or-vacancy-name>/SKILL.md`
 * **ATS / Portal Identity**: Apex domain, portal platform (e.g. Workday, Greenhouse, Lever, SmartRecruiters, Personio, Taleo), and URL patterns.
+* **Technical selector strategies**: Stable field labels, button identifiers, and robust selector strategies where available.
 * **Navigation & Shortcuts**: Direct apply links, multi-page progression order, login requirements, and skip conditions.
 * **Form & Interaction Patterns**: Mandatory section order, dropdown behaviors, radio group groupings, custom widgets, and consent checkbox locations.
-* **File Upload Mechanisms**: Specific file upload triggers (e.g. "Resume uploader input appears inside 'My Experience' tab").
-* **Modal & Dialog Dismissal**: Cookie banner handling, mandatory popups, or disclosure dialogs.
+* **File Upload Handling**: Specific file upload handling and upload triggers (e.g. "Resume uploader input appears inside 'My Experience' tab").
+* **Modal & Dialog Dismissal**: Modal dismissal rules, cookie banner handling, mandatory popups, or disclosure dialogs.
 * **Submit Sequence & Verification**: Exact final button label/behavior and confirmation messages indicating successful receipt.
 * **Failure & Recovery Observations**: Workarounds for validation errors or anti-bot layout shifts discovered during Browser Use execution.
 
