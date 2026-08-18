@@ -1,4 +1,4 @@
-# LINKEDIN DIRECT VACANCY DISCOVERY, VALIDATION, PERSISTENCE & SELF-AUDIT (REFACTORED V2)
+# LINKEDIN DIRECT VACANCY DISCOVERY, VALIDATION, PERSISTENCE & SELF-AUDIT (REFACTORED V3)
 
 ## OBJECTIVE
 
@@ -8,16 +8,18 @@ Search LinkedIn posts only. Do not analyze the home feed, use direct messages, o
 
 ---
 
-## 1. BROWSER SETUP & STREAMLINED CDP WORKFLOW
+## 1. BROWSER SETUP & BROWSER USE MCP DELEGATION MODEL
 
-Use MCP Unbrowse connected through Playwright/CDP at `http://cloak-browser:9222` for all browser actions.
+All browser execution is delegated through the **Browser Use MCP** server (`browser_use`).
 
-### Connection Protocol
-1. **Direct CDP Connection**: Connect Playwright over CDP: `browser = playwright.chromium.connect_over_cdp('http://cloak-browser:9222')`.
-2. **Context & Active Page**: Access existing context and active page: `context = browser.contexts[0]`, `page = context.pages[-1]`. Bring active page to front (`page.bring_to_front()`).
-3. **Local CDP Fallback**: If local CDP on `127.0.0.1:9222` is closed and required by background utilities, run a local TCP proxy forwarding `127.0.0.1:9222` -> `cloak-browser:9222` and run `yes | unbrowse setup`.
-4. **Tab Teardown Protocol**: Before completing execution, close all non-essential created pages (`await page.close()`) to avoid leaving active IndexedDB database locks in Chromium.
+### Responsibility Model
+* **Antigravity (Orchestrator)**: Decides *what* search queries to run, what candidate posts to inspect, evaluates semantic matching against the profile, verifies gates, deduplicates records, and manages database transactions.
+* **Browser Use (Browser Executor)**: Autonomously executes complete browser goals (navigating LinkedIn, scrolling feeds, expanding "See more", unwrapping external ATS redirect links, and extracting text/contacts) and returns structured results.
 
+### Tool Usage Protocol
+1. **High-Level Goal Delegation**: Call Browser Use MCP (`run_browser_task` or `browse_url`) with clear, self-contained objectives rather than issuing low-level step-by-step clicks or DOM queries.
+2. **Compact Result Consumption**: Antigravity consumes the structured output/report returned by Browser Use. Do not request or process raw browser step traces unless diagnosing a failure.
+3. **Legacy Fallback**: Legacy browser tools (`unbrowse`, `playwright`) are reserved strictly as emergency fallbacks if Browser Use encounters an unrecoverable transport error. Antigravity must never default to micromanaging DOM actions.
 
 ---
 
@@ -39,7 +41,7 @@ The canonical database is `/runtime/harness-scraper/app.db`. Never write to it d
 
 ## 3. PHASE 1 — DYNAMIC CANDIDATE PROFILE INGESTION
 
-1. Inspect `resources/` and read candidate profile files (`resources/profile.md`).
+1. Inspect candidate profile resources at `/inputs/resources/profile.md` (or `resources/profile.md`).
 2. Dynamically extract location, visa/work authorization constraints, acceptable work arrangements (remote/hybrid/onsite), technical skills, domain experience, role families, and seniority.
 3. Build a concise internal candidate profile summary. Do not hardcode candidate names, locations, technologies, or titles.
 
@@ -52,17 +54,29 @@ Generate up to 3 search passes dynamically from candidate profile:
 * **PASS 2 — ALTERNATIVE MATCHES**: Profile-derived role synonyms + domain terms + secondary skills.
 * **PASS 3 — CONTROLLED BROADENING**: Broader queries while retaining key profile skills/domain constraints.
 
-Each pass executes one LinkedIn post search query and up to 3 scroll-and-extraction cycles. Search LinkedIn posts only. Stop immediately once 10 fully validated vacancies pass final audit.
+### Delegated Search Execution
+For each pass, instruct Browser Use via a high-level goal:
+```text
+Navigate to LinkedIn post search with query "<generated_query>".
+Scroll through the search results for up to 3 scroll cycles.
+Collect candidate vacancy posts, extracting the author, post snippet, post permalink, and any immediately visible contact credentials.
+```
+Search LinkedIn posts only. Stop immediately once 10 fully validated vacancies pass final audit.
 
 ---
 
 ## 5. PHASE 3 — CANDIDATE EVALUATION & MANDATORY GATES
 
-### Full Post Review Requirement
-A search result card or snippet is metadata only. For every candidate vacancy:
-1. Open the original LinkedIn post in the browser.
-2. **Expand Post Body**: Always click "See more" to expand collapsed text before evaluating facts or extracting contact details.
-3. **External Apply URL Unwrapping**: If the post contains an external application link or LinkedIn job page with an external "Apply" button, navigate/click to trigger redirects and extract the final vendor application URL as `submit_url`.
+### Delegated Post Inspection Requirement
+A search snippet is metadata only. For each prospective vacancy:
+1. Delegate post inspection to Browser Use:
+   ```text
+   Open LinkedIn post at "<post_url>".
+   Expand the full post body by clicking "See more".
+   If the post contains an external application link or job link with an "Apply" button, follow/click it to unwrap all redirects and return the final destination ATS URL.
+   Extract the full post text, company name, role title, location/remote conditions, requirements, recruiter email, and final application URL.
+   ```
+2. Antigravity evaluates the returned facts against the mandatory gates:
 
 ### Mandatory Evaluation Gates
 Reject immediately if any gate fails:
