@@ -11,18 +11,15 @@ services:
     command: [ "/bin/sh", "/init_cloak.sh" ]
     networks: [ ljpa-network ]
 
-  linkedin-bot-collect:
-    profiles: [ modes ]
+  linkedin-bot:
     image: localhost/ljpa_reworked_linkedin-bot:latest
     build: .
-    container_name: linkedin-bot-collect
+    container_name: linkedin-bot
     userns_mode: keep-id
     depends_on:
       cloak-browser:
         condition: service_started
       antigravity-cli:
-        condition: service_started
-      sqlite-ui:
         condition: service_started
     volumes:
       - ./data:/app/data
@@ -32,54 +29,9 @@ services:
     environment:
       CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
       UV_CACHE_DIR: /tmp/.uv-cache
-    command: uv run --no-dev python -m ljpa_reworked.main --mode collect
+    command: [ "sh", "-c", "mkdir -p /app/data && touch /app/data/bot.log && tail -F /app/data/bot.log" ]
     networks: [ ljpa-network ]
 
-  linkedin-bot-url-process:
-    profiles: [ modes ]
-    image: localhost/ljpa_reworked_linkedin-bot:latest
-    build: .
-    container_name: linkedin-bot-url-process
-    userns_mode: keep-id
-    depends_on:
-      cloak-browser:
-        condition: service_started
-      antigravity-cli:
-        condition: service_started
-      sqlite-ui:
-        condition: service_started
-    volumes:
-      - ./data:/app/data
-      - ./resources:/app/resources
-    env_file: [ .env ]
-    environment:
-      CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
-      UV_CACHE_DIR: /tmp/.uv-cache
-    command: uv run --no-dev python -m ljpa_reworked.main --mode url_process
-    networks: [ ljpa-network ]
-
-  linkedin-bot-email-process:
-    profiles: [ modes ]
-    image: localhost/ljpa_reworked_linkedin-bot:latest
-    build: .
-    container_name: linkedin-bot-email-process
-    userns_mode: keep-id
-    depends_on:
-      cloak-browser:
-        condition: service_started
-      antigravity-cli:
-        condition: service_started
-      sqlite-ui:
-        condition: service_started
-    volumes:
-      - ./data:/app/data
-      - ./resources:/app/resources
-    env_file: [ .env ]
-    environment:
-      CDP_URL: ${CDP_URL:-http://cloak-browser:9222}
-      UV_CACHE_DIR: /tmp/.uv-cache
-    command: uv run --no-dev python -m ljpa_reworked.main --mode email_process
-    networks: [ ljpa-network ]
 
   antigravity-cli:
     build:
@@ -100,18 +52,25 @@ services:
       HARNESS_DATA_DIR: /runtime/harness-scraper
       HARNESS_RESOURCES_DIR: /inputs/resources
       GEMINI_DIR: /runtime/gemini
+      BROWSER_USE_MODEL: ${BROWSER_USE_MODEL:-free-tier}
     stdin_open: true
     tty: true
     command: [ "python3", "/app/harness/harness_server.py" ]
     networks: [ ljpa-network ]
 
-  sqlite-ui:
-    build:
-      context: .
-      dockerfile: Dockerfile.sqlite
-    container_name: sqlite-ui
+  datasette:
+    image: docker.io/datasetteproject/datasette:latest
+    container_name: datasette
     ports: [ "7901:7901" ]
-    volumes: [ "./data:/data" ]
+    volumes:
+      - ./data:/data
+      - ./static:/app/static:ro
+      - ./metadata.json:/app/metadata.json:ro
+    entrypoint: [ "/bin/sh", "-c" ]
+    command:
+      - >
+        pip install -q --no-cache-dir datasette-search-all datasette-jellyfish datasette-render-markdown &&
+        exec datasette /data/app.db -h 0.0.0.0 -p 7901 --metadata /app/metadata.json --static static:/app/static --setting sql_time_limit_ms 5000 --setting truncate_cells_html 120 --setting default_page_size 50
     networks: [ ljpa-network ]
 
 networks:

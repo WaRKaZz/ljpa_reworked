@@ -84,6 +84,13 @@ RUN /usr/sbin/useradd \
   /home/agent/.gemini/config \
   /home/agent/.gemini/config/skills \
   /home/agent/.unbrowse \
+  && /usr/bin/install -d \
+  -o agent \
+  -g agent \
+  -m 0777 \
+  /runtime \
+  /runtime/workspace \
+  && ln -sf /runtime/workspace /workspace \
   && /usr/bin/chown -R agent:agent /home/agent
 
 # Очистка кэша apt.
@@ -107,10 +114,11 @@ RUN bash -o pipefail -c \
 
 # MarkItDown service uses MCP 2.0 because Antigravity probes `server/discover` (2026-07-28).
 # Python Playwright is required by Harness browser automation, independently of the Node MCP package.
-RUN python -m pip install --no-cache-dir "markitdown==0.1.7" "mcp==2.0.0" fastapi uvicorn pydantic playwright \
+RUN python -m pip install --no-cache-dir "markitdown==0.1.7" "mcp==2.0.0" fastapi uvicorn pydantic playwright "browser-use" "langchain-openai" \
   && python -c "import playwright; print(playwright.__version__ if hasattr(playwright, '__version__') else playwright.__file__)"
 
 COPY --chown=agent:agent src/ljpa_reworked/services/docker/markitdown_mcp.py /home/agent/.local/lib/markitdown_mcp.py
+COPY --chown=agent:agent src/ljpa_reworked/services/docker/browser_use_mcp.py /home/agent/.local/lib/browser_use_mcp.py
 
 # Нативная установка Superpowers и Ponytail.
 RUN agy plugin install https://github.com/obra/superpowers \
@@ -133,14 +141,20 @@ COPY --chown=agent:agent <<'JSON' /home/agent/.gemini/config/mcp_config.json
       "serverUrl": "https://mcp.context7.com/mcp"
     },
     "markitdown": {
-      "serverUrl": "http://markitdown-mcp:3001/mcp/"
+      "command": "python3",
+      "args": ["/home/agent/.local/lib/markitdown_mcp.py"]
+    },
+    "browser_use": {
+      "command": "python3",
+      "args": ["/home/agent/.local/lib/browser_use_mcp.py"]
     },
     "unbrowse": {
       "command": "unbrowse",
       "args": ["mcp"]
     },
     "playwright": {
-      "command": "playwright-mcp"
+      "command": "playwright-mcp",
+      "args": ["--cdp-endpoint", "http://cloak-browser:9222"]
     },
     "imap": {
       "command": "imap-mcp-server",
@@ -173,14 +187,14 @@ User instructions and workspace AGENTS.md or GEMINI.md constraints take preceden
 
 # Persistent agent workspace
 
-`/workspace` is the persistent writable workspace volume for this agent. Never create agent-generated files in `/app`, `/app/data`, `/app/prompts`, `/app/resources`, or the user's project tree unless the user explicitly asks to change a project file.
+`/runtime/workspace` is the persistent writable workspace volume for this agent. Never create agent-generated files in `/app`, `/app/data`, `/app/prompts`, `/app/resources`, or the user's project tree unless the user explicitly asks to change a project file.
 
-- Put every scratch script, temporary artifact, downloaded input, generated report, execution note, and agent-only state under `/workspace`.
-- Before creating a file, reuse an existing suitable directory under `/workspace`; do not write one-off artifacts into application data directories.
-- Keep `/workspace/README.md` current. For each retained file or directory, record its path, purpose, creator/task, and whether it is disposable or persistent.
-- Reusable procedures and domain knowledge belong in `/workspace/skills/<skill-name>/SKILL.md`, not as loose notes. Include a trigger, steps, constraints, and verification in each skill.
-- At the beginning of work, inspect `/workspace/skills` if it exists. These are workspace skills available for the current task; read each relevant `SKILL.md` before acting. When a task yields reusable knowledge, document it there as a skill and update `/workspace/README.md`.
-- Do not put secrets, tokens, cookies, candidate profiles, or database contents in `/workspace` or its documentation.
+- Put every scratch script, temporary artifact, downloaded input, generated report, execution note, and agent-only state under `/runtime/workspace`.
+- Before creating a file, reuse an existing suitable directory under `/runtime/workspace`; do not write one-off artifacts into application data directories.
+- Keep `/runtime/workspace/README.md` current. For each retained file or directory, record its path, purpose, creator/task, and whether it is disposable or persistent.
+- Reusable procedures and domain knowledge belong in `/runtime/workspace/skills/<skill-name>/SKILL.md`, not as loose notes. Include a trigger, steps, constraints, and verification in each skill.
+- At the beginning of work, inspect `/runtime/workspace/skills` if it exists. These are workspace skills available for the current task; read each relevant `SKILL.md` before acting. When a task yields reusable knowledge, document it there as a skill and update `/runtime/workspace/README.md`.
+- Do not put secrets, tokens, cookies, candidate profiles, or database contents in `/runtime/workspace` or its documentation.
 
 # Engineering workflow precedence
 
@@ -213,7 +227,7 @@ RUN node --version \
   && uv --version \
   && agy --version \
   && unbrowse --version \
-  && python -c "import markitdown, mcp, fastapi, uvicorn, pydantic" \
+  && python -c "import markitdown, mcp, fastapi, uvicorn, pydantic, browser_use, langchain_openai" \
   && command -v playwright-mcp \
   && python -m json.tool \
   "${HOME}/.gemini/config/mcp_config.json" >/dev/null \
