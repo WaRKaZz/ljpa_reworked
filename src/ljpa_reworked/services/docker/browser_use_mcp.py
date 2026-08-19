@@ -3,12 +3,15 @@ import logging
 import os
 import sys
 
-from mcp.server.fastmcp import FastMCP
+try:
+    from mcp.server import MCPServer as ServerClass
+except ImportError:
+    from mcp.server.fastmcp import FastMCP as ServerClass
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger("browser_use_mcp")
 
-mcp = FastMCP("browser_use")
+app = ServerClass("browser_use")
 
 
 def get_llm():
@@ -40,9 +43,8 @@ def get_browser():
     return Browser(cdp_url=cdp_url)
 
 
-@mcp.tool()
-async def run_browser_task(task: str, max_steps: int = 25) -> str:
-    """Execute a high-level autonomous browser task using Browser Use and return a structured execution report."""
+async def execute_browser_task(task: str, max_steps: int = 25) -> str:
+    """Execute autonomous browser goal using Browser Use and return structured JSON."""
     from browser_use import Agent
 
     llm = get_llm()
@@ -66,12 +68,18 @@ async def run_browser_task(task: str, max_steps: int = 25) -> str:
     return json.dumps(report, indent=2)
 
 
-@mcp.tool()
+@app.tool()
+async def run_browser_task(task: str, max_steps: int = 25) -> str:
+    """Execute a high-level autonomous browser task using Browser Use and return a structured execution report."""
+    return await execute_browser_task(task, max_steps=max_steps)
+
+
+@app.tool()
 async def browse_url(url: str, task: str) -> str:
     """Navigate to a target URL and perform a focused extraction or interaction task."""
     full_task = f"Navigate to {url} and perform: {task}"
-    return await run_browser_task(full_task)
+    return await execute_browser_task(full_task)
 
 
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    app.run(transport="stdio")
