@@ -69,13 +69,34 @@ def publish_scraper_database(canonical_path: Path, scraper_path: Path) -> None:
         scraper_path.unlink(missing_ok=True)
 
 
+@dataclass
+class HarnessScraperResult:
+    completed: bool
+    conversation_id: str | None = None
+    tail_lines: list[str] = field(default_factory=list)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, int):
+            return (0 if self.completed else 1) == other
+        if isinstance(other, HarnessScraperResult):
+            return (
+                self.completed == other.completed
+                and self.conversation_id == other.conversation_id
+                and self.tail_lines == other.tail_lines
+            )
+        return False
+
+    def __int__(self) -> int:
+        return 0 if self.completed else 1
+
+
 def run_linkedin_harness(
     prompt_file: str = "/app/prompts/harness_scraper.md",
     timeout: str = "8h",
     api_url: str = "http://antigravity-cli:8080/run-harness",
     canonical_db_path: Path | None = None,
     scraper_db_path: Path | None = None,
-) -> int:
+) -> HarnessScraperResult:
     """Run scraper against an isolated DB copy, then publish only on success."""
     if canonical_db_path is None:
         canonical_db_path = Path("data/app.db")
@@ -86,7 +107,7 @@ def run_linkedin_harness(
         prepare_scraper_database(canonical_db_path, scraper_db_path)
     except (OSError, RuntimeError, sqlite3.Error) as error:
         logger.error("Could not prepare scraper database: %s", error)
-        return 1
+        return HarnessScraperResult(completed=False)
 
     payload = json.dumps(
         {"prompt_file": prompt_file, "timeout": timeout, "model": HARNESS_MODEL}
@@ -100,12 +121,36 @@ def run_linkedin_harness(
 
     logger.info("Sending scraper harness request to %s", api_url)
     agy_success = False
+    conversation_id: str | None = None
+    tail_lines: list[str] = []
     try:
         with urllib.request.urlopen(req) as response:
             for line in response:
                 decoded_line = line.decode("utf-8")
                 sys.stdout.write(decoded_line)
                 sys.stdout.flush()
+                tail_lines.append(decoded_line)
+                if len(tail_lines) > 80:
+                    tail_lines.pop(0)
+
+                try:
+                    event = json.loads(decoded_line)
+                    if isinstance(event, dict):
+                        if not conversation_id:
+                            cid = event.get("conversation_id") or event.get(
+                                "conversationId"
+                            )
+                            if not cid and isinstance(event.get("result"), dict):
+                                res_dict = event.get("result")
+                                if isinstance(res_dict, dict):
+                                    cid = res_dict.get(
+                                        "conversation_id"
+                                    ) or res_dict.get("conversationId")
+                            if cid and isinstance(cid, str) and cid.strip():
+                                conversation_id = cid.strip()
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
                 is_terminal, is_success = parse_terminal_result(decoded_line)
                 if is_terminal:
                     if is_success:
@@ -116,16 +161,28 @@ def run_linkedin_harness(
         if not agy_success:
             logger.warning("Stream ended without terminal AGY result event")
             scraper_db_path.unlink(missing_ok=True)
-            return 1
+            return HarnessScraperResult(
+                completed=False,
+                conversation_id=conversation_id,
+                tail_lines=tail_lines,
+            )
 
         publish_scraper_database(canonical_db_path, scraper_db_path)
-        return 0
+        return HarnessScraperResult(
+            completed=True,
+            conversation_id=conversation_id,
+            tail_lines=tail_lines,
+        )
     except (urllib.error.URLError, OSError, RuntimeError, sqlite3.Error) as error:
         logger.error(
             "Scraper harness failed; canonical database was retained: %s", error
         )
         scraper_db_path.unlink(missing_ok=True)
-        return 1
+        return HarnessScraperResult(
+            completed=False,
+            conversation_id=conversation_id,
+            tail_lines=tail_lines,
+        )
 
 
 @dataclass
@@ -202,27 +259,28 @@ def harness_submit(
                 sys.stdout.write(decoded_line)
                 sys.stdout.flush()
                 tail_lines.append(decoded_line)
-                if len(tail_lines) > 40:
+                if len(tail_lines) > 80:
                     tail_lines.pop(0)
 
                 try:
                     event = json.loads(decoded_line)
                     if isinstance(event, dict):
                         if not conversation_id:
-                            cid = event.get("conversation_id") or event.get("conversationId")
+                            cid = event.get("conversation_id") or event.get(
+                                "conversationId"
+                            )
                             if not cid and isinstance(event.get("result"), dict):
                                 res_dict = event.get("result")
                                 if isinstance(res_dict, dict):
-                                    cid = res_dict.get("conversation_id") or res_dict.get("conversationId")
+                                    cid = res_dict.get(
+                                        "conversation_id"
+                                    ) or res_dict.get("conversationId")
                             if cid and isinstance(cid, str) and cid.strip():
                                 conversation_id = cid.strip()
 
-                        completed |= (
-                            event.get("status") == "success"
-                            or (
-                                event.get("event") == "result"
-                                and event.get("result", {}).get("status") == "SUCCESS"
-                            )
+                        completed |= event.get("status") == "success" or (
+                            event.get("event") == "result"
+                            and event.get("result", {}).get("status") == "SUCCESS"
                         )
                 except (json.JSONDecodeError, TypeError):
                     pass
@@ -276,6 +334,7 @@ def harness_save_site_skill(
         conversation_id,
     )
     completed = False
+    has_save_activity = False
     with urllib.request.urlopen(req, timeout=http_timeout) as response:
         for line in response:
             decoded_line = line.decode("utf-8")
@@ -284,19 +343,91 @@ def harness_save_site_skill(
             try:
                 event = json.loads(decoded_line)
                 if isinstance(event, dict):
-                    completed |= (
-                        event.get("status") == "success"
-                        or (
-                            event.get("event") == "result"
-                            and event.get("result", {}).get("status") == "SUCCESS"
-                        )
+                    tool_info = event.get("tool_info") or event.get(
+                        "step_update", {}
+                    ).get("tool_info")
+                    if isinstance(tool_info, dict):
+                        params = str(tool_info.get("parameters", {}))
+                        if any(
+                            k in params for k in ("SKILL.md", "README.md", "skills/")
+                        ):
+                            has_save_activity = True
+
+                    completed |= event.get("status") == "success" or (
+                        event.get("event") == "result"
+                        and event.get("result", {}).get("status") == "SUCCESS"
                     )
             except (json.JSONDecodeError, TypeError):
                 pass
-    if not completed:
+    if not (completed or has_save_activity):
         raise RuntimeError("Skill-save harness process did not report success.")
     return 0
 
+
+def harness_save_scraper_skill(
+    conversation_id: str,
+    prompt_file: str = "/app/prompts/harness_save_scraper_skill.md",
+    timeout: str = "30m",
+    api_url: str = "http://antigravity-cli:8080/run-harness",
+    http_timeout: float | None = None,
+) -> int:
+    """Run second pass AGY request to save scraper skill bound to original conversation ID."""
+    if not conversation_id:
+        raise ValueError("conversation_id is required for harness_save_scraper_skill")
+    if http_timeout is None:
+        try:
+            http_timeout = _parse_timeout_seconds(timeout) + 30.0
+        except Exception:
+            http_timeout = 1830.0
+
+    payload = json.dumps(
+        {
+            "prompt_file": prompt_file,
+            "timeout": timeout,
+            "conversation_id": conversation_id,
+            "model": HARNESS_MODEL,
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        api_url,
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    logger.info(
+        "Sending scraper skill-save harness request to %s for conversation %s",
+        api_url,
+        conversation_id,
+    )
+    completed = False
+    has_save_activity = False
+    with urllib.request.urlopen(req, timeout=http_timeout) as response:
+        for line in response:
+            decoded_line = line.decode("utf-8")
+            sys.stdout.write(decoded_line)
+            sys.stdout.flush()
+            try:
+                event = json.loads(decoded_line)
+                if isinstance(event, dict):
+                    tool_info = event.get("tool_info") or event.get(
+                        "step_update", {}
+                    ).get("tool_info")
+                    if isinstance(tool_info, dict):
+                        params = str(tool_info.get("parameters", {}))
+                        if any(
+                            k in params for k in ("SKILL.md", "README.md", "skills/")
+                        ):
+                            has_save_activity = True
+
+                    completed |= event.get("status") == "success" or (
+                        event.get("event") == "result"
+                        and event.get("result", {}).get("status") == "SUCCESS"
+                    )
+            except (json.JSONDecodeError, TypeError):
+                pass
+    if not (completed or has_save_activity):
+        raise RuntimeError("Scraper skill-save harness process did not report success.")
+    return 0
 
 
 def main() -> None:
