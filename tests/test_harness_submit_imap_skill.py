@@ -54,3 +54,19 @@ def test_harness_save_site_skill_prompt_contracts():
     assert "credentials.json" in prompt
     assert "No Raw Logs" in prompt or "raw transcript" in prompt
     assert "Do not access or query SQLite database" in prompt or "database" in prompt
+
+
+def test_harness_save_scraper_skill_prompt_contracts():
+    prompt_path = Path("prompts/harness_save_scraper_skill.md")
+    assert prompt_path.exists(), "prompts/harness_save_scraper_skill.md must exist"
+    prompt = prompt_path.read_text(encoding="utf-8")
+    assert "AUTOMATED REUSABLE LINKEDIN SCRAPER SKILL SAVING HARNESS" in prompt
+    assert "/runtime/workspace/linkedin_posts_scraper/SKILL.md" in prompt
+    assert "/runtime/workspace/README.md" in prompt
+    assert "search quer" in prompt.lower() or "keyword pattern" in prompt.lower()
+    assert "see more" in prompt.lower()
+    assert "redirect" in prompt.lower() or "unwrapping" in prompt.lower()
+    assert "pagination" in prompt.lower() or "scrolling" in prompt.lower()
+    assert "personal data" in prompt.lower() or "candidate" in prompt.lower()
+    assert "password" in prompt.lower() or "otp" in prompt.lower()
+    assert "database" in prompt.lower() or "app.db" in prompt.lower()
