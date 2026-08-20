@@ -8,6 +8,14 @@ Search LinkedIn posts only. Do not analyze the home feed, use direct messages, o
 
 ---
 
+## 0. PRE-FLIGHT SKILL DISCOVERY & ADAPTIVE EXECUTION
+
+1. **Pre-flight Skill Inspection**: Before starting candidate search passes, inspect `/runtime/workspace/README.md` and `/runtime/workspace/linkedin_posts_scraper/SKILL.md` to discover learned scraping strategies, verified selectors, and runtime tips accumulated from prior runs.
+2. **Adaptive Execution**: If `/runtime/workspace/linkedin_posts_scraper/SKILL.md` exists and is valid, apply its documented query templates, search filters, post expansion ("See more") selectors, redirect unwrapping methods, and timing optimizations to accelerate execution.
+3. **Graceful Ignore Rule**: The skill is an optimization guide, not a hard dependency. If the skill is absent, does not help, contains outdated selectors, or fails to match elements on the live LinkedIn page, immediately ignore the skill advice and fall back to standard dynamic DOM inspection and exploration passes. Never abort, fail, or block discovery due to missing, invalid, or failing skill selectors.
+
+---
+
 ## 1. BROWSER SETUP & STREAMLINED CDP WORKFLOW
 
 Use MCP Unbrowse connected through Playwright/CDP at `http://cloak-browser:9222` for all browser actions.

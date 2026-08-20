@@ -79,3 +79,13 @@ def test_harness_scraper_prompt_contract():
     assert "/runtime/harness-scraper/app.db" in content
     assert "/runtime/workspace/app.db.work" in content
     assert "/workspace/scraper-result.json" not in content
+
+    # Pre-flight skill discovery and adaptive fallback
+    assert (
+        "/runtime/workspace/linkedin_posts_scraper/SKILL.md" in content
+        or "linkedin_posts_scraper/SKILL.md" in content
+    )
+    assert "/runtime/workspace/README.md" in content
+    assert "0. PRE-FLIGHT SKILL DISCOVERY & ADAPTIVE EXECUTION" in content
+    assert "fall back" in content.lower() or "fallback" in content.lower()
+    assert "ignore" in content.lower()
