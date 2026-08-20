@@ -38,6 +38,7 @@ from ljpa_reworked.operations.evaluation_ops import (
 from ljpa_reworked.services.chatgpt_gdrive import ChatGPTGDriveService
 from ljpa_reworked.services.harness_runner import (
     get_gemini_quota_remaining,
+    harness_save_scraper_skill,
     harness_save_site_skill,
     harness_submit,
     run_linkedin_harness,
@@ -420,6 +421,36 @@ def submit_top_vacancies(db, limit: int | None = None) -> int:
     return 0
 
 
+def _trigger_harness_save_scraper_skill(res: object) -> None:
+    if getattr(res, "completed", False) and getattr(res, "conversation_id", None):
+        try:
+            harness_save_scraper_skill(
+                conversation_id=res.conversation_id,  # type: ignore[attr-defined]
+                prompt_file="/app/prompts/harness_save_scraper_skill.md",
+                timeout="30m",
+                api_url=HARNESS_API_URL,
+            )
+            logger.info(
+                "Successfully completed scraper skill saving (conversation %s)",
+                res.conversation_id,  # type: ignore[attr-defined]
+            )
+        except Exception as skill_exc:
+            logger.error(
+                "Scraper skill saving failed (conversation %s): %s",
+                res.conversation_id,  # type: ignore[attr-defined]
+                skill_exc,
+            )
+            try:
+                Telegram().send_message(
+                    f"Scraper skill saving failed (conversation {res.conversation_id}): {skill_exc}"  # type: ignore[attr-defined]
+                )
+            except Exception as telegram_exc:
+                logger.error(
+                    "Failed to send Telegram scraper skill save notification: %s",
+                    telegram_exc,
+                )
+
+
 def main(mode: str = "collect", dry_run: bool = False) -> int:
     init_db()
 
@@ -432,7 +463,8 @@ def main(mode: str = "collect", dry_run: bool = False) -> int:
 
     if normalized_mode in ("collect", "collect-all"):
         logger.info("[Step 1] Running LinkedIn Post Vacancy Collector...")
-        run_linkedin_harness(api_url=HARNESS_API_URL)
+        res = run_linkedin_harness(api_url=HARNESS_API_URL)
+        _trigger_harness_save_scraper_skill(res)
         logger.info("[Step 2] Searching JobSpy vacancies...")
         try:
             JobSpyIntegrationService().run()
@@ -466,7 +498,8 @@ def main(mode: str = "collect", dry_run: bool = False) -> int:
 
     if normalized_mode == "collect-harness":
         logger.info("[Step 1] Running LinkedIn Post Vacancy Collector via Harness...")
-        run_linkedin_harness(api_url=HARNESS_API_URL)
+        res = run_linkedin_harness(api_url=HARNESS_API_URL)
+        _trigger_harness_save_scraper_skill(res)
         with SessionLocal() as db:
             logger.info("[Step 2] Evaluating unrated vacancies in database...")
             evaluate_unrated_vacancies(db)

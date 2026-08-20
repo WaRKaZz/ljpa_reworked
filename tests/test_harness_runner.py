@@ -4,6 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from ljpa_reworked.config import HARNESS_API_URL
+from ljpa_reworked.main import main
 from ljpa_reworked.services.harness_runner import (
     HarnessScraperResult,
     harness_save_scraper_skill,
@@ -408,3 +410,96 @@ def test_harness_save_scraper_skill_requires_conversation_id():
 
     with pytest.raises(ValueError, match="conversation_id is required"):
         harness_save_scraper_skill(conversation_id=None)
+
+
+def test_main_collect_harness_triggers_harness_save_scraper_skill():
+    mock_result = HarnessScraperResult(
+        completed=True,
+        conversation_id="conv-scraper-123",
+        tail_lines=["line1", "line2"],
+    )
+    with (
+        patch("ljpa_reworked.main.init_db"),
+        patch("ljpa_reworked.main.SessionLocal") as mock_session_local,
+        patch(
+            "ljpa_reworked.main.run_linkedin_harness", return_value=mock_result
+        ) as mock_run_harness,
+        patch("ljpa_reworked.main.harness_save_scraper_skill") as mock_save_skill,
+        patch("ljpa_reworked.main.evaluate_unrated_vacancies"),
+    ):
+        mock_db = MagicMock()
+        mock_session_local.return_value.__enter__.return_value = mock_db
+
+        ret = main(mode="collect-harness")
+        assert ret == 0
+        mock_run_harness.assert_called_once()
+        mock_save_skill.assert_called_once_with(
+            conversation_id="conv-scraper-123",
+            prompt_file="/app/prompts/harness_save_scraper_skill.md",
+            timeout="30m",
+            api_url=HARNESS_API_URL,
+        )
+
+
+def test_main_collect_mode_triggers_harness_save_scraper_skill():
+    mock_result = HarnessScraperResult(
+        completed=True,
+        conversation_id="conv-scraper-collect-456",
+        tail_lines=["done"],
+    )
+    with (
+        patch("ljpa_reworked.main.init_db"),
+        patch("ljpa_reworked.main.SessionLocal") as mock_session_local,
+        patch(
+            "ljpa_reworked.main.run_linkedin_harness", return_value=mock_result
+        ) as mock_run_harness,
+        patch("ljpa_reworked.main.harness_save_scraper_skill") as mock_save_skill,
+        patch("ljpa_reworked.main.JobSpyIntegrationService"),
+        patch("ljpa_reworked.main.evaluate_unrated_vacancies"),
+    ):
+        mock_db = MagicMock()
+        mock_session_local.return_value.__enter__.return_value = mock_db
+
+        ret = main(mode="collect")
+        assert ret == 0
+        mock_run_harness.assert_called_once()
+        mock_save_skill.assert_called_once_with(
+            conversation_id="conv-scraper-collect-456",
+            prompt_file="/app/prompts/harness_save_scraper_skill.md",
+            timeout="30m",
+            api_url=HARNESS_API_URL,
+        )
+
+
+def test_main_collect_harness_handles_skill_save_exception():
+    mock_result = HarnessScraperResult(
+        completed=True,
+        conversation_id="conv-scraper-err-789",
+        tail_lines=["done"],
+    )
+    with (
+        patch("ljpa_reworked.main.init_db"),
+        patch("ljpa_reworked.main.SessionLocal") as mock_session_local,
+        patch("ljpa_reworked.main.run_linkedin_harness", return_value=mock_result),
+        patch(
+            "ljpa_reworked.main.harness_save_scraper_skill",
+            side_effect=RuntimeError("skill save timeout"),
+        ) as mock_save_skill,
+        patch("ljpa_reworked.main.Telegram") as mock_telegram,
+        patch("ljpa_reworked.main.evaluate_unrated_vacancies"),
+    ):
+        mock_db = MagicMock()
+        mock_session_local.return_value.__enter__.return_value = mock_db
+
+        ret = main(mode="collect-harness")
+        assert ret == 0
+        mock_save_skill.assert_called_once_with(
+            conversation_id="conv-scraper-err-789",
+            prompt_file="/app/prompts/harness_save_scraper_skill.md",
+            timeout="30m",
+            api_url=HARNESS_API_URL,
+        )
+        mock_telegram.return_value.send_message.assert_called_once()
+        sent_msg = mock_telegram.return_value.send_message.call_args.args[0]
+        assert "conv-scraper-err-789" in sent_msg
+        assert "skill save timeout" in sent_msg
