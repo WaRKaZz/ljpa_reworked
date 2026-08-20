@@ -5,7 +5,6 @@ from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.project import CrewBase, agent, crew, task
 
 from ljpa_reworked.config import create_llm
-from ljpa_reworked.models.crewai_pydantic_models import BasicEvaluationCrewAI
 
 config_dir = os.path.join(os.path.dirname(__file__), "config")
 
@@ -41,11 +40,29 @@ class ResumeEvaluationCrew:
             agent_kwargs["max_iter"] = self.max_iter
         return Agent(**agent_kwargs)
 
+    @agent
+    def visa_evaluation_agent(self) -> Agent:
+        agent_kwargs = {
+            "config": self.agents_config["visa_evaluation_agent"],
+            "llm": self.llm,
+            "tools": [],
+            "allow_delegation": False,
+            "max_execution_time": self.max_execution_time,
+        }
+        if self.max_iter is not None:
+            agent_kwargs["max_iter"] = self.max_iter
+        return Agent(**agent_kwargs)
+
     @task
     def evaluate_resume_task(self) -> Task:
         return Task(
             config=self.tasks_config["evaluate_resume_task"],
-            output_pydantic=BasicEvaluationCrewAI,
+        )
+
+    @task
+    def evaluate_visa_task(self) -> Task:
+        return Task(
+            config=self.tasks_config["evaluate_visa_task"],
         )
 
     @crew

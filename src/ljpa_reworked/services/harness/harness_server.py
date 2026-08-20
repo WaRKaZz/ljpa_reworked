@@ -163,10 +163,11 @@ def run_harness(req: HarnessRequest):
     ]
     if req.conversation_id:
         cmd.extend(["--conversation", req.conversation_id])
+    print_arg = goal_str if req.conversation_id else f"/goal {goal_str}"
     cmd.extend(
         [
             "--print",
-            f"/goal {goal_str}",
+            print_arg,
             "--print-timeout",
             req.timeout,
             "--output-format",
@@ -178,7 +179,6 @@ def run_harness(req: HarnessRequest):
         agy_stream_generator(cmd),
         media_type="application/x-ndjson",
     )
-
 
 
 if __name__ == "__main__":

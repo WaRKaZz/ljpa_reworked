@@ -56,3 +56,20 @@ def test_url_then_email_marks_submission_via_all():
     assert confirm_email_application_submitted(session, vacancy.id).status == (
         VacancyStatus.submitted_via_all
     )
+
+
+def test_submitted_via_email_can_transition_to_application_error():
+    from ljpa_reworked.operations.vacancy_ops import transition_vacancy_status
+
+    engine = create_engine("sqlite:///:memory:")
+    init_db(bind_engine=engine)
+    session = sessionmaker(bind=engine)()
+    vacancy = _vacancy(session)
+
+    confirm_email_application_submitted(session, vacancy.id)
+    assert vacancy.status == VacancyStatus.submitted_via_email
+
+    updated = transition_vacancy_status(
+        session, vacancy.id, VacancyStatus.application_error
+    )
+    assert updated.status == VacancyStatus.application_error

@@ -32,7 +32,10 @@ def test_fetch_and_store_jobs_service(mock_upsert_vacancy_by_url, mock_scrape_jo
 
     assert len(result) == 1
     mock_scrape_jobs.assert_called_once()
+    assert mock_scrape_jobs.call_args.kwargs.get("linkedin_fetch_description") is True
+    assert mock_scrape_jobs.call_args.kwargs.get("description_format") == "markdown"
     mock_upsert_vacancy_by_url.assert_called_once()
+    assert mock_upsert_vacancy_by_url.call_args[0][1]["text"] == "Great job description"
 
 
 @patch("ljpa_reworked.services.jobspy.scrape_jobs")
@@ -124,3 +127,15 @@ def test_indeed_country_follows_query_location():
     assert indeed_country_for_location("Houston, TX, USA") == "usa"
     assert indeed_country_for_location("Frankfurt, Germany") == "germany"
     assert indeed_country_for_location("Dubai, UAE") == "united arab emirates"
+
+
+def test_jobspy_requests_timeout_patch():
+    from jobspy.util import RequestsRotating
+
+    session = RequestsRotating()
+    with patch("requests.Session.request") as mock_super_request:
+        session.request("GET", "https://www.linkedin.com/jobs/view/123", timeout=5)
+        assert mock_super_request.call_args.kwargs["timeout"] == 20
+
+        session.request("GET", "https://www.linkedin.com/jobs/view/123", timeout=30)
+        assert mock_super_request.call_args.kwargs["timeout"] == 30

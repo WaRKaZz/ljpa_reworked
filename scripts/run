@@ -1,0 +1,29 @@
+#!/bin/sh
+set -e
+
+# Strip leading '--' if passed as a delimiter by some wrappers
+if [ "$1" = "--" ]; then
+    shift
+fi
+
+if [ $# -eq 0 ]; then
+    echo "Usage: run [--collect-chatgpt | --collect-harness | --collect-jobspy | --url-submit | --email-submit] [--dry-run]"
+    echo ""
+    echo "Available tasks:"
+    echo "  --collect-chatgpt   Fetch and parse vacancies from Google Drive"
+    echo "  --collect-harness   Scrape LinkedIn recruiter posts via AGY Harness"
+    echo "  --collect-jobspy    Search official job postings via JobSpy"
+    echo "  --url-submit        Evaluate vacancies, create resumes, submit URL applications"
+    echo "  --email-submit      Evaluate vacancies, create resumes, send email applications"
+    echo "  --dry-run           Simulate action without committing changes to DB"
+    exit 1
+fi
+
+# If PID 1 stdout is writable, route directly to it so `podman compose logs -f` receives output
+if [ -w /proc/1/fd/1 ]; then
+    exec uv run --no-dev python -u -m ljpa_reworked.main "$@" > /proc/1/fd/1 2>&1
+else
+    exec uv run --no-dev python -u -m ljpa_reworked.main "$@"
+fi
+
+

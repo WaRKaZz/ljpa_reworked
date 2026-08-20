@@ -10,11 +10,39 @@ evaluate_resume_task:
 
     Match candidate profile skills and experience to vacancy using the supplied candidate profile and vacancy text only.
     Calculate rating (0-100) and actionable summary recommendations.
+
     Formulate a structured factual inclusion plan:
     - required_profile_sections: list of verified candidate profile sections to include for this vacancy.
     - prioritized_facts: prioritized verified facts from candidate profile relevant to the vacancy.
     - missing_mandatory_facts: list missing facts ONLY if candidate profile itself lacks basic candidate identity or skills needed to construct a resume. If candidate profile contains valid candidate details (name, skills, experience summary), set missing_mandatory_facts to an empty list [].
     Do not access external URLs.
+
+    IMPORTANT: Output ONLY a single raw valid JSON object starting with '{' and ending with '}'. Do NOT return Python code or markdown wrappers.
   expected_output: >
-    A BasicEvaluationCrewAI object with summary (str), rating (int 0-100), required_profile_sections (list[str]), prioritized_facts (list[str]), and missing_mandatory_facts (list[str]).
+    Raw JSON object containing keys: summary (str), rating (int 0-100), required_profile_sections (list[str]), prioritized_facts (list[str]), and missing_mandatory_facts (list[str]).
   agent: resume_evaluation_agent
+
+evaluate_visa_task:
+  description: >
+    Evaluate Visa Sponsorship Feasibility for:
+    Title: {title}
+    Vacancy: {text}
+
+    Candidate profile:
+    {candidate_profile}
+
+    Employer Visa Status:
+    {visa_status_context}
+
+    Evaluate Visa Sponsorship Probability (0-100):
+    - Identify candidate's point of origin / location from Candidate profile and the vacancy location / country / company.
+    - If the employer provides visa sponsorship (as indicated in Employer Visa Status or explicitly stated in vacancy text): assign a high probability (85-100, typically 95-100).
+    - If the employer does not provide visa sponsorship or vacancy explicitly states no visa sponsorship / requires existing local work authorization / citizenship / PR: assign 0-10 (unless candidate does not require a visa for that country).
+    - If visa is not required: assign 100.
+    - If not specified: evaluate secondary factors: candidate skill seniority and specialization, company size / likelihood of sponsoring foreign candidates, and country immigration accessibility. Assign an estimated probability (0-100).
+    Do not access external URLs.
+
+    IMPORTANT: Output ONLY a single raw valid JSON object starting with '{' and ending with '}'. Do NOT return Python code or markdown wrappers.
+  expected_output: >
+    Raw JSON object containing keys: visa_probability (int 0-100) and visa_reasoning (str).
+  agent: visa_evaluation_agent

@@ -7,6 +7,7 @@ from typing import Any
 
 import pandas as pd
 from jobspy import scrape_jobs
+from jobspy.util import RequestsRotating
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
@@ -16,9 +17,27 @@ from ljpa_reworked.models.crewai_pydantic_models import (
     VisaStatus,
 )
 from ljpa_reworked.models.database_models import DataSource, Vacancy
-from ljpa_reworked.operations.vacancy_ops import upsert_vacancy_by_url
+from ljpa_reworked.operations.vacancy_ops import (
+    extract_primary_email,
+    upsert_vacancy_by_url,
+)
 
 logger = logging.getLogger(__name__)
+
+# Ensure JobSpy requests (like LinkedIn description fetching) use a minimum 20s timeout instead of 5s
+_orig_requests_rotating_request = RequestsRotating.request
+
+
+def _patched_requests_rotating_request(self, method, url, **kwargs):
+    timeout = kwargs.get("timeout")
+    if timeout is not None and isinstance(timeout, (int, float)) and timeout < 20:
+        kwargs["timeout"] = 20
+    elif timeout is None:
+        kwargs["timeout"] = 20
+    return _orig_requests_rotating_request(self, method, url, **kwargs)
+
+
+RequestsRotating.request = _patched_requests_rotating_request
 
 
 class JobSpyRunSummary(BaseModel):
@@ -272,6 +291,8 @@ class JobSpyIntegrationService:
                         "results_wanted": q.results_wanted,
                         "hours_old": 72,
                         "country_indeed": indeed_country_for_location(q.location),
+                        "linkedin_fetch_description": True,
+                        "description_format": "markdown",
                     }
                     if q.site_name == "google" and getattr(
                         q, "google_search_term", None
@@ -317,16 +338,21 @@ class JobSpyIntegrationService:
 
                     raw_emails = row.get("emails")
                     email_val = (
-                        str(raw_emails).strip()
-                        if raw_emails is not None
-                        and not pd.isna(raw_emails)
-                        and str(raw_emails).strip()
+                        extract_primary_email(raw_emails)
+                        if raw_emails is not None and not pd.isna(raw_emails)
                         else None
                     )
 
+                    raw_desc = row.get("description")
+                    desc_val = (
+                        str(raw_desc).strip()
+                        if raw_desc is not None and not pd.isna(raw_desc)
+                        else ""
+                    )
+
                     vacancy_data = {
-                        "title": str(row.get("title") or "Unknown Title"),
-                        "text": str(row.get("description") or ""),
+                        "title": str(row.get("title") or "Unknown Title").strip(),
+                        "text": desc_val,
                         "submit_email": email_val,
                         "submit_url": trimmed_url,
                         "source": source_enum,
@@ -386,16 +412,21 @@ def _store_jobs_df(
 
         raw_emails = row.get("emails")
         email_val = (
-            str(raw_emails).strip()
-            if raw_emails is not None
-            and not pd.isna(raw_emails)
-            and str(raw_emails).strip()
+            extract_primary_email(raw_emails)
+            if raw_emails is not None and not pd.isna(raw_emails)
             else None
         )
 
+        raw_desc = row.get("description")
+        desc_val = (
+            str(raw_desc).strip()
+            if raw_desc is not None and not pd.isna(raw_desc)
+            else ""
+        )
+
         vacancy_data = {
-            "title": str(row.get("title") or "Unknown Title"),
-            "text": str(row.get("description") or ""),
+            "title": str(row.get("title") or "Unknown Title").strip(),
+            "text": desc_val,
             "submit_email": email_val,
             "submit_url": trimmed_url,
             "source": source_enum,
@@ -438,6 +469,8 @@ def fetch_and_store_jobs(
             "results_wanted": results_wanted,
             "hours_old": 72,
             "country_indeed": "worldwide",
+            "linkedin_fetch_description": True,
+            "description_format": "markdown",
         }
         if site_name == "google" and google_search_term:
             scrape_kwargs["google_search_term"] = google_search_term

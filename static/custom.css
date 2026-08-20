@@ -1,0 +1,75 @@
+/* Compact & Modern styling for Datasette */
+
+/* Main typography & density */
+body {
+    font-size: 13px;
+    line-height: 1.4;
+    color: #24292f;
+}
+
+/* Compact table */
+table.rows-and-columns {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+    margin-top: 10px;
+    font-size: 13px;
+}
+
+table.rows-and-columns th {
+    padding: 6px 10px;
+    background: #f6f8fa;
+    border-bottom: 2px solid #d0d7de;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    white-space: nowrap;
+}
+
+table.rows-and-columns td {
+    padding: 5px 8px;
+    border-bottom: 1px solid #e1e4e8;
+    vertical-align: middle;
+    max-height: 48px;
+}
+
+/* Zebra striping & hover */
+table.rows-and-columns tbody tr:nth-child(even) {
+    background-color: #fafbfc;
+}
+
+table.rows-and-columns tbody tr:hover {
+    background-color: #f1f7ff;
+}
+
+/* Limit wide text columns (like job description/text) */
+table.rows-and-columns td.col-text,
+table.rows-and-columns td.col-description,
+table.rows-and-columns td.col-requirements_raw {
+    max-width: 320px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* URLs & emails */
+table.rows-and-columns td.col-submit_url,
+table.rows-and-columns td.col-url {
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Status badges */
+.col-status, .col-visa_status {
+    white-space: nowrap;
+    font-weight: 500;
+}
+
+/* Compact facets and side panels */
+.facet-results {
+    font-size: 12px;
+    padding: 6px 10px;
+}

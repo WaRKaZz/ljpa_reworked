@@ -124,7 +124,9 @@ def test_processes_only_unevaluated_vacancies_and_creates_resume_for_passing_mat
         Base.metadata.drop_all(bind=engine)
 
 
-def test_submit_top_vacancies_submits_all_eligible_vacancies_directly(monkeypatch, tmp_path):
+def test_submit_top_vacancies_submits_all_eligible_vacancies_directly(
+    monkeypatch, tmp_path
+):
     from ljpa_reworked import main
     from ljpa_reworked.models.database_models import Resume
 
@@ -156,10 +158,23 @@ def test_submit_top_vacancies_submits_all_eligible_vacancies_directly(monkeypatc
             "render_resume_crewai_to_pdf",
             lambda resume_crewai, pdf_path: None,
         )
+        from ljpa_reworked.models.crewai_pydantic_models import SubmissionReviewCrewAI
+        from ljpa_reworked.services.harness_runner import HarnessSubmitResult
+
         monkeypatch.setattr(
             main,
             "harness_submit",
-            lambda **kwargs: submitted.append(kwargs["vacancy_url"]) or 0,
+            lambda **kwargs: (
+                submitted.append(kwargs["vacancy_url"])
+                or HarnessSubmitResult(
+                    completed=True, tail_lines=['{"status": "success"}\n']
+                )
+            ),
+        )
+        monkeypatch.setattr(
+            main,
+            "crewai_review_submission_result",
+            lambda tail_lines: SubmissionReviewCrewAI(decision="success"),
         )
 
         assert main.submit_top_vacancies(db) == 0

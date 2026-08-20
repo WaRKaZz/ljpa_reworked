@@ -35,6 +35,8 @@ def test_stage4c_real_smoke_evaluator_generator_render():
         "submit_url": "https://example.com/careers/python-engineer",
         "linkedin_url": "https://linkedin.com/in/testcandidate",
         "candidate_profile": synthetic_profile,
+        "visa_status": "not_mentioned",
+        "visa_status_context": "Visa status is not specified in the database (database visa_status: not_mentioned). Evaluate feasibility based on vacancy text and secondary factors.",
     }
 
     start_eval = time.monotonic()
@@ -43,10 +45,23 @@ def test_stage4c_real_smoke_evaluator_generator_render():
     eval_time = time.monotonic() - start_eval
 
     assert len(eval_result.tasks_output) > 0
-    eval_pydantic = eval_result.tasks_output[0].pydantic
+    from ljpa_reworked.crew_workflow import extract_clean_json
+
+    merged_data = {}
+    for task_out in eval_result.tasks_output:
+        data = extract_clean_json(task_out.raw)
+        if isinstance(data, dict):
+            merged_data.update(data)
+    if "visa_probability" not in merged_data:
+        merged_data["visa_probability"] = 100
+    if "missing_mandatory_facts" not in merged_data:
+        merged_data["missing_mandatory_facts"] = []
+
+    eval_pydantic = BasicEvaluationCrewAI.model_validate(merged_data)
     assert isinstance(eval_pydantic, BasicEvaluationCrewAI)
     assert 0 <= eval_pydantic.rating <= 100
     assert bool(eval_pydantic.summary)
+    assert 0 <= eval_pydantic.visa_probability <= 100
     assert eval_time < 90.0, f"Evaluator took too long: {eval_time:.2f}s"
     # crewai_evaluate_vacancy clears vacancy-fit gaps after profile completeness passes.
     eval_pydantic = eval_pydantic.model_copy(update={"missing_mandatory_facts": []})

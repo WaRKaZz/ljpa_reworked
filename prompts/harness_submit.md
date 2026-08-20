@@ -1,4 +1,4 @@
-# AUTOMATED SINGLE-VACANCY APPLICATION SUBMISSION HARNESS (REFACTORED V2)
+# AUTOMATED SINGLE-VACANCY APPLICATION SUBMISSION HARNESS (REFACTORED V3)
 
 ## OBJECTIVE
 
@@ -30,11 +30,12 @@ Your sole objective is to complete and submit this one application.
 Use MCP Unbrowse connected through Playwright/CDP at `http://cloak-browser:9222`.
 
 ### Connection Protocol
-1. **Direct CDP Connection**: Connect Playwright directly over CDP: `browser = playwright.chromium.connect_over_cdp('http://cloak-browser:9222')`.
-2. **Context & Active Page**: Access existing context and active page: `context = browser.contexts[0]`, `page = context.pages[-1]`.
-3. **Local CDP Proxy Fallback**: If local CDP on `127.0.0.1:9222` is closed and required by background CLI utilities, run a background TCP proxy forwarding `127.0.0.1:9222` -> `cloak-browser:9222` and run `yes | unbrowse setup`.
-4. **Tab Teardown Protocol**: Before completing execution, close all created application tabs (`await page.close()`) to avoid leaving active IndexedDB database locks.
-
+1. **One browser only**: The configured `playwright` MCP is already pinned to `http://cloak-browser:9222`. Use that MCP for every browser action.
+2. **No local fallback**: Do not run `npx playwright install`, `unbrowse setup`, or a local CDP proxy. Do not start a local browser. These create a second browser and are not part of this workflow.
+3. **Direct CDP Connection**: Connect Playwright directly over CDP: `browser = playwright.chromium.connect_over_cdp('http://cloak-browser:9222')`.
+4. **CDP failure rule**: If the `playwright` MCP reports a CDP connection error, stop the application attempt and report the exact error. Do not attempt alternate browser tooling or repeated environment diagnostics.
+5. **Context & Active Page**: Access existing context and active page: `context = browser.contexts[0]`, `page = context.pages[-1]`.
+6. **Tab Teardown Protocol**: Before completing execution, close all created application tabs (`await page.close()`) to avoid leaving active IndexedDB database locks.
 
 ### Interaction Guidelines
 * **DOM Clicks**: Prefer JavaScript clicks (`page.evaluate("el => el.click()", element)`) or forced clicks (`element.click(force=True)`) if standard clicks are intercepted by sticky headers or overlays.
@@ -127,15 +128,28 @@ The only policy-based reason to stop the application flow is a requirement to ma
 
 ---
 
-## 9. METHODICAL BATCH FORM EXECUTION
+## 9. METHODICAL BATCH FORM EXECUTION & AUTOFILL HIERARCHY
 
-Execute form filling methodically:
+To minimize token consumption and avoid field-by-field reasoning loops:
 
-1. **Popup & Modal Check**: Before interacting with form fields or advancing to the next step, check for any visible popups, modal overlays, dialogs, or mandatory consent banners, and handle or dismiss them appropriately.
-2. **Batch Field Completion**: Complete all visible fields in a form section in methodic, consolidated passes rather than writing separate micro-steps or individual scripts for single inputs.
-3. **Resume Attachment**: Upload the exact PDF at `UNTRUSTED_RESUME_PATH` and confirm attachment in the UI.
-4. **Validation Check**: Before clicking next/continue/submit, and immediately after attempting to advance, check whether any validation errors, missing field indicators, or inline form warnings are present, and resolve them before proceeding.
-5. **Single Submission**: Review internal consistency, ensure no payment is required, and click the final submission control only once.
+### Execution Priority Hierarchy
+1. **Site-Specific Preparation**: If a matching site skill exists in `/runtime/workspace/<site>/SKILL.md`, execute its known modal dismissal, navigation shortcuts, or wizard transitions.
+2. **Deterministic Batch Autofill**: Before manually exploring or filling individual fields, invoke the `generic-form-autofill` engine:
+   ```bash
+   python3 -m ljpa_reworked.services.autofill.cli --profile /inputs/resources/profile.md --resume UNTRUSTED_RESUME_PATH --cdp http://cloak-browser:9222
+   ```
+3. **Structured Result Consumption**:
+   - Inspect the returned JSON report.
+   - Do NOT repeat or re-verify fields listed under `filled` or `uploaded`.
+   - Treat `status: "complete"` as having standard fields and resume populated.
+4. **Exception-Only Reasoning**:
+   - Inspect only the controls listed under `unresolved` where `required == true`.
+   - Use targeted Playwright MCP actions (`browser_fill`, `browser_click`, `browser_select`) specifically for those unresolved controls.
+5. **No Unnecessary Snapshots**:
+   - Do NOT snapshot the page after every field or after successful batch autofill.
+   - Only call `browser_snapshot` on unfamiliar page transitions, when resolving an unknown custom widget, or before critical final submission review.
+6. **Multi-Step Forms**: On advancing to each subsequent wizard page/step, run a new pass of `generic-form-autofill` before manual interaction.
+7. **Single Final Submission**: Validate required fields, ensure no payment is requested, and trigger the final submit button once.
 
 ---
 

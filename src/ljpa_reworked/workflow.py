@@ -103,12 +103,21 @@ def persist_prepared_resume(
             rendered_at=datetime.now(),
             commit=False,
         )
-        transition_vacancy_status(
-            db=db,
-            vacancy_id=vacancy.id,
-            target_status=VacancyStatus.application_prepared,
-            commit=False,
-        )
+        if vacancy.status not in (
+            VacancyStatus.submitted_via_email,
+            VacancyStatus.submitted_via_url,
+            VacancyStatus.submitted_via_all,
+            VacancyStatus.withdrawn,
+            VacancyStatus.expired,
+            VacancyStatus.archived,
+            VacancyStatus.rejected,
+        ):
+            transition_vacancy_status(
+                db=db,
+                vacancy_id=vacancy.id,
+                target_status=VacancyStatus.application_prepared,
+                commit=False,
+            )
         db.commit()
         db.refresh(orm_resume)
         return orm_resume

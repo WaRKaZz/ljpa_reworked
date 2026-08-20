@@ -52,7 +52,6 @@ services:
       HARNESS_DATA_DIR: /runtime/harness-scraper
       HARNESS_RESOURCES_DIR: /inputs/resources
       GEMINI_DIR: /runtime/gemini
-      BROWSER_USE_MODEL: ${BROWSER_USE_MODEL:-free-tier}
     stdin_open: true
     tty: true
     command: [ "python3", "/app/harness/harness_server.py" ]

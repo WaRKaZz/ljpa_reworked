@@ -99,6 +99,9 @@ class BasicEvaluation(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     rating: Mapped[int] = mapped_column(Integer, nullable=False)
+    visa_probability: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=100, server_default="100"
+    )
     vacancy_id: Mapped[int] = mapped_column(Integer, ForeignKey("vacancy.id"))
     created_at: Mapped[created_at]
 
@@ -107,6 +110,12 @@ class BasicEvaluation(Base):
         if rating < 0 or rating > 100:
             raise ValueError("Rating must be between 0 and 100")
         return rating
+
+    @validates("visa_probability")
+    def validate_visa_probability(self, key, visa_probability):
+        if visa_probability < 0 or visa_probability > 100:
+            raise ValueError("Visa probability must be between 0 and 100")
+        return visa_probability
 
     # Relationship
     vacancy: Mapped["Vacancy"] = relationship(back_populates="basic_evaluation")

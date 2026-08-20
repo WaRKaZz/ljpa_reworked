@@ -50,3 +50,11 @@ def init_db(bind_engine=None) -> None:
                 "CREATE UNIQUE INDEX IF NOT EXISTS ux_resume_vacancy_id ON resume (vacancy_id)"
             )
         )
+        try:
+            connection.execute(
+                text(
+                    "ALTER TABLE basic_evaluation ADD COLUMN visa_probability INTEGER DEFAULT 100 NOT NULL"
+                )
+            )
+        except Exception:
+            pass

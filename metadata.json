@@ -1,0 +1,43 @@
+{
+  "title": "LJPA Vacancy Explorer",
+  "description": "Interactive SQLite database explorer with FTS5 search and fuzzy matching",
+  "extra_css_urls": [
+    "/static/custom.css"
+  ],
+  "databases": {
+    "app": {
+      "tables": {
+        "vacancy": {
+          "title": "Vacancies",
+          "facets": [
+            "status",
+            "visa_status",
+            "source"
+          ],
+          "sort_desc": "created_at"
+        },
+        "basic_evaluation": {
+          "title": "Basic Evaluations",
+          "facets": [
+            "rating",
+            "visa_probability"
+          ],
+          "sort_desc": "created_at"
+        },
+        "email": {
+          "title": "Emails",
+          "facets": [
+            "sent"
+          ],
+          "sort_desc": "created_at"
+        },
+        "telegram_status": {
+          "title": "Telegram Statuses",
+          "facets": [
+            "sent"
+          ]
+        }
+      }
+    }
+  }
+}

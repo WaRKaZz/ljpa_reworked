@@ -4,11 +4,11 @@ from datetime import UTC, datetime
 from sqlalchemy import and_, desc, func
 from sqlalchemy.orm import Session
 
+from ljpa_reworked.config import MINIMUM_SCORE
 from ljpa_reworked.models.crewai_pydantic_models import BasicEvaluationCrewAI
-from ljpa_reworked.models.database_models import BasicEvaluation, Vacancy
+from ljpa_reworked.models.database_models import BasicEvaluation, Resume, Vacancy
 from ljpa_reworked.models.enums import VacancyStatus
 
-MINIMUM_SCORE = 50.0
 DAILY_SCORE_PENALTY = 1.5
 
 
@@ -18,16 +18,27 @@ class RankedVacancy:
     score: float
 
 
-def adjusted_score(rating: int, created_at: datetime, *, now: datetime) -> float:
-    """Return score after a 1.5-point penalty for every full day of age."""
+def adjusted_score(
+    rating: int,
+    created_at: datetime,
+    visa_probability: int = 100,
+    *,
+    now: datetime,
+) -> float:
+    """Return score after age penalty and visa sponsorship penalty.
+
+    Formula: rating - (age_days * 1.5) - ((100 - visa_probability) / 2.2)
+    """
     age_days = max(0, (now - created_at).days)
-    return rating - (age_days * DAILY_SCORE_PENALTY)
+    age_tax = age_days * DAILY_SCORE_PENALTY
+    visa_penalty = (100.0 - visa_probability) / 2.2
+    return rating - age_tax - visa_penalty
 
 
 def build_ranked_submission_queue(
     db: Session, *, now: datetime | None = None
 ) -> list[RankedVacancy]:
-    """Discard low-score vacancies and rank prepared URL applications."""
+    """Discard low-score vacancies and rank unapplied-via-URL error-free vacancies with existing resumes."""
     now = now or datetime.now(UTC).replace(tzinfo=None)
     latest_evaluation_id = (
         db.query(BasicEvaluation.vacancy_id, func.max(BasicEvaluation.id).label("id"))
@@ -38,9 +49,21 @@ def build_ranked_submission_queue(
         db.query(Vacancy, BasicEvaluation)
         .join(latest_evaluation_id, latest_evaluation_id.c.vacancy_id == Vacancy.id)
         .join(BasicEvaluation, BasicEvaluation.id == latest_evaluation_id.c.id)
+        .join(Resume, Resume.vacancy_id == Vacancy.id)
         .filter(
             Vacancy.deleted.is_(False),
-            Vacancy.status == VacancyStatus.application_prepared,
+            Vacancy.status.notin_(
+                [
+                    VacancyStatus.submitted_via_url,
+                    VacancyStatus.submitted_via_all,
+                    VacancyStatus.application_error,
+                    VacancyStatus.review_error,
+                    VacancyStatus.rejected,
+                    VacancyStatus.withdrawn,
+                    VacancyStatus.expired,
+                    VacancyStatus.archived,
+                ]
+            ),
             Vacancy.submit_url.isnot(None),
             Vacancy.submit_url != "",
         )
@@ -48,8 +71,63 @@ def build_ranked_submission_queue(
     )
     ranked: list[RankedVacancy] = []
     for vacancy, evaluation in rows:
-        score = adjusted_score(evaluation.rating, vacancy.created_at, now=now)
-        if evaluation.rating < MINIMUM_SCORE or score < MINIMUM_SCORE:
+        visa_prob = getattr(evaluation, "visa_probability", 100)
+        if visa_prob is None:
+            visa_prob = 100
+        score = adjusted_score(
+            evaluation.rating, vacancy.created_at, visa_probability=visa_prob, now=now
+        )
+        if score < MINIMUM_SCORE:
+            vacancy.deleted = True
+            continue
+        ranked.append(RankedVacancy(vacancy=vacancy, score=score))
+    db.commit()
+    return sorted(ranked, key=lambda item: (-item.score, item.vacancy.id))
+
+
+def build_ranked_email_submission_queue(
+    db: Session, *, now: datetime | None = None
+) -> list[RankedVacancy]:
+    """Discard low-score vacancies and rank unapplied-via-email error-free vacancies with existing resumes."""
+    now = now or datetime.now(UTC).replace(tzinfo=None)
+    latest_evaluation_id = (
+        db.query(BasicEvaluation.vacancy_id, func.max(BasicEvaluation.id).label("id"))
+        .group_by(BasicEvaluation.vacancy_id)
+        .subquery()
+    )
+    rows = (
+        db.query(Vacancy, BasicEvaluation)
+        .join(latest_evaluation_id, latest_evaluation_id.c.vacancy_id == Vacancy.id)
+        .join(BasicEvaluation, BasicEvaluation.id == latest_evaluation_id.c.id)
+        .join(Resume, Resume.vacancy_id == Vacancy.id)
+        .filter(
+            Vacancy.deleted.is_(False),
+            Vacancy.status.notin_(
+                [
+                    VacancyStatus.submitted_via_email,
+                    VacancyStatus.submitted_via_all,
+                    VacancyStatus.application_error,
+                    VacancyStatus.review_error,
+                    VacancyStatus.rejected,
+                    VacancyStatus.withdrawn,
+                    VacancyStatus.expired,
+                    VacancyStatus.archived,
+                ]
+            ),
+            Vacancy.submit_email.isnot(None),
+            Vacancy.submit_email != "",
+        )
+        .all()
+    )
+    ranked: list[RankedVacancy] = []
+    for vacancy, evaluation in rows:
+        visa_prob = getattr(evaluation, "visa_probability", 100)
+        if visa_prob is None:
+            visa_prob = 100
+        score = adjusted_score(
+            evaluation.rating, vacancy.created_at, visa_probability=visa_prob, now=now
+        )
+        if score < MINIMUM_SCORE:
             vacancy.deleted = True
             continue
         ranked.append(RankedVacancy(vacancy=vacancy, score=score))
@@ -64,6 +142,7 @@ def create_evaluation(
         vacancy_id=vacancy_id,
         summary=evaluation_data.summary,
         rating=evaluation_data.rating,
+        visa_probability=evaluation_data.visa_probability,
     )
     db.add(evaluation)
     db.commit()
@@ -88,6 +167,7 @@ def update_evaluation(
     evaluation_id: int,
     summary: str | None = None,
     rating: int | None = None,
+    visa_probability: int | None = None,
 ) -> BasicEvaluation | None:
     evaluation = get_evaluation_by_id(db, evaluation_id)
     if evaluation:
@@ -95,6 +175,8 @@ def update_evaluation(
             evaluation.summary = summary
         if rating is not None:
             evaluation.rating = rating
+        if visa_probability is not None:
+            evaluation.visa_probability = visa_probability
         db.commit()
         db.refresh(evaluation)
     return evaluation

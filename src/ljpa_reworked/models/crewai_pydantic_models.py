@@ -100,6 +100,9 @@ class VacancyCrewAI(BaseModel):
             v = v.strip()
             if not v:
                 return None
+            matches = re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", v)
+            if matches:
+                return matches[0].strip()
         return v
 
     @field_validator("submit_email", mode="after")
@@ -129,6 +132,10 @@ class EmailCrewAI(BaseModel):
 class BasicEvaluationCrewAI(BaseModel):
     summary: StrippedStr
     rating: Annotated[int, Field(ge=0, le=100)]
+    visa_probability: Annotated[int, Field(ge=0, le=100)] = Field(
+        default=100,
+        description="Probability score (0-100) of obtaining visa sponsorship or work permit for the candidate.",
+    )
     required_profile_sections: list[StrippedStr] = Field(default_factory=list)
     prioritized_facts: list[StrippedStr] = Field(default_factory=list)
     missing_mandatory_facts: list[StrippedStr] = Field(default_factory=list)
@@ -150,7 +157,7 @@ class JobSearchQuery(BaseModel):
     ]
     site_name: Literal["linkedin", "indeed"]
     google_search_term: StrippedStr | None = None
-    results_wanted: Annotated[int, Field(ge=1, le=50)] = 25
+    results_wanted: Annotated[int, Field(ge=1, le=50)] = 5
 
 
 class JobSearchQuerySet(BaseModel):

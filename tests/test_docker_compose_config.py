@@ -22,33 +22,20 @@ def test_compose_yml_structure():
     assert cloak.get("image") == "docker.io/cloakhq/cloakbrowser:latest"
     assert "ports" not in cloak, "CDP must stay inside the Compose network"
 
-    assert "linkedin-bot" not in services, (
-        "Duplicate linkedin-bot service must be removed"
-    )
-    assert "linkedin-bot-full" not in services, (
-        "Legacy linkedin-bot-full service must be removed"
-    )
-    assert "linkedin-bot-process" not in services, (
-        "Legacy linkedin-bot-process service must be removed"
-    )
+    assert "linkedin-bot" in services, "compose.yml must contain service 'linkedin-bot'"
+    assert "linkedin-bot-collect" not in services
+    assert "linkedin-bot-url-process" not in services
+    assert "linkedin-bot-email-process" not in services
 
-    for service_name, mode in {
-        "linkedin-bot-collect": "collect",
-        "linkedin-bot-url-process": "url_process",
-        "linkedin-bot-email-process": "email_process",
-    }.items():
-        bot = services[service_name]
-        assert bot.get("build") == ".", f"{service_name} must define build context"
-        assert (
-            bot["command"]
-            == f"uv run --no-dev python -m ljpa_reworked.main --mode {mode}"
-        )
-        assert bot["userns_mode"] == "keep-id"
-        assert "./runtime:/runtime" not in bot["volumes"]
-        assert "./resources:/app/resources" in bot["volumes"]
-        assert bot.get("profiles") == ["modes"], (
-            f"{service_name} must use 'modes' profile"
-        )
+    bot = services["linkedin-bot"]
+    assert bot.get("build") == ".", "linkedin-bot must define build context"
+    assert bot["userns_mode"] == "keep-id"
+    assert "./data:/app/data" in bot["volumes"]
+    assert bot["command"] == [
+        "sh",
+        "-c",
+        "mkdir -p /app/data && touch /app/data/bot.log && tail -F /app/data/bot.log",
+    ]
 
     cli = services["antigravity-cli"]
     volumes = [str(v) for v in cli.get("volumes", [])]

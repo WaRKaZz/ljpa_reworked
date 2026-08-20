@@ -9,5 +9,6 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 COPY src/ ./src/
-RUN uv sync --frozen --no-dev && mkdir -p /app/data /app/resources /tmp/.uv-cache && chmod -R 777 /app /tmp
+COPY scripts/run /usr/local/bin/run
+RUN chmod +x /usr/local/bin/run && uv sync --frozen --no-dev && mkdir -p /app/data /app/resources /tmp/.uv-cache && chmod -R 777 /app /tmp
 CMD ["uv", "run", "--no-dev", "python", "-m", "ljpa_reworked.main"]

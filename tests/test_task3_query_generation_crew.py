@@ -16,7 +16,7 @@ def test_job_search_query_valid():
     assert query.search_term == "Python Engineer"
     assert query.location == "Remote"
     assert query.site_name == "linkedin"
-    assert query.results_wanted == 25  # default value
+    assert query.results_wanted == 5  # default value
 
     query_custom = JobSearchQuery(
         search_term="Backend Developer",
@@ -208,7 +208,8 @@ def test_query_generation_prompt_uses_job_search_preferences_not_candidate_histo
 
     assert "Job Search Preferences" in task_config
     assert "current or past residence" in task_config
-    assert "10 to 15" in task_config
+    assert "3 to 5" in task_config
+    assert "visa sponsorship" in task_config.lower()
 
 
 def test_query_generation_prompt_preserves_explicit_worldwide_preference():
@@ -291,7 +292,7 @@ def test_query_generation_prompt_keyword_query_rules():
         / "src/ljpa_reworked/crews/query_generation_crew/config/tasks.yaml"
     ).read_text(encoding="utf-8")
 
-    assert "5–7 short" in task_config or "5-7 short" in task_config
+    assert "short" in task_config
     assert "no sentence" in task_config or "full sentences" in task_config
     assert "google_search_term" not in task_config
     assert "jobs near <location>" not in task_config

@@ -103,13 +103,18 @@ def test_orchestration_review_error_transitions_to_application_error_and_notifie
     from ljpa_reworked.services.harness_runner import HarnessSubmitResult
 
     mock_db = MagicMock()
-    mock_vacancy = MagicMock(id=42, title="Python Dev", submit_url="https://example.com/job")
+    mock_vacancy = MagicMock(
+        id=42, title="Python Dev", submit_url="https://example.com/job"
+    )
     mock_vacancy.status = VacancyStatus.application_prepared
     mock_ranked = MagicMock(vacancy=mock_vacancy)
     mock_resume = MagicMock(path="resume_42.pdf")
 
     with (
-        patch("ljpa_reworked.main.build_ranked_submission_queue", return_value=[mock_ranked]),
+        patch(
+            "ljpa_reworked.main.build_ranked_submission_queue",
+            return_value=[mock_ranked],
+        ),
         patch("ljpa_reworked.main.get_gemini_quota_remaining", return_value=0.5),
         patch("ljpa_reworked.main.get_resume_by_vacancy", return_value=mock_resume),
         patch("os.path.isfile", return_value=True),
@@ -150,7 +155,9 @@ def test_orchestration_review_success_transitions_to_submitted_via_url_and_runs_
     from ljpa_reworked.services.harness_runner import HarnessSubmitResult
 
     mock_db = MagicMock()
-    mock_vacancy = MagicMock(id=101, title="Backend Dev", submit_url="https://example.com/job101")
+    mock_vacancy = MagicMock(
+        id=101, title="Backend Dev", submit_url="https://example.com/job101"
+    )
     mock_ranked = MagicMock(vacancy=mock_vacancy)
     mock_resume = MagicMock(path="resume_101.pdf")
 
@@ -164,14 +171,22 @@ def test_orchestration_review_success_transitions_to_submitted_via_url_and_runs_
         return 0
 
     with (
-        patch("ljpa_reworked.main.build_ranked_submission_queue", return_value=[mock_ranked]),
+        patch(
+            "ljpa_reworked.main.build_ranked_submission_queue",
+            return_value=[mock_ranked],
+        ),
         patch("ljpa_reworked.main.get_gemini_quota_remaining", return_value=0.5),
         patch("ljpa_reworked.main.get_resume_by_vacancy", return_value=mock_resume),
         patch("os.path.isfile", return_value=True),
         patch("ljpa_reworked.main.harness_submit") as mock_submit,
         patch("ljpa_reworked.main.crewai_review_submission_result") as mock_review,
-        patch("ljpa_reworked.main.confirm_url_application_submitted", side_effect=mock_confirm),
-        patch("ljpa_reworked.main.harness_save_site_skill", side_effect=mock_save_skill),
+        patch(
+            "ljpa_reworked.main.confirm_url_application_submitted",
+            side_effect=mock_confirm,
+        ),
+        patch(
+            "ljpa_reworked.main.harness_save_site_skill", side_effect=mock_save_skill
+        ),
         patch("ljpa_reworked.main.Telegram") as mock_telegram_cls,
     ):
         mock_submit.return_value = HarnessSubmitResult(
@@ -193,19 +208,27 @@ def test_orchestration_second_pass_timeout_or_exception_preserves_submitted_via_
     from ljpa_reworked.services.harness_runner import HarnessSubmitResult
 
     mock_db = MagicMock()
-    mock_vacancy = MagicMock(id=202, title="Lead Engineer", submit_url="https://example.com/job202")
+    mock_vacancy = MagicMock(
+        id=202, title="Lead Engineer", submit_url="https://example.com/job202"
+    )
     mock_ranked = MagicMock(vacancy=mock_vacancy)
     mock_resume = MagicMock(path="resume_202.pdf")
 
     with (
-        patch("ljpa_reworked.main.build_ranked_submission_queue", return_value=[mock_ranked]),
+        patch(
+            "ljpa_reworked.main.build_ranked_submission_queue",
+            return_value=[mock_ranked],
+        ),
         patch("ljpa_reworked.main.get_gemini_quota_remaining", return_value=0.5),
         patch("ljpa_reworked.main.get_resume_by_vacancy", return_value=mock_resume),
         patch("os.path.isfile", return_value=True),
         patch("ljpa_reworked.main.harness_submit") as mock_submit,
         patch("ljpa_reworked.main.crewai_review_submission_result") as mock_review,
         patch("ljpa_reworked.main.confirm_url_application_submitted") as mock_confirm,
-        patch("ljpa_reworked.main.harness_save_site_skill", side_effect=RuntimeError("Skill save timeout")),
+        patch(
+            "ljpa_reworked.main.harness_save_site_skill",
+            side_effect=RuntimeError("Skill save timeout"),
+        ),
         patch("ljpa_reworked.main.transition_vacancy_status") as mock_transition,
         patch("ljpa_reworked.main.Telegram") as mock_telegram_cls,
     ):
@@ -235,12 +258,17 @@ def test_orchestration_runs_crewai_review_on_stream_tail_when_terminal_flag_is_e
     from ljpa_reworked.services.harness_runner import HarnessSubmitResult
 
     mock_db = MagicMock()
-    mock_vacancy = MagicMock(id=303, title="Data Engineer", submit_url="https://example.com/job303")
+    mock_vacancy = MagicMock(
+        id=303, title="Data Engineer", submit_url="https://example.com/job303"
+    )
     mock_ranked = MagicMock(vacancy=mock_vacancy)
     mock_resume = MagicMock(path="resume_303.pdf")
 
     with (
-        patch("ljpa_reworked.main.build_ranked_submission_queue", return_value=[mock_ranked]),
+        patch(
+            "ljpa_reworked.main.build_ranked_submission_queue",
+            return_value=[mock_ranked],
+        ),
         patch("ljpa_reworked.main.get_gemini_quota_remaining", return_value=0.5),
         patch("ljpa_reworked.main.get_resume_by_vacancy", return_value=mock_resume),
         patch("os.path.isfile", return_value=True),
@@ -260,7 +288,9 @@ def test_orchestration_runs_crewai_review_on_stream_tail_when_terminal_flag_is_e
         ret = submit_top_vacancies(mock_db)
         assert ret == 0
 
-        mock_review.assert_called_once_with(['{"event":"step","content":"ATS confirmation visible"}\n'])
+        mock_review.assert_called_once_with(
+            ['{"event":"step","content":"ATS confirmation visible"}\n']
+        )
         mock_confirm.assert_called_once_with(db=mock_db, vacancy_id=303)
 
 
@@ -270,12 +300,17 @@ def test_orchestration_no_stream_evidence_skips_review_transitions_to_applicatio
     from ljpa_reworked.services.harness_runner import HarnessSubmitResult
 
     mock_db = MagicMock()
-    mock_vacancy = MagicMock(id=404, title="QA Engineer", submit_url="https://example.com/job404")
+    mock_vacancy = MagicMock(
+        id=404, title="QA Engineer", submit_url="https://example.com/job404"
+    )
     mock_ranked = MagicMock(vacancy=mock_vacancy)
     mock_resume = MagicMock(path="resume_404.pdf")
 
     with (
-        patch("ljpa_reworked.main.build_ranked_submission_queue", return_value=[mock_ranked]),
+        patch(
+            "ljpa_reworked.main.build_ranked_submission_queue",
+            return_value=[mock_ranked],
+        ),
         patch("ljpa_reworked.main.get_gemini_quota_remaining", return_value=0.5),
         patch("ljpa_reworked.main.get_resume_by_vacancy", return_value=mock_resume),
         patch("os.path.isfile", return_value=True),
@@ -296,7 +331,9 @@ def test_orchestration_no_stream_evidence_skips_review_transitions_to_applicatio
         assert ret == 0
 
         mock_review.assert_not_called()
-        mock_transition.assert_called_once_with(mock_db, 404, VacancyStatus.application_error)
+        mock_transition.assert_called_once_with(
+            mock_db, 404, VacancyStatus.application_error
+        )
         mock_telegram_instance.send_message.assert_called_once()
         msg = mock_telegram_instance.send_message.call_args.args[0]
         assert "404" in msg

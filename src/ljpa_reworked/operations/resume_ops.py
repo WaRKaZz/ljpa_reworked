@@ -18,23 +18,30 @@ def create_resume(
     """Create resume for specific vacancy."""
     personal_info = resume_data.personal_info
 
-    resume = Resume(
-        vacancy_id=vacancy_id,
-        fullname=personal_info.name,
-        email=personal_info.email,
-        phone=personal_info.phone,
-        address=personal_info.address,
-        summary=resume_data.summary,
-        personal_info=personal_info.model_dump(),
-        education=[edu.model_dump() for edu in resume_data.education],
-        experience=[exp.model_dump() for exp in resume_data.experience],
-        skills=[skill.model_dump() for skill in resume_data.skills],
-        projects=[proj.model_dump() for proj in resume_data.projects],
-        certifications=[cert.model_dump() for cert in resume_data.certifications],
-        path=path,
-        rendered_at=rendered_at,
-    )
-    db.add(resume)
+    resume = db.query(Resume).filter(Resume.vacancy_id == vacancy_id).first()
+    if resume is None:
+        resume = Resume(
+            vacancy_id=vacancy_id,
+            fullname=personal_info.name,
+            email=personal_info.email,
+            summary=resume_data.summary,
+        )
+        db.add(resume)
+
+    resume.fullname = personal_info.name
+    resume.email = personal_info.email
+    resume.phone = personal_info.phone
+    resume.address = personal_info.address
+    resume.summary = resume_data.summary
+    resume.personal_info = personal_info.model_dump()
+    resume.education = [edu.model_dump() for edu in resume_data.education]
+    resume.experience = [exp.model_dump() for exp in resume_data.experience]
+    resume.skills = [skill.model_dump() for skill in resume_data.skills]
+    resume.projects = [proj.model_dump() for proj in resume_data.projects]
+    resume.certifications = [cert.model_dump() for cert in resume_data.certifications]
+    resume.path = path
+    resume.rendered_at = rendered_at
+
     if commit:
         db.commit()
         db.refresh(resume)

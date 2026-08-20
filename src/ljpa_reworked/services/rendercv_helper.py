@@ -199,21 +199,33 @@ def validate_pdf_page_layout(pdf_path: str) -> tuple[bool, str]:
     if not os.path.exists(pdf_path):
         return False, f"PDF file does not exist at {pdf_path}"
 
+    doc = None
     try:
         doc = pypdfium2.PdfDocument(pdf_path)
+        page_count = len(doc)
+        if not 1 <= page_count <= 2:
+            return False, f"PDF must contain one or two pages, got {page_count}"
+
+        for index in range(page_count):
+            page = doc[index]
+            textpage = page.get_textpage()
+            text = textpage.get_text_bounded().strip()
+            if hasattr(textpage, "close"):
+                textpage.close()
+            if hasattr(page, "close"):
+                page.close()
+            if len(text) < 100:
+                return False, f"Page {index + 1} has insufficient readable text"
+
+        return True, f"{page_count}-page PDF has readable text on every page"
     except Exception as error:
         return False, f"Failed to parse PDF: {error}"
-
-    page_count = len(doc)
-    if not 1 <= page_count <= 2:
-        return False, f"PDF must contain one or two pages, got {page_count}"
-
-    for index in range(page_count):
-        text = doc[index].get_textpage().get_text_bounded().strip()
-        if len(text) < 100:
-            return False, f"Page {index + 1} has insufficient readable text"
-
-    return True, f"{page_count}-page PDF has readable text on every page"
+    finally:
+        if doc is not None and hasattr(doc, "close"):
+            try:
+                doc.close()
+            except Exception:
+                pass
 
 
 class RenderCVError(RuntimeError):

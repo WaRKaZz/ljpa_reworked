@@ -29,9 +29,11 @@ EMBED_MODEL = os.getenv("EMBED_MODEL")
 EMBED_API_KEY = os.getenv("EMBED_API_KEY")
 EMBED_BASE_URL = os.getenv("EMBED_BASE_URL")
 LINKEDIN_PROFILE_URL = os.getenv("LINKEDIN_PROFILE_URL")
+CHATGPT_GDRIVE_URL = os.getenv("CHATGPT_GDRIVE_URL")
 
 AGY_BIN_PATH = os.getenv("AGY_BIN_PATH", "/home/warkazz/.local/bin/agy")
 GEMINI_DIR = os.getenv("GEMINI_DIR", os.path.expanduser("~/.gemini_alt"))
+MINIMUM_SCORE = float(os.getenv("MINIMUM_SCORE", "60.0"))
 
 # =============================================================================
 # File Paths and Resource Settings

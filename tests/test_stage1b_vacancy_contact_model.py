@@ -186,6 +186,7 @@ def test_crewai_generate_email_dict_ignores_legacy_fields():
     from unittest.mock import MagicMock, patch
 
     from ljpa_reworked.crew_workflow import crewai_generate_email
+    from ljpa_reworked.models.crewai_pydantic_models import EmailCrewAI
 
     legacy_dict = {
         "text": "Job text",
@@ -197,7 +198,9 @@ def test_crewai_generate_email_dict_ignores_legacy_fields():
         mock_crew_instance = MagicMock()
         mock_crew_cls.return_value.crew.return_value = mock_crew_instance
         mock_output = MagicMock()
-        mock_output.tasks_output = [MagicMock(pydantic="mock_email")]
+        mock_output.tasks_output = [
+            MagicMock(pydantic=EmailCrewAI(subject="Test Subject", body="Test Body"))
+        ]
         mock_crew_instance.kickoff.return_value = mock_output
         mock_crew_instance.usage_metrics.successful_requests = 1
 
@@ -207,3 +210,54 @@ def test_crewai_generate_email_dict_ignores_legacy_fields():
         passed_inputs = mock_crew_instance.kickoff.call_args[1]["inputs"]
         assert passed_inputs["submit_email"] == ""
         assert passed_inputs["submit_url"] == ""
+
+
+def test_upsert_vacancy_with_multiple_comma_separated_emails(in_memory_db):
+    data = {
+        "title": "Automation Engineer",
+        "text": "Job details",
+        "submit_email": "dftrecruitment.grs@cabinetoffice.gov.uk, Charis.Doidge@mcga.gov.uk, dftrecruitment.grs@cabinetoffice.gov.uk",
+        "submit_url": "https://linkedin.com/jobs/view/999",
+    }
+    vac, created = upsert_vacancy_by_url(in_memory_db, data)
+    assert created is True
+    assert vac is not None
+    assert vac.submit_email == "dftrecruitment.grs@cabinetoffice.gov.uk"
+    assert vac.submit_url == "https://linkedin.com/jobs/view/999"
+
+
+def test_create_vacancy_direct_with_multiple_emails(in_memory_db):
+    vac = create_vacancy_direct(
+        db=in_memory_db,
+        title="Controls Engineer",
+        text="Job details",
+        submit_email="first.contact@example.com, second.contact@example.com",
+        submit_url=None,
+    )
+    assert vac is not None
+    assert vac.submit_email == "first.contact@example.com"
+
+
+def test_pydantic_normalizes_comma_separated_emails():
+    v = VacancyCrewAI(
+        title="Dev",
+        text="Text",
+        submit_email="lead@company.com, hr@company.com",
+        submit_url=None,
+        visa_status=VisaStatus.not_mentioned,
+    )
+    assert v.submit_email == "lead@company.com"
+
+
+def test_upsert_vacancy_with_invalid_email_but_valid_url_succeeds(in_memory_db):
+    data = {
+        "title": "Software Engineer",
+        "text": "Job details",
+        "submit_email": "not-a-valid-email",
+        "submit_url": "https://careers.example.com/job/123",
+    }
+    vac, created = upsert_vacancy_by_url(in_memory_db, data)
+    assert created is True
+    assert vac is not None
+    assert vac.submit_email is None
+    assert vac.submit_url == "https://careers.example.com/job/123"

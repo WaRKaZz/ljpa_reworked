@@ -19,6 +19,7 @@ from ljpa_reworked.models.crewai_pydantic_models import (
     EmailCrewAI,  # noqa
     ResumeCrewAI,
     SubmissionReviewCrewAI,
+    VisaStatus,
 )
 from ljpa_reworked.resume_static_profile import (
     merge_static_resume_profile,
@@ -163,11 +164,39 @@ def extract_clean_json(text: str) -> dict:
     raise ValueError(f"Could not extract valid JSON from LLM output: {text[:200]}")
 
 
+def format_visa_status_context(visa_status: object) -> tuple[str, str]:
+    if isinstance(visa_status, VisaStatus):
+        status_str = visa_status.value
+    elif isinstance(visa_status, str):
+        status_str = visa_status.strip()
+    else:
+        status_str = "not_mentioned"
+
+    status_str_lower = status_str.lower()
+    if status_str_lower == "provided":
+        context = (
+            "The employer explicitly provides visa sponsorship (database visa_status: provided). "
+            "Visa sponsorship is confirmed provided by the employer."
+        )
+    elif status_str_lower == "not_provided":
+        context = "The employer explicitly does NOT provide visa sponsorship (database visa_status: not_provided)."
+    elif status_str_lower == "not_required":
+        context = "Visa sponsorship is not required for this vacancy (database visa_status: not_required)."
+    else:
+        context = (
+            "Visa status is not specified in the database (database visa_status: not_mentioned). "
+            "Evaluate feasibility based on vacancy text and secondary factors."
+        )
+    return status_str, context
+
+
 @crewai_retry_handler
 def crewai_evaluate_vacancy(vacancy: "Vacancy") -> BasicEvaluationCrewAI:
     profile_text = read_profile_text(PROFILE_FILE_PATH)
     present_sections = validate_profile_completeness(profile_text)
     crew = ResumeEvaluationCrew().crew()
+    raw_visa_status = getattr(vacancy, "visa_status", None)
+    visa_status_val, visa_status_context = format_visa_status_context(raw_visa_status)
     inputs = {
         "text": vacancy.text,
         "title": vacancy.title,
@@ -176,6 +205,8 @@ def crewai_evaluate_vacancy(vacancy: "Vacancy") -> BasicEvaluationCrewAI:
         "linkedin_url": LINKEDIN_PROFILE_URL,
         "candidate_profile": profile_text,
         "required_profile_sections": present_sections,
+        "visa_status": visa_status_val,
+        "visa_status_context": visa_status_context,
     }
     crew_output = crew.kickoff(inputs=inputs)
     if isinstance(getattr(crew_output, "pydantic", None), BasicEvaluationCrewAI):

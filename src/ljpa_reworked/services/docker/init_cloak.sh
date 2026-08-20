@@ -1,8 +1,8 @@
 #!/bin/sh
 set -e
 
-python3 -c "
-import os, json, urllib.request, zipfile
+python3 << 'EOF'
+import os, json, urllib.request, zipfile, re
 key = os.getenv('CAPSOLVER_API_KEY', '').strip()
 ext_dir = '/app/data/extensions/capsolver'
 if key and not os.path.exists(f'{ext_dir}/manifest.json'):
@@ -16,36 +16,28 @@ if key and not os.path.exists(f'{ext_dir}/manifest.json'):
         z.extractall(ext_dir)
     os.remove(zip_path)
 
-if key and os.path.exists(f'{ext_dir}/assets/config.json'):
-    cfg_path = f'{ext_dir}/assets/config.json'
-    try:
-        cfg = json.load(open(cfg_path))
-    except Exception:
-        cfg = {}
-    cfg.update({
-        'apiKey': key,
-        'enabledForRecaptchaV2': True,
-        'enabledForRecaptchaV3': True,
-        'enabledForHCaptcha': True,
-        'enabledForFunCaptcha': True,
-        'enabledForCloudflare': True,
-        'enabledForAwsClassification': True,
-        'useCapSolverHost': True
-    })
-    json.dump(cfg, open(cfg_path, 'w'), indent=2)
-    print('[init_cloak] CapSolver API Key successfully configured in config.json')
-"
-
-# Start dbus session if available to eliminate dbus connection warnings
-if command -v dbus-daemon >/dev/null 2>&1; then
-    mkdir -p /var/run/dbus
-    dbus-daemon --system --fork 2>/dev/null || true
-    eval "$(dbus-launch --sh-syntax 2>/dev/null || true)"
-fi
+cfg_js = f"{ext_dir}/assets/config.js"
+if key and os.path.exists(cfg_js):
+    with open(cfg_js, "r") as f:
+        content = f.read()
+    content = re.sub(r"apiKey:\s*['\"].*?['\"]", f"apiKey: '{key}'", content)
+    content = re.sub(r"useCapsolver:\s*(true|false)", "useCapsolver: true", content)
+    with open(cfg_js, "w") as f:
+        f.write(content)
+    print("[init_cloak] CapSolver API Key successfully configured in config.js")
+EOF
 
 EXTRA_ARGS="--password-store=basic --use-mock-keychain --log-level=3"
 if [ -d "/app/data/extensions/capsolver" ] && [ -f "/app/data/extensions/capsolver/manifest.json" ]; then
     EXTRA_ARGS="$EXTRA_ARGS --load-extension=/app/data/extensions/capsolver --disable-extensions-except=/app/data/extensions/capsolver"
 fi
 
-exec cloakserve --host 0.0.0.0 --port 9222 --extra-args="$EXTRA_ARGS"
+# Pre-warm Chrome instance in the background once cloakserve starts listening
+(
+    while ! curl -s http://127.0.0.1:9222/json/version >/dev/null 2>&1; do
+        sleep 0.2
+    done
+    curl -s http://127.0.0.1:9222/json/list >/dev/null 2>&1 || true
+) &
+
+exec cloakserve --port=9222 --idle-timeout=0 $EXTRA_ARGS

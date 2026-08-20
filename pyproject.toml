@@ -16,6 +16,7 @@ dependencies = [
     "thefuzz[speedup]>=0.22.1",
     "typst>=0.15.0",
     "fastapi>=0.141.1",
+    "gdown>=5.2.0",
     "uvicorn>=0.52.1",
 ]
 

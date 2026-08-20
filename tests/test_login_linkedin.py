@@ -104,7 +104,8 @@ async def test_login_linkedin_main_success(tmp_path):
 
     with (
         patch(
-            "ljpa_reworked.services.auth.login_linkedin.async_playwright", return_value=mock_cm
+            "ljpa_reworked.services.auth.login_linkedin.async_playwright",
+            return_value=mock_cm,
         ),
         patch.dict(
             "os.environ",

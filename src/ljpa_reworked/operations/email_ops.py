@@ -30,7 +30,6 @@ def has_recent_sent_email_to_recipient(
     return count > 0
 
 
-
 def create_email(
     db: Session,
     vacancy_id: int,

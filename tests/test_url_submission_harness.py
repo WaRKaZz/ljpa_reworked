@@ -64,7 +64,13 @@ def test_run_harness_with_conversation_id_adds_conversation_flag():
         assert "--conversation" in cmd
         conv_idx = cmd.index("--conversation")
         assert cmd[conv_idx + 1] == "conv-12345-xyz"
-
+        print_idx = cmd.index("--print")
+        print_arg = cmd[print_idx + 1]
+        assert not print_arg.startswith("/goal")
+        assert (
+            "Execute the task defined in /app/prompts/harness_save_site_skill.md"
+            in print_arg
+        )
 
 
 def test_agy_stream_generator_succeeds_after_normal_completion():

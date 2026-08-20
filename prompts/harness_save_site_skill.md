@@ -1,4 +1,4 @@
-# AUTOMATED REUSABLE SITE SKILL SAVING HARNESS
+# AUTOMATED REUSABLE SITE SKILL SAVING HARNESS (REFACTORED V3)
 
 ## OBJECTIVE
 
@@ -14,8 +14,10 @@ Your tasks:
 
 Inside `/runtime/workspace/<site-or-vacancy-name>/SKILL.md`:
 * Document clear, step-by-step technical instructions for automating job applications on this portal/ATS.
-* Include selector strategies, modal dismissal rules, navigation shortcuts, file upload handling, and direct apply URL patterns.
-* Focus exclusively on reproducible site mechanics and workflow patterns.
+* Focus strictly on reusable site mechanics not already solved by the `generic-form-autofill` engine.
+* Include technical selector strategies, modal dismissal rules, navigation shortcuts, custom widget workarounds (e.g. React virtualized lists, custom shadow DOM elements), file upload dropzone locations, and direct apply URL patterns.
+* Do NOT duplicate generic field dictionaries (e.g. standard First Name / Last Name mappings) that the generic autofill engine already handles automatically.
+* When repairing a previously failed skill, document the exact failure reason and the verified workaround.
 
 Inside `/runtime/workspace/README.md`:
 * Add or update an explicit mapping entry linking the target ATS domain/URL pattern to `/runtime/workspace/<site-or-vacancy-name>/SKILL.md`.
