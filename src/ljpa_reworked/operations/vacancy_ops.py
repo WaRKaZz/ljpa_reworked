@@ -27,6 +27,19 @@ TERMINAL_STATUSES = {
 EMAIL_REGEX = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 
 
+def extract_primary_email(raw_email: str | None) -> str | None:
+    """Extract and normalize the first valid email address from raw text or comma-delimited string."""
+    if raw_email is None:
+        return None
+    text = str(raw_email).strip()
+    if not text or text.lower() == "nan":
+        return None
+    matches = re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", text)
+    if matches:
+        return matches[0].strip()
+    return None
+
+
 def _normalize_and_validate_contacts(
     submit_email: str | None,
     submit_url: str | None,
@@ -43,7 +56,10 @@ def _normalize_and_validate_contacts(
     )
 
     if email_clean is not None:
-        if not re.match(EMAIL_REGEX, email_clean):
+        primary = extract_primary_email(email_clean)
+        if primary is not None:
+            email_clean = primary
+        elif not re.match(EMAIL_REGEX, email_clean):
             raise ValueError(f"Invalid email syntax: {email_clean}")
 
     if email_clean is None and url_clean is None:
@@ -188,7 +204,13 @@ def transition_vacancy_status(
         return vacancy
 
     if vacancy.status in TERMINAL_STATUSES:
-        if allowed_from_statuses is None or vacancy.status not in allowed_from_statuses:
+        is_permitted_override = (
+            vacancy.status == VacancyStatus.submitted_via_email
+            and target_status == VacancyStatus.application_error
+        )
+        if not is_permitted_override and (
+            allowed_from_statuses is None or vacancy.status not in allowed_from_statuses
+        ):
             raise ValueError(
                 f"Cannot transition vacancy {vacancy_id} from terminal status '{vacancy.status.value}' to '{target_status.value}'."
             )
@@ -273,39 +295,6 @@ def confirm_url_application_submitted(
         VacancyStatus.submitted_via_url,
         VacancyStatus.submitted_via_email,
         applied_at,
-    )
-
-
-def get_eligible_url_vacancies(
-    db: Session,
-    limit: int = 20,
-    max_age_days: int = 60,
-) -> list[Vacancy]:
-    """Get up to limit freshest eligible URL vacancies created within max_age_days."""
-    from datetime import timedelta
-
-    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=max_age_days)
-    return (
-        db.query(Vacancy)
-        .filter(
-            and_(
-                Vacancy.deleted.is_(False),
-                Vacancy.submit_url.isnot(None),
-                Vacancy.submit_url != "",
-                or_(
-                    Vacancy.submit_url.startswith("http://"),
-                    Vacancy.submit_url.startswith("https://"),
-                ),
-                Vacancy.created_at >= cutoff,
-                Vacancy.visa_status.in_(
-                    [VisaStatus.provided, VisaStatus.not_mentioned]
-                ),
-                Vacancy.status.notin_(TERMINAL_STATUSES),
-            )
-        )
-        .order_by(Vacancy.created_at.desc(), Vacancy.id.desc())
-        .limit(limit)
-        .all()
     )
 
 
@@ -395,12 +384,16 @@ def upsert_vacancy_by_url(
     raw_email = vacancy_data.get("submit_email")
 
     url = str(raw_url).strip() if raw_url and str(raw_url).strip() else None
-    email = str(raw_email).strip() if raw_email and str(raw_email).strip() else None
-
-    if email is not None:
-        if not re.match(EMAIL_REGEX, email):
-            logger.warning("Skipping vacancy upsert: invalid email syntax '%s'", email)
-            return None, False
+    email_str = (
+        str(raw_email).strip()
+        if raw_email is not None
+        and str(raw_email).strip()
+        and str(raw_email).strip().lower() != "nan"
+        else None
+    )
+    email = extract_primary_email(email_str) if email_str else None
+    if email_str and not email:
+        logger.warning("Invalid email syntax '%s' provided for vacancy", email_str)
 
     if not url and not email:
         logger.warning(

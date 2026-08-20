@@ -1,7 +1,34 @@
+from datetime import UTC, datetime, timedelta
+
 from sqlalchemy.orm import Session
 
 from ljpa_reworked.models.crewai_pydantic_models import EmailCrewAI
 from ljpa_reworked.models.database_models import Email
+
+
+def has_recent_sent_email_to_recipient(
+    db: Session,
+    recipient: str | None,
+    days: int = 30,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    """Check if an email was sent to this recipient within the last `days` days."""
+    if not recipient or not str(recipient).strip():
+        return False
+    now = now or datetime.now(UTC).replace(tzinfo=None)
+    cutoff = now - timedelta(days=days)
+    count = (
+        db.query(Email)
+        .filter(
+            Email.recipient == str(recipient).strip(),
+            Email.sent.is_(True),
+            Email.created_at >= cutoff,
+        )
+        .count()
+    )
+    return count > 0
+
 
 
 def create_email(
