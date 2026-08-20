@@ -1,11 +1,12 @@
 import argparse
 import logging
 import os
+import sys
 from datetime import datetime
 
 from sqlalchemy import func
 
-from ljpa_reworked.config import HARNESS_API_URL, RESOURCES_DIR
+from ljpa_reworked.config import HARNESS_API_URL, MINIMUM_SCORE, RESOURCES_DIR
 from ljpa_reworked.crew_workflow import (
     crewai_evaluate_vacancy,
     crewai_generate_email,
@@ -25,6 +26,7 @@ from ljpa_reworked.operations import (
     extract_primary_email,
     get_resume_by_vacancy,
     get_unrated_vacancies,
+    has_recent_sent_email_to_recipient,
     mark_email_sent,
     reconstruct_resume_crewai,
     transition_vacancy_status,
@@ -33,6 +35,7 @@ from ljpa_reworked.operations.evaluation_ops import (
     build_ranked_email_submission_queue,
     build_ranked_submission_queue,
 )
+from ljpa_reworked.services.chatgpt_gdrive import ChatGPTGDriveService
 from ljpa_reworked.services.harness_runner import (
     get_gemini_quota_remaining,
     harness_save_site_skill,
@@ -50,6 +53,11 @@ from ljpa_reworked.workflow import (
     send_email,
 )
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+)
 logger = logging.getLogger(__name__)
 
 SUBMISSION_LIMIT = 5
@@ -65,7 +73,7 @@ def evaluate_unrated_vacancies(db) -> int:
     for vacancy in get_unrated_vacancies(db):
         evaluation = crewai_evaluate_vacancy(vacancy=vacancy)
         create_evaluation(db=db, vacancy_id=vacancy.id, evaluation_data=evaluation)
-        if evaluation.rating < 50:
+        if evaluation.rating < MINIMUM_SCORE:
             vacancy.deleted = True
             db.commit()
         count += 1
@@ -112,7 +120,7 @@ def generate_missing_resumes(db) -> int:
         if visa_prob is None:
             visa_prob = 100
         score = stored_evaluation.rating - (100.0 - visa_prob) / 2.2
-        if score <= 50.0:
+        if score < MINIMUM_SCORE:
             continue
         evaluation = BasicEvaluationCrewAI(
             rating=stored_evaluation.rating,
@@ -144,7 +152,7 @@ def process_eligible_vacancies(db, vacancies) -> None:
         if visa_prob is None:
             visa_prob = 100
         score = evaluation.rating - (100.0 - visa_prob) / 2.2
-        if score <= 50.0:
+        if score < MINIMUM_SCORE:
             continue
         resume, temp_pdf_path = crewai_generate_resume_with_retry(
             vacancy=vacancy, evaluation=evaluation
@@ -208,6 +216,15 @@ def submit_top_email_vacancies(db, limit: int | None = None) -> int:
                 vacancy.id,
             )
             transition_vacancy_status(db, vacancy.id, VacancyStatus.application_error)
+            continue
+
+        if has_recent_sent_email_to_recipient(db, recipient=recipient, days=30):
+            logger.info(
+                "Skipping vacancy %s: email already sent to %s within the last 30 days. Archiving vacancy.",
+                vacancy.id,
+                recipient,
+            )
+            transition_vacancy_status(db, vacancy.id, VacancyStatus.archived)
             continue
 
         try:
@@ -387,7 +404,7 @@ def submit_top_vacancies(db, limit: int | None = None) -> int:
                             )
                             try:
                                 Telegram().send_message(
-                                    f"Skill saving failed for vacancy {vacancy.id} (conversation {cid})."
+                                    f"Skill saving failed for vacancy {vacancy.id} (conversation {cid}): {skill_exc}"
                                 )
                             except Exception as telegram_exc:
                                 logger.error(
@@ -403,12 +420,17 @@ def submit_top_vacancies(db, limit: int | None = None) -> int:
     return 0
 
 
-def main(mode: str = "collect") -> int:
+def main(mode: str = "collect", dry_run: bool = False) -> int:
     init_db()
 
-    logger.info("=== STARTING AGENTIC PIPELINE (MODE: %s) ===", mode.upper())
+    normalized_mode = mode.lower().replace("_", "-")
+    logger.info(
+        "=== STARTING AGENTIC PIPELINE (MODE: %s, DRY_RUN: %s) ===",
+        normalized_mode.upper(),
+        dry_run,
+    )
 
-    if mode == "collect":
+    if normalized_mode in ("collect", "collect-all"):
         logger.info("[Step 1] Running LinkedIn Post Vacancy Collector...")
         run_linkedin_harness(api_url=HARNESS_API_URL)
         logger.info("[Step 2] Searching JobSpy vacancies...")
@@ -420,12 +442,51 @@ def main(mode: str = "collect") -> int:
         with SessionLocal() as db:
             logger.info("[Step 3] Evaluating unrated vacancies in database...")
             evaluate_unrated_vacancies(db)
+            logger.info("[Mode: collect] Completed discovery and evaluation.")
+            return 0
+
+    if normalized_mode == "collect-chatgpt":
+        with SessionLocal() as db:
             logger.info(
-                "[Mode: Collect] Completed discovery and evaluation. Skipping resume generation and submission."
+                "[Step 1] Fetching and synchronizing vacancies from Google Drive..."
+            )
+            service = ChatGPTGDriveService(dry_run=dry_run)
+            added, skipped = service.run(db)
+            if not dry_run:
+                logger.info("[Step 2] Evaluating unrated vacancies in database...")
+                evaluate_unrated_vacancies(db)
+            else:
+                logger.info("[Dry Run] Skipped evaluation of vacancies.")
+            logger.info(
+                "[Mode: collect-chatgpt] Completed. Added: %d, Skipped: %d.",
+                added,
+                skipped,
             )
             return 0
 
-    if mode == "email_process":
+    if normalized_mode == "collect-harness":
+        logger.info("[Step 1] Running LinkedIn Post Vacancy Collector via Harness...")
+        run_linkedin_harness(api_url=HARNESS_API_URL)
+        with SessionLocal() as db:
+            logger.info("[Step 2] Evaluating unrated vacancies in database...")
+            evaluate_unrated_vacancies(db)
+            logger.info("[Mode: collect-harness] Completed discovery and evaluation.")
+            return 0
+
+    if normalized_mode == "collect-jobspy":
+        logger.info("[Step 1] Searching JobSpy vacancies...")
+        try:
+            JobSpyIntegrationService().run()
+        except Exception as exc:
+            logger.error("JobSpy search warning: %s", exc)
+
+        with SessionLocal() as db:
+            logger.info("[Step 2] Evaluating unrated vacancies in database...")
+            evaluate_unrated_vacancies(db)
+            logger.info("[Mode: collect-jobspy] Completed discovery and evaluation.")
+            return 0
+
+    if normalized_mode in ("email-submit", "email-process"):
         with SessionLocal() as db:
             logger.info(
                 "[Step 1] Evaluating unreviewed vacancies and creating resumes..."
@@ -433,12 +494,13 @@ def main(mode: str = "collect") -> int:
             process_unevaluated_vacancies(db)
 
             logger.info(
-                "[Step 2] Submitting email applications until all score > 50 vacancies are processed..."
+                "[Step 2] Submitting email applications until all score >= %s vacancies are processed...",
+                MINIMUM_SCORE,
             )
             submit_top_email_vacancies(db, limit=None)
             return 0
 
-    if mode == "url_process":
+    if normalized_mode in ("url-submit", "url-process"):
         with SessionLocal() as db:
             logger.info(
                 "[Step 1] Evaluating unreviewed vacancies and creating resumes..."
@@ -459,12 +521,90 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="LinkedIn Job Processing Automation (LJPA)"
     )
-    parser.add_argument(
-        "--mode",
-        choices=["collect", "url_process", "email_process"],
-        default="collect",
-        help="Pipeline execution mode: 'collect' (discovery + evaluation only), 'url_process' (resume generation + URL submission while quota > 7%), 'email_process' (resume generation + email submission for all score > 50).",
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--collect-chatgpt",
+        action="store_true",
+        help="Fetch vacancies from Google Drive, validate, sync to DB, and evaluate fit.",
     )
+    group.add_argument(
+        "--collect-harness",
+        action="store_true",
+        help="Run LinkedIn Harness post scraper and evaluate new vacancies.",
+    )
+    group.add_argument(
+        "--collect-jobspy",
+        action="store_true",
+        help="Search JobSpy LinkedIn/Indeed vacancies and evaluate new vacancies.",
+    )
+    group.add_argument(
+        "--url-submit",
+        action="store_true",
+        help="Generate resumes and submit URL applications while Gemini quota > 7%%.",
+    )
+    group.add_argument(
+        "--email-submit",
+        action="store_true",
+        help=f"Generate resumes and submit email applications for vacancies with score >= {MINIMUM_SCORE}.",
+    )
+    group.add_argument(
+        "--mode",
+        choices=[
+            "collect-chatgpt",
+            "collect-harness",
+            "collect-jobspy",
+            "url-submit",
+            "email-submit",
+            "collect_chatgpt",
+            "collect_harness",
+            "collect_jobspy",
+            "url_submit",
+            "email_submit",
+        ],
+        help="Alternative parameter to select pipeline execution mode.",
+    )
+    parser.add_argument(
+        "positional_mode",
+        nargs="?",
+        default=None,
+        choices=[
+            "collect-chatgpt",
+            "collect-harness",
+            "collect-jobspy",
+            "url-submit",
+            "email-submit",
+            "collect_chatgpt",
+            "collect_harness",
+            "collect_jobspy",
+            "url_submit",
+            "email_submit",
+        ],
+        help="Optional positional mode parameter.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Simulate execution without modifying the database.",
+    )
+
     args = parser.parse_args()
 
-    raise SystemExit(main(mode=args.mode))
+    selected_mode = None
+    if args.collect_chatgpt:
+        selected_mode = "collect-chatgpt"
+    elif args.collect_harness:
+        selected_mode = "collect-harness"
+    elif args.collect_jobspy:
+        selected_mode = "collect-jobspy"
+    elif args.url_submit:
+        selected_mode = "url-submit"
+    elif args.email_submit:
+        selected_mode = "email-submit"
+    elif args.mode:
+        selected_mode = args.mode
+    elif args.positional_mode:
+        selected_mode = args.positional_mode
+    else:
+        selected_mode = "collect-chatgpt"
+
+    raise SystemExit(main(mode=selected_mode, dry_run=args.dry_run))

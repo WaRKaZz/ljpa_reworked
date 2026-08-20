@@ -464,9 +464,7 @@ def test_has_recent_sent_email_to_recipient():
         )
         db.add(e3)
         db.commit()
-        assert has_recent_sent_email_to_recipient(
-            db, "hr@recent.com", days=30, now=now
-        )
+        assert has_recent_sent_email_to_recipient(db, "hr@recent.com", days=30, now=now)
 
         # Whitespace handling
         assert has_recent_sent_email_to_recipient(
@@ -479,3 +477,172 @@ def test_has_recent_sent_email_to_recipient():
         db.close()
         Base.metadata.drop_all(bind=engine)
 
+
+def test_submit_top_email_vacancies_skips_and_archives_recent_recipient(
+    monkeypatch, tmp_path
+):
+    from ljpa_reworked import main
+
+    db, engine = _session()
+    try:
+        resumes_dir = tmp_path / "resumes"
+        resumes_dir.mkdir()
+        monkeypatch.setattr(main, "SUBMISSION_RESUMES_DIR", str(resumes_dir))
+
+        # Existing sent email 10 days ago
+        v_prior = create_vacancy_direct(
+            db,
+            title="Prior Job",
+            text="Text",
+            submit_email="recent@company.com",
+        )
+        db.add(
+            Email(
+                vacancy_id=v_prior.id,
+                subject="Old App",
+                recipient="recent@company.com",
+                sent=True,
+                created_at=datetime.now() - timedelta(days=10),
+            )
+        )
+
+        # Vacancy 1: target recipient was emailed 10 days ago
+        v1 = create_vacancy_direct(
+            db,
+            title="Duplicate Target Job",
+            text="Text 1",
+            submit_email="recent@company.com",
+        )
+        v1.status = VacancyStatus.application_prepared
+        _evaluation(db, v1, rating=95)
+        (resumes_dir / f"resume_{v1.id}.pdf").write_bytes(b"%PDF-1.4")
+        db.add(
+            Resume(
+                vacancy_id=v1.id,
+                fullname="Applicant",
+                email="applicant@example.com",
+                summary="Summary",
+                path=f"resume_{v1.id}.pdf",
+            )
+        )
+
+        # Vacancy 2: fresh recipient
+        v2 = create_vacancy_direct(
+            db,
+            title="Fresh Target Job",
+            text="Text 2",
+            submit_email="fresh@company.com",
+        )
+        v2.status = VacancyStatus.application_prepared
+        _evaluation(db, v2, rating=90)
+        (resumes_dir / f"resume_{v2.id}.pdf").write_bytes(b"%PDF-1.4")
+        db.add(
+            Resume(
+                vacancy_id=v2.id,
+                fullname="Applicant",
+                email="applicant@example.com",
+                summary="Summary",
+                path=f"resume_{v2.id}.pdf",
+            )
+        )
+        db.commit()
+
+        sent_emails = []
+        monkeypatch.setattr(
+            main,
+            "crewai_generate_email",
+            lambda vacancy: EmailCrewAI(
+                subject=f"Applying for {vacancy.title}", body="Body"
+            ),
+        )
+        monkeypatch.setattr(main, "send_email", lambda em: sent_emails.append(em))
+
+        count = main.submit_top_email_vacancies(db, limit=5)
+        assert count == 1
+        assert len(sent_emails) == 1
+        assert sent_emails[0].recipient == "fresh@company.com"
+
+        # v1 archived and not sent
+        db_v1 = db.get(Vacancy, v1.id)
+        assert db_v1.status == VacancyStatus.archived
+        assert db.query(Email).filter(Email.vacancy_id == v1.id).count() == 0
+
+        # v2 submitted
+        db_v2 = db.get(Vacancy, v2.id)
+        assert db_v2.status == VacancyStatus.submitted_via_email
+    finally:
+        db.close()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_submit_top_email_vacancies_deduplicates_same_batch(monkeypatch, tmp_path):
+    from ljpa_reworked import main
+
+    db, engine = _session()
+    try:
+        resumes_dir = tmp_path / "resumes"
+        resumes_dir.mkdir()
+        monkeypatch.setattr(main, "SUBMISSION_RESUMES_DIR", str(resumes_dir))
+
+        # Two vacancies with the same submit_email in the queue
+        v1 = create_vacancy_direct(
+            db,
+            title="Batch Job 1",
+            text="Text 1",
+            submit_email="common@company.com",
+        )
+        v1.status = VacancyStatus.application_prepared
+        _evaluation(db, v1, rating=95)
+        (resumes_dir / f"resume_{v1.id}.pdf").write_bytes(b"%PDF-1.4")
+        db.add(
+            Resume(
+                vacancy_id=v1.id,
+                fullname="Applicant",
+                email="applicant@example.com",
+                summary="Summary",
+                path=f"resume_{v1.id}.pdf",
+            )
+        )
+
+        v2 = create_vacancy_direct(
+            db,
+            title="Batch Job 2",
+            text="Text 2",
+            submit_email="common@company.com",
+        )
+        v2.status = VacancyStatus.application_prepared
+        _evaluation(db, v2, rating=90)
+        (resumes_dir / f"resume_{v2.id}.pdf").write_bytes(b"%PDF-1.4")
+        db.add(
+            Resume(
+                vacancy_id=v2.id,
+                fullname="Applicant",
+                email="applicant@example.com",
+                summary="Summary",
+                path=f"resume_{v2.id}.pdf",
+            )
+        )
+        db.commit()
+
+        sent_emails = []
+        monkeypatch.setattr(
+            main,
+            "crewai_generate_email",
+            lambda vacancy: EmailCrewAI(
+                subject=f"Applying for {vacancy.title}", body="Body"
+            ),
+        )
+        monkeypatch.setattr(main, "send_email", lambda em: sent_emails.append(em))
+
+        count = main.submit_top_email_vacancies(db, limit=5)
+        assert count == 1
+        assert len(sent_emails) == 1
+        assert sent_emails[0].recipient == "common@company.com"
+
+        # v1 submitted
+        assert db.get(Vacancy, v1.id).status == VacancyStatus.submitted_via_email
+        # v2 archived due to 30-day dedup within same run
+        assert db.get(Vacancy, v2.id).status == VacancyStatus.archived
+    finally:
+        db.close()
+        Base.metadata.drop_all(bind=engine)
